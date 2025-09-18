@@ -1,0 +1,9 @@
+:root {
+  --success: #22c55e;
+  --warning: #eab308;
+  --error: #991b1b;
+  --info: #0ea5e9;
+
+  --text-default: #0a0f1a;
+  --text-muted: #272f43;
+}
