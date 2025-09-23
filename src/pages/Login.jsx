@@ -29,7 +29,7 @@ export default function Login() {
           <button type="submit">Entrar</button>
         </form>
       </section>
-
+<AccessibilityToggles />
       <section className="right">
         <div className="overlay">
           <h3>
