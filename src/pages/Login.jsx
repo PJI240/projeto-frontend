@@ -17,7 +17,6 @@ export default function Login() {
         <h1 className="brand">Projeto Integrador</h1>
         <h2 className="title">Acesso ao Sistema</h2>
 
-        {/* Botões de acessibilidade */}
         <AccessibilityToggles />
 
         <form className="form" onSubmit={enviar}>
