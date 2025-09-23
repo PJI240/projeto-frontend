@@ -19,17 +19,32 @@ export default function Login() {
 
         <form className="form" onSubmit={enviar}>
           <label htmlFor="email">E-mail</label>
-          <input id="email" type="email" value={email}
-                 onChange={(e) => setEmail(e.target.value)} required />
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
           <label htmlFor="pass">Senha</label>
-          <input id="pass" type="password" value={senha}
-                 onChange={(e) => setSenha(e.target.value)} required />
+          <input
+            id="pass"
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            required
+          />
 
           <button type="submit">Entrar</button>
         </form>
+
+        {/* Centralizado logo abaixo do botão */}
+        <div className="toggles-wrapper">
+          <AccessibilityToggles />
+        </div>
       </section>
-<AccessibilityToggles />
+
       <section className="right">
         <div className="overlay">
           <h3>
