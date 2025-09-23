@@ -1,60 +1,47 @@
 import { useState } from "react";
+import "./login.css";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [mensagem, setMensagem] = useState("");
 
-  const handleSubmit = async (e) => {
+  const enviar = (e) => {
     e.preventDefault();
-
-    try {
-      const resposta = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, senha }),
-      });
-
-      const dados = await resposta.json();
-      if (resposta.ok) {
-        setMensagem("Login realizado com sucesso! ✅");
-        // aqui futuramente: salvar token, redirecionar para dashboard etc.
-      } else {
-        setMensagem(dados.error || "Falha no login ❌");
-      }
-    } catch (err) {
-      setMensagem("Erro de conexão com servidor ❌");
-    }
+    alert(`Login com: ${email}`);
   };
 
   return (
-    <main style={{ maxWidth: 400, margin: "3rem auto", fontFamily: "Arial" }}>
-      <h1>Login</h1>
-      <form onSubmit={handleSubmit}>
-        <label>Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{ width: "100%", marginBottom: "1rem" }}
-        />
+    <div className="split">
+      <section className="left">
+        <h1 className="brand">Projeto Integrador</h1>
+        <h2 className="title">Acesso ao Sistema</h2>
 
-        <label>Senha</label>
-        <input
-          type="password"
-          value={senha}
-          onChange={(e) => setSenha(e.target.value)}
-          required
-          style={{ width: "100%", marginBottom: "1rem" }}
-        />
+        <form className="form" onSubmit={enviar}>
+          <label htmlFor="email">E-mail</label>
+          <input id="email" type="email" value={email}
+                 onChange={(e) => setEmail(e.target.value)} required />
 
-        <button type="submit" style={{ width: "100%", padding: "0.5rem" }}>
-          Entrar
-        </button>
-      </form>
+          <label htmlFor="pass">Senha</label>
+          <input id="pass" type="password" value={senha}
+                 onChange={(e) => setSenha(e.target.value)} required />
 
-      {mensagem && <p style={{ marginTop: "1rem" }}>{mensagem}</p>}
-    </main>
+          <button type="submit">Entrar</button>
+          <div className="links">
+            <a href="#recuperar">Esqueci minha senha</a>
+          </div>
+        </form>
+
+        <p className="foot">Protótipo acadêmico.</p>
+      </section>
+
+      <section className="right">
+        <div className="overlay">
+          <h3>
+            Projeto Integrador Univesp
+            <span> Sistema de contagem de horas trabalhadas</span>
+          </h3>
+        </div>
+      </section>
+    </div>
   );
 }
