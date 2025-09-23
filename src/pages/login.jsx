@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AccessibilityToggles from "../components/AccessibilityToggles";
 import "./login.css";
 
 export default function Login() {
@@ -16,6 +17,9 @@ export default function Login() {
         <h1 className="brand">Projeto Integrador</h1>
         <h2 className="title">Acesso ao Sistema</h2>
 
+        {/* Botões de acessibilidade */}
+        <AccessibilityToggles />
+
         <form className="form" onSubmit={enviar}>
           <label htmlFor="email">E-mail</label>
           <input id="email" type="email" value={email}
@@ -26,12 +30,7 @@ export default function Login() {
                  onChange={(e) => setSenha(e.target.value)} required />
 
           <button type="submit">Entrar</button>
-          <div className="links">
-            <a href="#recuperar">Esqueci minha senha</a>
-          </div>
         </form>
-
-        <p className="foot">Protótipo acadêmico.</p>
       </section>
 
       <section className="right">
