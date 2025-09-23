@@ -1,8 +1,8 @@
-import { Home } from './pages/Home';
+import { Home } from './pages/Login';
 
 import './styles/theme.css';
 import './styles/global.css';
 
 export function App() {
-  return <Home />
+  return <Login />
 }
