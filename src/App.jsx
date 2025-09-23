@@ -1,6 +1,6 @@
 import { Login } from './pages/Login';
 
-import './styles/theme.css';
+import './styles/themes.css';
 import './styles/global.css';
 
 export function App() {
