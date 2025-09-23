@@ -17,8 +17,6 @@ export default function Login() {
         <h1 className="brand">Projeto Integrador</h1>
         <h2 className="title">Acesso ao Sistema</h2>
 
-        <AccessibilityToggles />
-
         <form className="form" onSubmit={enviar}>
           <label htmlFor="email">E-mail</label>
           <input id="email" type="email" value={email}
