@@ -26,7 +26,7 @@
 .foot{ margin-top:auto; font-size:var(--fs-12); color:var(--muted); }
 
 .right {
-  flex: 1 1 auto;position: relative;background: right center / cover no-repeat;
+  flex: 1 1 auto;position: relative;background: right top / cover no-repeat;
   background-image:url("/hero.jpg"); /* coloque /public/hero.jpg */
   color:#fff; display:flex; align-items:center; justify-content:center;
 }
