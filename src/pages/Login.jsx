@@ -5,10 +5,36 @@ import "./login.css";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const enviar = (e) => {
+  const enviar = async (e) => {
     e.preventDefault();
-    alert(`Login com: ${email}`);
+    setErr("");
+    setLoading(true);
+
+    try {
+      const resp = await fetch("http://localhost:4000/api/auth/login", {
+        method: "POST",
+        credentials: "include", // importante pro cookie
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha }),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok || !data.ok) {
+        setErr("E-mail ou senha inválidos.");
+        return;
+      }
+
+      // Login OK: redireciona para dashboard
+      window.location.href = "/dashboard";
+    } catch (err) {
+      setErr("Erro de conexão com o servidor.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -36,10 +62,17 @@ export default function Login() {
             required
           />
 
-          <button type="submit">Entrar</button>
+          <button type="submit" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
+
+          {err && (
+            <div role="alert" aria-live="polite" className="mt-2 text-red-600">
+              {err}
+            </div>
+          )}
         </form>
 
-        {/* Centralizado logo abaixo do botão */}
         <div className="toggles-wrapper">
           <AccessibilityToggles />
         </div>
