@@ -81,11 +81,12 @@ export default function Login() {
           <AccessibilityToggles />
         </div>
 
-         <p className="mt-4 text-sm text-gray-700">
+        {/* Rodapé com link de cadastro */}
+        <p className="mt-4 text-sm text-gray-700">
           Não tem acesso?{" "}
-          
+          <strong>
             <Link to="/register">Cadastre-se</Link>
-         
+          </strong>
         </p>
       </section>
 
