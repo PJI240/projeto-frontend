@@ -24,7 +24,6 @@
 .links a{ color:var(--accent); text-decoration:none; }
 .links a:hover{ color:var(--accent-strong); text-decoration:underline; }
 
-/* NOVO ESTILO PARA O LINK DE CADASTRO */
 .register-link {
   text-align: center;
   margin-top: 16px;
