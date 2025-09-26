@@ -1,58 +1,100 @@
-.split{ display:flex; min-height:100vh; }
-.left{
-  flex:1 1 520px; max-width:640px; background:var(--panel);
-  padding:48px 40px; display:flex; flex-direction:column; gap:16px;
-}
-.brand{ font-weight:800; letter-spacing:.5px; font-size:var(--fs-18); color:var(--fg); }
-.title{ margin:0; font-size:var(--fs-24); color:var(--fg); }
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import AccessibilityToggles from "../components/AccessibilityToggles";
+import "./login.css";
 
-.form{ display:flex; flex-direction:column; gap:12px; }
-.form label{ font-size:var(--fs-14); color:var(--fg); }
-.form input{
-  padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius);
-  font-size:var(--fs-16); background:#fff; color:#111;
-}
-.form input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+const API_BASE = import.meta.env.VITE_API_BASE;
 
-.form button{
-  margin-top:8px; padding:12px 16px; border:none; border-radius:var(--radius);
-  background: #111827; color:#fff; font-weight:600; font-size:var(--fs-16); box-shadow: var(--shadow);
-}
-.form button:hover{ filter: brightness(.92); }
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
-.links{ display:flex; justify-content:space-between; font-size:var(--fs-14); }
-.links a{ color:var(--accent); text-decoration:none; }
-.links a:hover{ color:var(--accent-strong); text-decoration:underline; }
-.foot{ margin-top:auto; font-size:var(--fs-12); color:var(--muted); }
+  const enviar = async (e) => {
+    e.preventDefault();
+    setErr("");
+    setLoading(true);
 
-.right {
-  flex: 1 1 auto;position: relative;background: right top / cover no-repeat;
-  background-image:url("/hero.jpg"); /* coloque /public/hero.jpg */
-  color:#fff; display:flex; align-items:center; justify-content:center;
-}
-.overlay{
-  width:100%; height:100%; background:linear-gradient(90deg, rgba(0,0,0,.6), rgba(0,0,0,.25));
-  display:flex; align-items:center; justify-content:center; text-align:center; padding:24px;
-}
-.right h3{ font-size: clamp(var(--fs-24), 5vw, var(--fs-32)); line-height:1.2; margin:0; }
-.right h3 span{ display:block; color:#a7f3d0; font-size: clamp(var(--fs-16), 3vw, var(--fs-24)); }
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        credentials: "include", // mantém o cookie JWT
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha }),
+      });
 
-@media (max-width: 900px){
-  .split{ flex-direction:column; }
-  .left{ max-width:100%; }
-  .right{ min-height:40vh; }
-}
-.register-link {
-  text-align: center;
-  margin-top: 20px;
-  color: #666;
-}
+      const data = await resp.json();
 
-.register-link a {
-  color: #007bff;
-  text-decoration: none;
-}
+      if (!resp.ok || !data.ok) {
+        setErr("E-mail ou senha inválidos.");
+        return;
+      }
 
-.register-link a:hover {
-  text-decoration: underline;
+      // redireciona para a dashboard
+      window.location.href = "/dashboard";
+    } catch (e) {
+      console.error("LOGIN_ERROR", e);
+      setErr("Erro de conexão com o servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="split">
+      <section className="left">
+        <h1 className="brand">Projeto Integrador</h1>
+        <h2 className="title">Acesso ao Sistema</h2>
+
+        <form className="form" onSubmit={enviar}>
+          <label htmlFor="email">E-mail</label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+
+          <label htmlFor="pass">Senha</label>
+          <input
+            id="pass"
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            required
+          />
+
+          <button type="submit" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
+          </button>
+
+          {err && (
+            <div role="alert" aria-live="polite" className="mt-2 text-red-600">
+              {err}
+            </div>
+          )}
+        </form>
+
+        {/* Link para cadastro adicionado aqui */}
+        <p className="register-link">
+          Não tem uma conta? <Link to="/register">Cadastre-se</Link>
+        </p>
+
+        <div className="toggles-wrapper">
+          <AccessibilityToggles />
+        </div>
+      </section>
+
+      <section className="right">
+        <div className="overlay">
+          <h3>
+            Projeto Integrador Univesp
+            <span> Sistema de contagem de horas trabalhadas</span>
+          </h3>
+        </div>
+      </section>
+    </div>
+  );
 }
