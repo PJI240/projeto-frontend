@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // ← Adicionar useNavigate
 import AccessibilityToggles from "../components/AccessibilityToggles";
 import "./login.css";
 
@@ -10,6 +10,7 @@ export default function Login() {
   const [senha, setSenha] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); // ← Hook do React Router
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -19,7 +20,7 @@ export default function Login() {
     try {
       const resp = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
-        credentials: "include", // mantém o cookie JWT
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
       });
@@ -31,8 +32,8 @@ export default function Login() {
         return;
       }
 
-      // redireciona para a dashboard
-      window.location.href = "/dashboard";
+      // ✅ CORRETO: Navegação client-side sem refresh
+      navigate("/dashboard");
     } catch (e) {
       console.error("LOGIN_ERROR", e);
       setErr("Erro de conexão com o servidor.");
