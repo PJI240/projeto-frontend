@@ -8,34 +8,33 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const enviar = async (e) => {
-    e.preventDefault();
-    setErr("");
-    setLoading(true);
+ const enviar = async (e) => {
+  e.preventDefault();
+  setErr("");
+  setLoading(true);
 
-    try {
-      const resp = await fetch("http://localhost:4000/api/auth/login", {
-        method: "POST",
-        credentials: "include", // importante pro cookie
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, senha }),
-      });
+  try {
+    const resp = await fetch("https://yamabiko.proxy.rlwy.net/api/auth/login", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, senha }),
+    });
 
-      const data = await resp.json();
+    const data = await resp.json();
 
-      if (!resp.ok || !data.ok) {
-        setErr("E-mail ou senha inválidos.");
-        return;
-      }
-
-      // Login OK: redireciona para dashboard
-      window.location.href = "/dashboard";
-    } catch (err) {
-      setErr("Erro de conexão com o servidor.");
-    } finally {
-      setLoading(false);
+    if (!resp.ok || !data.ok) {
+      setErr("E-mail ou senha inválidos.");
+      return;
     }
-  };
+
+    window.location.href = "/dashboard";
+  } catch {
+    setErr("Erro de conexão com o servidor.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="split">
