@@ -83,9 +83,9 @@ export default function Login() {
 
          <p className="mt-4 text-sm text-gray-700">
           Não tem acesso?{" "}
-          <strong> 
+          
             <Link to="/register">Cadastre-se</Link>
-          </strong>
+         
         </p>
       </section>
 
