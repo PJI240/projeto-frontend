@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom'; 
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import AccessibilityToggles from "../components/AccessibilityToggles";
+import "./login.css";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -76,12 +77,9 @@ export default function Login() {
           )}
         </form>
 
-        {/* Rodapé com link de cadastro */}
-        <p className="mt-4 text-sm text-gray-700">
-          Não tem acesso?{" "}
-          <strong>
-            <Link to="/register">Cadastre-se</Link>
-          </strong>
+        {/* Link para cadastro adicionado aqui */}
+        <p className="register-link">
+          Não tem uma conta? <Link to="/register">Cadastre-se</Link>
         </p>
 
         <div className="toggles-wrapper">
