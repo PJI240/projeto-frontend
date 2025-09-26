@@ -85,7 +85,6 @@ export default function Login() {
           Não tem acesso?{" "}
           <strong> 
             <Link to="/register">Cadastre-se</Link>
-            */}
           </strong>
         </p>
       </section>
