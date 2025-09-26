@@ -8,13 +8,15 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
- const enviar = async (e) => {
+ const API_BASE = "https://projeto-backend-production-898d.up.railway.app";
+
+const enviar = async (e) => {
   e.preventDefault();
   setErr("");
   setLoading(true);
 
   try {
-    const resp = await fetch("https://projeto-backend-production-898d.up.railway.app/api/auth/login", {
+    const resp = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
