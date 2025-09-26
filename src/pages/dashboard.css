@@ -1,0 +1,58 @@
+.split { display: grid; grid-template-columns: 1fr; min-height: 100dvh; }
+@media (min-width: 1024px){ .split { grid-template-columns: 420px 1fr; } }
+
+.left { padding: 2rem; display: flex; flex-direction: column; gap: 1rem; }
+.right { position: relative; background: linear-gradient(120deg, #0a66c2, #0f172a); }
+
+.brand { font-weight: 800; font-size: 1.25rem; color: #111827; }
+.title { font-weight: 700; font-size: 1.5rem; color: #111827; }
+
+.toggles-wrapper { margin-top: auto; }
+
+.overlay {
+  position: relative; inset: 0; padding: 2rem; color: #fff;
+  min-height: 100%;
+}
+
+/* topo */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.topbar h3 { font-size: 1.25rem; }
+.topbar h3 span { display: block; font-size: .9rem; font-weight: 400; opacity: .9; }
+.topbar .actions button {
+  font: inherit; padding: .5rem .75rem; border-radius: .5rem; border: 1px solid #d0d7de;
+  background: #fff; color: #111; cursor: pointer;
+}
+.topbar .actions button:disabled { opacity: .6; cursor: default; }
+
+/* cards */
+.cards { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+@media (min-width: 640px){ .cards { grid-template-columns: repeat(2, 1fr);} }
+@media (min-width: 1024px){ .cards { grid-template-columns: repeat(3, 1fr);} }
+
+.stat-card {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 1rem; padding: 1rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04); color: #111827;
+}
+.stat-title { font-size: .9rem; color: #4b5563; }
+.stat-value { margin-top: .25rem; font-size: 2rem; font-weight: 800; }
+.stat-hint { margin-top: .25rem; font-size: .75rem; color: #6b7280; }
+
+/* alerts */
+.alert-error {
+  background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;
+  padding: .75rem .9rem; border-radius: .5rem; margin: .5rem 0 1rem;
+}
+
+/* menu lateral simples */
+.menu { display: flex; flex-direction: column; gap: .5rem; margin-top: 1.25rem; }
+.menu a { color: #223; text-decoration: none; font-weight: 500; }
+.menu a:hover { text-decoration: underline; }
+
+.user-box { margin: .75rem 0; font-size: .95rem; color: #223; }
+.user-box .email { font-size: .85rem; color: #667; margin-top: .25rem; }
+.linklike { margin-top: .5rem; background: none; border: none; padding: 0; color: #0a66c2; cursor: pointer; text-decoration: underline; }
+
+.next-steps { margin-top: 1.25rem; background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1rem; color: #111827; }
+.next-steps h4 { margin: 0 0 .5rem; font-size: 1rem; }
+.next-steps ul { margin: 0; padding-left: 1.25rem; }
+.next-steps li { margin: .25rem 0; }
