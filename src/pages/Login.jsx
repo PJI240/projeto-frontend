@@ -2,41 +2,46 @@ import { useState } from "react";
 import AccessibilityToggles from "../components/AccessibilityToggles";
 import "./login.css";
 
+// URL da API vem do .env do Vite
+// Em desenvolvimento: VITE_API_BASE=http://localhost:4000
+// Em produção: VITE_API_BASE=https://projeto-backend-production-898d.up.railway.app
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
- const API_BASE = "https://projeto-backend-production-898d.up.railway.app";
+  const enviar = async (e) => {
+    e.preventDefault();
+    setErr("");
+    setLoading(true);
 
-const enviar = async (e) => {
-  e.preventDefault();
-  setErr("");
-  setLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        credentials: "include", // mantém o cookie JWT
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha }),
+      });
 
-  try {
-    const resp = await fetch(`${API_BASE}/api/auth/login`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, senha }),
-    });
+      const data = await resp.json();
 
-    const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        setErr("E-mail ou senha inválidos.");
+        return;
+      }
 
-    if (!resp.ok || !data.ok) {
-      setErr("E-mail ou senha inválidos.");
-      return;
+      // redireciona para a dashboard
+      window.location.href = "/dashboard";
+    } catch (e) {
+      console.error("LOGIN_ERROR", e);
+      setErr("Erro de conexão com o servidor.");
+    } finally {
+      setLoading(false);
     }
-
-    window.location.href = "/dashboard";
-  } catch {
-    setErr("Erro de conexão com o servidor.");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="split">
