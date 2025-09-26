@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom'; // Adicione esta importação
-import AccessibilityToggles from './AccessibilityToggles'; // Assumindo que este componente existe
+import { Link } from 'react-router-dom'; 
+import AccessibilityToggles from "../components/AccessibilityToggles";
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
