@@ -1,151 +1,31 @@
-/* src/pages/login.css */
-.split {
-  display: flex;
-  height: 100vh;
-}
-
-.split .left {
-  flex: 1;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background: #fff;
-}
-
-.split .right {
-  flex: 1;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.brand {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 0.5rem;
-}
-
-.title {
-  font-size: 1.5rem;
-  color: #666;
-  margin-bottom: 2rem;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  max-width: 400px;
-  width: 100%;
-}
-
-.form label {
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: #333;
-}
-
-.form input {
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 0.5rem;
-  margin-bottom: 1.5rem;
-  font-size: 1rem;
-  transition: border-color 0.3s;
-}
-
-.form input:focus {
-  outline: none;
-  border-color: #667eea;
-}
-
-.form button {
-  padding: 0.75rem;
-  background: #667eea;
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.form button:hover:not(:disabled) {
-  background: #5a6fd8;
-}
-
-.form button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.mt-2 {
-  margin-top: 0.5rem;
-}
-
-.text-red-600 {
-  color: #dc2626;
-}
-
-.overlay h3 {
-  color: white;
-  font-size: 2rem;
-  text-align: center;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-}
-
-.overlay span {
-  display: block;
-  font-size: 1.2rem;
-  margin-top: 1rem;
-  opacity: 0.9;
-}
-
+/* Estilos para os controles de acessibilidade (se necessário) */
 .toggles-wrapper {
-  margin-top: 2rem;
+  margin-top: 16px;
 }
 
-/* Estilos para o link de cadastro */
-.register-link {
-  text-align: center;
-  margin-top: 2rem;
-  color: #666;
-  font-size: 0.9rem;
+.accessibility-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.register-link a {
-  color: #667eea;
-  text-decoration: none;
-  font-weight: 600;
+.accessibility-toggle {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: var(--fs-12);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.register-link a:hover {
-  text-decoration: underline;
+.accessibility-toggle:hover {
+  border-color: var(--accent);
 }
 
-/* Responsividade */
-@media (max-width: 768px) {
-  .split {
-    flex-direction: column;
-  }
-  
-  .split .right {
-    display: none;
-  }
-  
-  .split .left {
-    padding: 1rem;
-  }
-}
-
-/* Acessibilidade */
-@media (prefers-reduced-motion: reduce) {
-  .form input,
-  .form button {
-    transition: none;
-  }
+.accessibility-toggle.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
