@@ -14,7 +14,7 @@ export default function Login() {
   setLoading(true);
 
   try {
-    const resp = await fetch("https://yamabiko.proxy.rlwy.net/api/auth/login", {
+    const resp = await fetch("https://projeto-backend-production-898d.up.railway.app/api/auth/login", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
