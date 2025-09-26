@@ -1,100 +1,151 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import AccessibilityToggles from "../components/AccessibilityToggles";
-import "./login.css";
+/* src/pages/login.css */
+.split {
+  display: flex;
+  height: 100vh;
+}
 
-const API_BASE = import.meta.env.VITE_API_BASE;
+.split .left {
+  flex: 1;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #fff;
+}
 
-export default function Login() {
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
+.split .right {
+  flex: 1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  const enviar = async (e) => {
-    e.preventDefault();
-    setErr("");
-    setLoading(true);
+.brand {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
 
-    try {
-      const resp = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        credentials: "include", // mantém o cookie JWT
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, senha }),
-      });
+.title {
+  font-size: 1.5rem;
+  color: #666;
+  margin-bottom: 2rem;
+}
 
-      const data = await resp.json();
+.form {
+  display: flex;
+  flex-direction: column;
+  max-width: 400px;
+  width: 100%;
+}
 
-      if (!resp.ok || !data.ok) {
-        setErr("E-mail ou senha inválidos.");
-        return;
-      }
+.form label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
 
-      // redireciona para a dashboard
-      window.location.href = "/dashboard";
-    } catch (e) {
-      console.error("LOGIN_ERROR", e);
-      setErr("Erro de conexão com o servidor.");
-    } finally {
-      setLoading(false);
-    }
-  };
+.form input {
+  padding: 0.75rem;
+  border: 2px solid #e1e5e9;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
 
-  return (
-    <div className="split">
-      <section className="left">
-        <h1 className="brand">Projeto Integrador</h1>
-        <h2 className="title">Acesso ao Sistema</h2>
+.form input:focus {
+  outline: none;
+  border-color: #667eea;
+}
 
-        <form className="form" onSubmit={enviar}>
-          <label htmlFor="email">E-mail</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+.form button {
+  padding: 0.75rem;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
 
-          <label htmlFor="pass">Senha</label>
-          <input
-            id="pass"
-            type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            required
-          />
+.form button:hover:not(:disabled) {
+  background: #5a6fd8;
+}
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
+.form button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
 
-          {err && (
-            <div role="alert" aria-live="polite" className="mt-2 text-red-600">
-              {err}
-            </div>
-          )}
-        </form>
+.mt-2 {
+  margin-top: 0.5rem;
+}
 
-        {/* Link para cadastro adicionado aqui */}
-        <p className="register-link">
-          Não tem uma conta? <Link to="/register">Cadastre-se</Link>
-        </p>
+.text-red-600 {
+  color: #dc2626;
+}
 
-        <div className="toggles-wrapper">
-          <AccessibilityToggles />
-        </div>
-      </section>
+.overlay h3 {
+  color: white;
+  font-size: 2rem;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
 
-      <section className="right">
-        <div className="overlay">
-          <h3>
-            Projeto Integrador Univesp
-            <span> Sistema de contagem de horas trabalhadas</span>
-          </h3>
-        </div>
-      </section>
-    </div>
-  );
+.overlay span {
+  display: block;
+  font-size: 1.2rem;
+  margin-top: 1rem;
+  opacity: 0.9;
+}
+
+.toggles-wrapper {
+  margin-top: 2rem;
+}
+
+/* Estilos para o link de cadastro */
+.register-link {
+  text-align: center;
+  margin-top: 2rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.register-link a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .split {
+    flex-direction: column;
+  }
+  
+  .split .right {
+    display: none;
+  }
+  
+  .split .left {
+    padding: 1rem;
+  }
+}
+
+/* Acessibilidade */
+@media (prefers-reduced-motion: reduce) {
+  .form input,
+  .form button {
+    transition: none;
+  }
 }
