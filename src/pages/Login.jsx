@@ -1,10 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom"; // <--- só se estiver usando React Router
 import AccessibilityToggles from "../components/AccessibilityToggles";
 import "./login.css";
 
-// URL da API vem do .env do Vite
-// Em desenvolvimento: VITE_API_BASE=http://localhost:4000
-// Em produção: VITE_API_BASE=https://projeto-backend-production-898d.up.railway.app
 const API_BASE = import.meta.env.VITE_API_BASE;
 
 export default function Login() {
@@ -78,6 +76,15 @@ export default function Login() {
             </div>
           )}
         </form>
+
+        {/* Rodapé com link de cadastro */}
+        <p className="mt-4 text-sm text-gray-700">
+          Não tem acesso?{" "}
+          <strong> 
+            <Link to="/register">Cadastre-se</Link>
+            */}
+          </strong>
+        </p>
 
         <div className="toggles-wrapper">
           <AccessibilityToggles />
