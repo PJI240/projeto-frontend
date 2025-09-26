@@ -42,3 +42,17 @@
   .left{ max-width:100%; }
   .right{ min-height:40vh; }
 }
+.register-link {
+  text-align: center;
+  margin-top: 20px;
+  color: #666;
+}
+
+.register-link a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
+}
