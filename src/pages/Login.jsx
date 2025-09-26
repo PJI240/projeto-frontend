@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import AccessibilityToggles from "../components/AccessibilityToggles";
 import "./login.css";
 
@@ -80,13 +79,6 @@ export default function Login() {
         <div className="toggles-wrapper">
           <AccessibilityToggles />
         </div>
-
-                <p className="mt-4 text-sm text-gray-700">
-          Não tem acesso?{" "}
-          <strong>
-            <Link to="/register">Cadastre-se</Link>
-          </strong>
-        </p>
       </section>
 
       <section className="right">
