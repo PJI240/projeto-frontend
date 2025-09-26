@@ -1,8 +1,6 @@
-// App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
-import Register from './pages/Register'; // Crie esta página
-import Dashboard from './pages/Dashboard'; // Sua dashboard
+import Register from './pages/Register';
 
 function App() {
   return (
@@ -11,7 +9,6 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </Router>
   );
