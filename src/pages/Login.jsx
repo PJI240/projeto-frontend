@@ -1,6 +1,6 @@
-import { useState } from "react";
-import AccessibilityToggles from "../components/AccessibilityToggles";
-import "./login.css";
+import { useState } from 'react';
+import { Link } from 'react-router-dom'; // Adicione esta importação
+import AccessibilityToggles from './AccessibilityToggles'; // Assumindo que este componente existe
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -75,6 +75,14 @@ export default function Login() {
             </div>
           )}
         </form>
+
+        {/* Rodapé com link de cadastro */}
+        <p className="mt-4 text-sm text-gray-700">
+          Não tem acesso?{" "}
+          <strong>
+            <Link to="/register">Cadastre-se</Link>
+          </strong>
+        </p>
 
         <div className="toggles-wrapper">
           <AccessibilityToggles />
