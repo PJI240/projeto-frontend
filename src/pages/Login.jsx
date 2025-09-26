@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom"; // <--- só se estiver usando React Router
 import AccessibilityToggles from "../components/AccessibilityToggles";
 import "./login.css";
 
@@ -77,18 +76,17 @@ export default function Login() {
           )}
         </form>
 
-        {/* Rodapé com link de cadastro */}
-        <p className="mt-4 text-sm text-gray-700">
+        <div className="toggles-wrapper">
+          <AccessibilityToggles />
+        </div>
+
+         <p className="mt-4 text-sm text-gray-700">
           Não tem acesso?{" "}
           <strong> 
             <Link to="/register">Cadastre-se</Link>
             */}
           </strong>
         </p>
-
-        <div className="toggles-wrapper">
-          <AccessibilityToggles />
-        </div>
       </section>
 
       <section className="right">
