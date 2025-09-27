@@ -17,32 +17,32 @@ body {
   border-radius: 6px;
 }
 
-/* ===== Tokens padrão (tema “default”) ===== */
+/* ===== Tokens padrão (tema “default” — sempre claro) ===== */
 :root {
   /* superfícies e texto */
-  --bg: #f7f7f8;
-  --panel: #ffffff;
-  --panel-muted: #f7f7f8;     /* equivalente ao fundo do dashboard */
-  --fg: #1f2937;              /* gray-800/900 */
-  --muted: #6b7280;           /* gray-500 */
-  --border: #e5e7eb;          /* gray-200 */
+  --bg: #f7f7f8;        /* cinza quase branco */
+  --panel: #ffffff;     /* branco */
+  --panel-muted: #f7f7f8;
+  --fg: #1f2937;        /* texto escuro */
+  --muted: #6b7280;
+  --border: #e5e7eb;
 
   /* ações e foco */
-  --accent: #3b82f6;          /* blue-500 (usado no dashboard) */
-  --accent-strong: #2563eb;   /* blue-600 (hover) */
-  --focus: #ffbf47;           /* amarelo alto-contraste para foco */
+  --accent: #3b82f6;        /* azul (dashboard) */
+  --accent-strong: #2563eb; /* hover */
+  --focus: #ffbf47;         /* amarelo para foco acessível */
 
   /* status/utilitários */
-  --success: #10b981;         /* emerald-500 */
-  --warning: #eab308;         /* yellow-500 */
-  --error: #dc2626;           /* red-600 */
-  --info: #0ea5e9;            /* sky-500 */
+  --success: #10b981;
+  --warning: #eab308;
+  --error: #dc2626;
+  --info: #0ea5e9;
 
   /* tipografia/efeitos */
   --radius: 12px;
   --shadow: 0 6px 18px rgba(0,0,0,.06);
 
-  /* escalas de fonte – podem ser sobrescritas pelo tema de fonte */
+  /* escalas de fonte – sobrescritas por [data-font] se necessário */
   --fs-12: 0.75rem;
   --fs-14: 0.875rem;
   --fs-16: 1rem;
@@ -84,7 +84,7 @@ body {
   border-color: var(--accent-strong);
 }
 
-/* ====== Layout de Login (antes em login.css) ====== */
+/* ===== Login ===== */
 .split { display:flex; min-height:100vh; }
 .left{
   flex:1 1 520px; max-width:640px; background:var(--panel);
@@ -138,7 +138,7 @@ body {
   .right{ min-height:40vh; }
 }
 
-/* ====== Layout de Dashboard (antes em dashboard.css) ====== */
+/* ===== Dashboard ===== */
 .dashboard-container {
   display: flex;
   min-height: 100vh;
@@ -243,7 +243,7 @@ body {
   padding: 1.5rem;
   border-radius: 0.75rem;
   box-shadow: 0 1px 3px rgba(0,0,0,.1);
-  border-left: 4px solid var(--accent); /* pode ser customizado com data-accent abaixo */
+  border-left: 4px solid var(--accent);
 }
 .stat-card[data-accent="success"] { border-left-color: var(--success); }
 .stat-card[data-accent="warning"] { border-left-color: var(--warning); }
