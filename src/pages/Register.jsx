@@ -291,11 +291,10 @@ export default function Register() {
 {step === 1 && (
   <div className="form" aria-labelledby="etapa-empresa">
     <h2 id="etapa-empresa" className="title" style={{ marginBottom: 8 }}>
-      1) Cadastro da empresa
+      Cadastro da empresa
     </h2>
     <p style={{ color: "var(--muted)", marginTop: 0 }}>
       Busque pelo seu <strong>CNPJ</strong> para preencher automaticamente os dados da empresa.
-      Se a busca não retornar, você poderá informar manualmente.
     </p>
 
     {/* Campo único de busca (visível inicialmente) */}
