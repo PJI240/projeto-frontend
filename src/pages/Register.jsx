@@ -249,9 +249,7 @@ export default function Register() {
         Cadastro em 3 passos
       </h1>
 
-      <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: 16 }}>
-        Vamos começar pelo CNPJ da sua empresa.
-      </p>
+
 
 
       {/* Barra de progresso (acessível) */}
