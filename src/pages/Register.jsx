@@ -366,9 +366,14 @@ export default function Register() {
                 <button type="button" className="toggle-btn" onClick={nextFromStep1}>
                   Continuar
                 </button>
-                <Link className="links" to="/login" style={{ alignSelf: "center" }}>
-                  Já tenho conta
-                </Link>
+                <button
+            type="button"
+            className="toggle-btn"
+            onClick={() => navigate("/login")}
+            style={{ background: "var(--error)", color: "#fff" }}
+          >
+            Cancelar
+          </button>
               </div>
             </>
           )}
