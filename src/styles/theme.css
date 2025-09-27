@@ -1,27 +1,21 @@
-:root {
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #991b1b;
-  --info: #0ea5e9;
+/* ===== Temas e preferências ===== */
 
-  --text-default: #0a0f1a;
-  --text-muted: #272f43;
-}
-/* Tema alto contraste: ativar com [data-theme="hc"] no <html> */
+/* Alto contraste — ativar com <html data-theme="hc"> */
 html[data-theme="hc"] {
-  --bg: #000;              /* fundo preto */
+  --bg: #000;
   --panel: #000;
-  --fg: #fff;              /* texto branco */
-  --muted: #d1d5db;        /* cinza claro */
+  --panel-muted: #000;     /* mantém tudo preto */
+  --fg: #fff;
+  --muted: #d1d5db;
   --border: #fff;
+
   --accent: #00ff6a;       /* verde neon */
   --accent-strong: #32ff90;
-  --focus: #ffbf00;        /* amarelo para foco visível */
+  --focus: #ffbf00;
 }
 
-/* Tema “fontes grandes”: ativar com [data-font="lg"] */
+/* Escala de fonte maior — ativar com <html data-font="lg"> */
 html[data-font="lg"] {
-  /* aumenta a escala de tipografia de forma proporcional */
   --fs-12: 0.9rem;
   --fs-14: 1rem;
   --fs-16: 1.125rem;
@@ -30,12 +24,27 @@ html[data-font="lg"] {
   --fs-32: 2.25rem;
 }
 
-/* Preferências do SO (opcional): se o usuário pedir alto contraste no sistema */
+/* Preferências do SO */
 @media (prefers-contrast: more) {
-  :root {
-    --focus: #ffbf00;
-  }
+  :root { --focus: #ffbf00; }
 }
+
 @media (prefers-reduced-motion: reduce) {
-  * { scroll-behavior: auto; animation-duration: .01ms !important; }
+  * { scroll-behavior: auto; animation-duration: .01ms !important; transition: none !important; }
+}
+
+/* Tema escuro automático (opcional, não interfere no alto contraste) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="hc"]) {
+    --bg: #0b1020;
+    --panel: #0e152b;
+    --panel-muted: #0b1020;
+    --fg: #f8fafc;
+    --muted: #cbd5e1;
+    --border: #1f2937;
+
+    --accent: #7aa2ff;
+    --accent-strong: #3d66ff;
+    --focus: #ffd166;
+  }
 }
