@@ -246,7 +246,7 @@ export default function Register() {
         <AccessibilityToggles />
       </div>
       <h1 className="title" style={{ marginTop: 8, marginBottom: 8 }}>
-        Cadastro guiado em 3 passos
+        Cadastro em 3 passos
       </h1>
       <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: 16 }}>
         Vamos começar pelo CNPJ da sua empresa.
@@ -461,7 +461,7 @@ export default function Register() {
       {step === 3 && (
         <div className="form" aria-labelledby="etapa-usuario">
           <h2 id="etapa-usuario" className="title" style={{ marginBottom: 8 }}>
-            Usuário principal (administrador)
+            Usuário principal
           </h2>
           <p style={{ color: "var(--muted)", marginTop: 0 }}>
             Crie o <strong>usuário responsável</strong> por gerenciar a empresa no sistema,
