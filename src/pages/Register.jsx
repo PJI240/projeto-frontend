@@ -318,7 +318,7 @@ export default function Register() {
         onClick={consultaCNPJ}
         disabled={loading}
       >
-        {loading ? "Consultando..." : "Consultar"}
+        {loading ? "Consultando..." : "Buscar"}
       </button>
     </div>
 
