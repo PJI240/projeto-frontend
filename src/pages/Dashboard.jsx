@@ -4,6 +4,64 @@ import AccessibilityToggles from "../components/AccessibilityToggles";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
+/** Ícones simples em SVG (herdam currentColor) */
+function UsersIcon(props) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M16 11c1.66 0 3-1.57 3-3.5S17.66 4 16 4s-3 1.57-3 3.5S14.34 11 16 11zm-9 0c1.66 0 3-1.57 3-3.5S8.66 4 7 4 4 5.57 4 7.5 5.34 11 7 11zm0 2c-2.67 0-8 1.34-8 4v1h10v-1c0-1.43.69-2.67 1.77-3.57C9.78 12.77 8.08 13 7 13zm9 0c-.46 0-.98.03-1.53.09 1.24.91 2.03 2.11 2.03 3.91v1h8v-1c0-2.66-5.33-4-8.5-4z" />
+    </svg>
+  );
+}
+function PersonIcon(props) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-3.31 0-8 1.34-8 4v2h16v-2c0-2.66-4.69-4-8-4z" />
+    </svg>
+  );
+}
+function BuildingIcon(props) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M3 21h18v-2H3v2zM19 3H5v14h14V3zm-8 12H7v-2h4v2zm0-4H7V9h4v2zm0-4H7V5h4v2zm6 8h-4v-2h4v2zm0-4h-4V9h4v2zm0-4h-4V5h4v2z" />
+    </svg>
+  );
+}
+function DatabaseIcon(props) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4zm0 6c-4.42 0-8-1.79-8-4v4c0 2.21 3.58 4 8 4s8-1.79 8-4V5c0 2.21-3.58 4-8 4zm0 4c-4.42 0-8-1.79-8-4v6c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4z" />
+    </svg>
+  );
+}
+function PlusIcon(props) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z" />
+    </svg>
+  );
+}
+function RefreshIcon(props) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M17.65 6.35A7.95 7.95 0 0012 4C7.58 4 4 7.58 4 12h2a6 6 0 1110.24 3.66L14 13v7h7l-2.35-2.35A7.96 7.96 0 0020 12c0-2.21-.9-4.2-2.35-5.65z" />
+    </svg>
+  );
+}
+function LogoutIcon(props) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+    </svg>
+  );
+}
+function AlertIcon(props) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+    </svg>
+  );
+}
+
 export default function Dashboard() {
   const [counts, setCounts] = useState({ usuarios: 0, pessoas: 0, empresas: 0 });
   const [me, setMe] = useState(null);
@@ -14,14 +72,8 @@ export default function Dashboard() {
   const fetchJson = useCallback(async (url, init) => {
     const r = await fetch(url, { credentials: "include", ...init });
     let data;
-    try { 
-      data = await r.json(); 
-    } catch { 
-      data = null; 
-    }
-    if (!r.ok) {
-      throw new Error(data?.error || `HTTP ${r.status}`);
-    }
+    try { data = await r.json(); } catch { data = null; }
+    if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
     return data;
   }, []);
 
@@ -53,68 +105,55 @@ export default function Dashboard() {
 
   const logout = async () => {
     try {
-      await fetch(`${API_BASE}/api/auth/logout`, { 
-        method: "POST", 
-        credentials: "include" 
-      });
+      await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
     } finally {
       navigate("/login");
     }
   };
 
+  const totalRegistros = (counts?.usuarios || 0) + (counts?.pessoas || 0) + (counts?.empresas || 0);
+
   return (
     <div className="dashboard-container">
       {/* Sidebar */}
-      <aside className="dashboard-sidebar">
+      <aside className="dashboard-sidebar" aria-label="Menu lateral">
         <div className="sidebar-header">
           <h1 className="brand">Projeto Integrador</h1>
           <h2 className="subtitle">Dashboard</h2>
         </div>
 
-        <div className="user-info">
+        {/* Informações do usuário (sem avatar/bordinha) */}
+        <div className="user-info" aria-live="polite">
           {me ? (
             <>
-              <div className="user-avatar">
-                <span>{me.nome.charAt(0).toUpperCase()}</span>
-              </div>
               <div className="user-details">
                 <div className="user-name">{me.nome}</div>
                 <div className="user-email">{me.email}</div>
               </div>
               <button className="logout-btn" onClick={logout} title="Sair">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
-                </svg>
+                <LogoutIcon />
               </button>
             </>
           ) : (
-            <div className="user-loading">Carregando...</div>
+            <div className="user-loading">Carregando…</div>
           )}
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Navegação principal">
           <Link to="/dashboard" className="nav-item active">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-            </svg>
+            <DatabaseIcon />
             <span>Visão Geral</span>
           </Link>
           <Link to="/cadastros/usuarios" className="nav-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-            </svg>
+            <UsersIcon />
             <span>Usuários</span>
           </Link>
           <Link to="/cadastros/pessoas" className="nav-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-            </svg>
+            <PersonIcon />
             <span>Pessoas</span>
           </Link>
           <Link to="/cadastros/empresas" className="nav-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
-            </svg>
+            <BuildingIcon />
             <span>Empresas</span>
           </Link>
         </nav>
@@ -124,86 +163,78 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Conteúdo principal */}
       <main className="dashboard-main">
         <header className="main-header">
           <div className="header-content">
             <h1>Visão Geral do Sistema</h1>
             <p>Monitoramento e gestão de dados</p>
           </div>
-          <button 
-            className="refresh-btn" 
-            onClick={carregar} 
+          <button
+            className="refresh-btn"
+            onClick={carregar}
             disabled={loading}
+            aria-busy={loading ? "true" : "false"}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-            </svg>
+            <RefreshIcon />
             {loading ? "Atualizando..." : "Atualizar"}
           </button>
         </header>
 
         {err && (
-          <div className="error-alert">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
-            {err}
+          <div className="error-alert" role="alert">
+            <AlertIcon />
+            <span>{err}</span>
           </div>
         )}
 
+        {/* Cards de estatística (sem emoji; cores via tema/data-accent) */}
         <div className="stats-grid">
           <StatCard
             title="Usuários Ativos"
-            value={loading ? "..." : counts.usuarios}
-            icon="👥"
+            value={loading ? "…" : counts.usuarios}
+            accent="info"
+            icon={<UsersIcon />}
             trend="+5%"
-            color="#3B82F6"
           />
           <StatCard
             title="Pessoas Cadastradas"
-            value={loading ? "..." : counts.pessoas}
-            icon="👤"
+            value={loading ? "…" : counts.pessoas}
+            accent="success"
+            icon={<PersonIcon />}
             trend="+12%"
-            color="#10B981"
           />
           <StatCard
             title="Empresas Ativas"
-            value={loading ? "..." : counts.empresas}
-            icon="🏢"
+            value={loading ? "…" : counts.empresas}
+            accent="warning"
+            icon={<BuildingIcon />}
             trend="+3%"
-            color="#F59E0B"
           />
           <StatCard
             title="Total de Registros"
-            value={loading ? "..." : counts.usuarios + counts.pessoas + counts.empresas}
-            icon="📊"
+            value={loading ? "…" : totalRegistros}
+            accent="error"
+            icon={<DatabaseIcon />}
             trend="+8%"
-            color="#8B5CF6"
           />
         </div>
 
-        <section className="quick-actions">
-          <h2>Ações Rápidas</h2>
+        <section className="quick-actions" aria-labelledby="acoes-rapidas">
+          <h2 id="acoes-rapidas">Ações Rápidas</h2>
           <div className="actions-grid">
-            <button className="action-card">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-              </svg>
+            <Link to="/cadastros/usuarios/novo" className="action-card" aria-label="Criar novo usuário">
+              <PlusIcon />
               <span>Novo Usuário</span>
-            </button>
-            <button className="action-card">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-              </svg>
+            </Link>
+            <Link to="/cadastros/pessoas/novo" className="action-card" aria-label="Criar nova pessoa">
+              <PlusIcon />
               <span>Nova Pessoa</span>
-            </button>
-            <button className="action-card">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-              </svg>
+            </Link>
+            <Link to="/cadastros/empresas/novo" className="action-card" aria-label="Criar nova empresa">
+              <PlusIcon />
               <span>Nova Empresa</span>
-            </button>
+            </Link>
           </div>
         </section>
       </main>
@@ -211,17 +242,21 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, icon, trend, color }) {
+/** Card de estatística usando variáveis do tema
+ *  - cor da borda: var(--accent) por padrão ou via data-accent="success|warning|error|info"
+ *  - fonte e contrastes respeitam [data-font] e [data-theme]
+ */
+function StatCard({ title, value, icon, trend, accent }) {
   return (
-    <div className="stat-card" style={{ borderLeftColor: color }}>
+    <article className="stat-card" data-accent={accent}>
       <div className="stat-header">
-        <div className="stat-icon">{icon}</div>
+        <div className="stat-icon" aria-hidden="true">{icon}</div>
         <span className="stat-trend">{trend}</span>
       </div>
       <div className="stat-content">
-        <div className="stat-value">{value}</div>
+        <div className="stat-value" aria-live="polite">{value}</div>
         <div className="stat-title">{title}</div>
       </div>
-    </div>
+    </article>
   );
 }
