@@ -373,7 +373,16 @@ export default function Register() {
       const canContinueStep1 = empresaFormVisivel && canGoStep2();
       return (
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+         
           <button
+            type="button"
+            className="toggle-btn"
+            onClick={() => navigate("/login")}
+            style={{ background: "var(--error)", color: "#fff" }}
+          >
+            Cancelar
+          </button>
+ <button
             type="button"
             className="toggle-btn"
             onClick={nextFromStep1}
@@ -383,14 +392,7 @@ export default function Register() {
           >
             Continuar
           </button>
-          <button
-            type="button"
-            className="toggle-btn"
-            onClick={() => navigate("/login")}
-            style={{ background: "var(--error)", color: "#fff" }}
-          >
-            Cancelar
-          </button>
+
                </div>
       );
     })()}
