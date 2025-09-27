@@ -22,7 +22,7 @@ body {
   /* superfícies e texto */
   --bg: #f7f7f8;
   --panel: #ffffff;
-  --panel-muted: #f8fafc;     /* equivalente ao fundo do dashboard */
+  --panel-muted: #f7f7f8;     /* equivalente ao fundo do dashboard */
   --fg: #1f2937;              /* gray-800/900 */
   --muted: #6b7280;           /* gray-500 */
   --border: #e5e7eb;          /* gray-200 */
