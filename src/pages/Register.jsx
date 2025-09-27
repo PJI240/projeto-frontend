@@ -402,7 +402,7 @@ export default function Register() {
       {step === 2 && (
         <div className="form" aria-labelledby="etapa-pessoa">
           <h2 id="etapa-pessoa" className="title" style={{ marginBottom: 8 }}>
-            2) Cadastro do responsável pela empresa
+            Cadastro do responsável pela empresa
           </h2>
           <p style={{ color: "var(--muted)", marginTop: 0 }}>
             Informe seus <strong>dados pessoais</strong>. Eles serão vinculados como responsável da empresa.
@@ -461,7 +461,7 @@ export default function Register() {
       {step === 3 && (
         <div className="form" aria-labelledby="etapa-usuario">
           <h2 id="etapa-usuario" className="title" style={{ marginBottom: 8 }}>
-            3) Usuário principal (administrador)
+            Usuário principal (administrador)
           </h2>
           <p style={{ color: "var(--muted)", marginTop: 0 }}>
             Crie o <strong>usuário responsável</strong> por gerenciar a empresa no sistema,
