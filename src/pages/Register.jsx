@@ -244,15 +244,12 @@ export default function Register() {
       {/* Toggles de acessibilidade sempre no topo esquerdo */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         <AccessibilityToggles />
-        <div className="brand" style={{ marginLeft: 8 }}>Projeto Integrador</div>
       </div>
-
-      {/* Título explicativo */}
       <h1 className="title" style={{ marginTop: 8, marginBottom: 8 }}>
         Cadastro guiado em 3 passos
       </h1>
       <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: 16 }}>
-        Você será orientado por etapas simples. Vamos começar pelo CNPJ da sua empresa.
+        Vamos começar pelo CNPJ da sua empresa.
       </p>
 
       {/* Barra de progresso (acessível) */}
