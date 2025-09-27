@@ -394,10 +394,7 @@ export default function Register() {
           >
             Cancelar
           </button>
-          <Link className="links" to="/login" style={{ alignSelf: "center" }}>
-            Já tenho conta
-          </Link>
-        </div>
+               </div>
       );
     })()}
   </div>
