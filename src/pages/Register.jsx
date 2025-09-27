@@ -249,13 +249,13 @@ export default function Register() {
         Cadastro em 3 passos
       </h1>
 
-      {/* Barra de progresso (acessível) */}
-      <div aria-label="Progresso do cadastro" style={{ marginBottom: 16 }}>
       <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: 16 }}>
         Vamos começar pelo CNPJ da sua empresa.
       </p>
 
 
+      {/* Barra de progresso (acessível) */}
+      <div aria-label="Progresso do cadastro" style={{ marginBottom: 16 }}>
         <div
           style={{
             height: 10,
