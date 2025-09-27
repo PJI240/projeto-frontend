@@ -290,6 +290,7 @@ export default function Register() {
       )}
 
       {/* ===== Etapa 1 ===== */}
+
 {step === 1 && (
   <div className="form" aria-labelledby="etapa-empresa">
     <h2 id="etapa-empresa" className="title" style={{ marginBottom: 8 }}>
@@ -311,7 +312,12 @@ export default function Register() {
         value={cnpjInput}
         onChange={(e) => setCnpjInput(e.target.value)}
       />
-      <button type="button" className="toggle-btn" onClick={consultaCNPJ} disabled={loading}>
+      <button
+        type="button"
+        className="toggle-btn"
+        onClick={consultaCNPJ}
+        disabled={loading}
+      >
         {loading ? "Consultando..." : "Consultar"}
       </button>
     </div>
@@ -361,9 +367,23 @@ export default function Register() {
             ? "Os campos foram preenchidos automaticamente. Revise antes de continuar."
             : "A busca não retornou dados. Preencha os campos manualmente para prosseguir."}
         </small>
+      </>
+    )}
 
+    {/* Ações — SEMPRE visíveis. 
+        “Continuar” fica desabilitado até existir formulário e validar. */}
+    {(() => {
+      const canContinueStep1 = empresaFormVisivel && canGoStep2();
+      return (
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button type="button" className="toggle-btn" onClick={nextFromStep1}>
+          <button
+            type="button"
+            className="toggle-btn"
+            onClick={nextFromStep1}
+            disabled={!canContinueStep1}
+            aria-disabled={!canContinueStep1}
+            title={!canContinueStep1 ? "Consulte o CNPJ e preencha os campos obrigatórios" : undefined}
+          >
             Continuar
           </button>
           <button
@@ -374,9 +394,12 @@ export default function Register() {
           >
             Cancelar
           </button>
+          <Link className="links" to="/login" style={{ alignSelf: "center" }}>
+            Já tenho conta
+          </Link>
         </div>
-      </>
-    )}
+      );
+    })()}
   </div>
 )}
 
