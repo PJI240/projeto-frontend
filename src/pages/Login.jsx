@@ -32,7 +32,6 @@ export default function Login() {
         return;
       }
 
-      // ✅ CORRETO: Navegação client-side sem refresh
       navigate("/dashboard");
     } catch (e) {
       console.error("LOGIN_ERROR", e);
@@ -45,7 +44,10 @@ export default function Login() {
   return (
     <div className="split">
       <section className="left">
-        <h1 className="brand">Projeto Integrador</h1>
+
+        <div className="toggles-wrapper">
+          <AccessibilityToggles />
+        </div>
         <h2 className="title">Acesso ao Sistema</h2>
 
         <form className="form" onSubmit={enviar}>
@@ -82,9 +84,6 @@ export default function Login() {
           Não tem uma conta? <Link to="/register">Cadastre-se</Link>
         </p>
 
-        <div className="toggles-wrapper">
-          <AccessibilityToggles />
-        </div>
       </section>
 
       <section className="right">
