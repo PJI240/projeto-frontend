@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom"; // ← Adicionar useNavigate
 import AccessibilityToggles from "../components/AccessibilityToggles";
-import "./login.css";
+
 
 const API_BASE = import.meta.env.VITE_API_BASE;
 
