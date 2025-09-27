@@ -521,7 +521,7 @@ export default function Register() {
                   onClick={submitNovoUsuario}
                   disabled={loading}
                 >
-                  {loading ? "Enviando..." : "Concluir cadastro (Administrador)"}
+                  {loading ? "Enviando..." : "Concluir cadastro"}
                 </button>
               </div>
             </>
@@ -563,9 +563,6 @@ export default function Register() {
             </>
           )}
 
-          <div style={{ marginTop: 16 }}>
-            <Link to="/login" className="links">Já tenho cadastro — ir para Login</Link>
-          </div>
         </div>
       )}
 
