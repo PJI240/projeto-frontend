@@ -290,83 +290,83 @@ export default function Register() {
       )}
 
       {/* ===== Etapa 1 ===== */}
-      {step === 1 && (
-        <div className="form" aria-labelledby="etapa-empresa">
-          <h2 id="etapa-empresa" className="title" style={{ marginBottom: 8 }}>
-            1) Cadastro da empresa
-          </h2>
-          <p style={{ color: "var(--muted)", marginTop: 0 }}>
-            Busque pelo seu <strong>CNPJ</strong> para preencher automaticamente os dados da empresa.
-            Se a busca não retornar, você poderá informar manualmente.
-          </p>
+{step === 1 && (
+  <div className="form" aria-labelledby="etapa-empresa">
+    <h2 id="etapa-empresa" className="title" style={{ marginBottom: 8 }}>
+      1) Cadastro da empresa
+    </h2>
+    <p style={{ color: "var(--muted)", marginTop: 0 }}>
+      Busque pelo seu <strong>CNPJ</strong> para preencher automaticamente os dados da empresa.
+      Se a busca não retornar, você poderá informar manualmente.
+    </p>
 
-          {/* Campo único de busca (visível inicialmente) */}
-          <label htmlFor="cnpj">CNPJ</label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              id="cnpj"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="00.000.000/0000-00"
-              value={cnpjInput}
-              onChange={(e) => setCnpjInput(e.target.value)}
-            />
-            <button type="button" className="toggle-btn" onClick={consultaCNPJ} disabled={loading}>
-              {loading ? "Consultando..." : "Consultar"}
-            </button>
-          </div>
+    {/* Campo único de busca (visível inicialmente) */}
+    <label htmlFor="cnpj">CNPJ</label>
+    <div style={{ display: "flex", gap: 8 }}>
+      <input
+        id="cnpj"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="00.000.000/0000-00"
+        value={cnpjInput}
+        onChange={(e) => setCnpjInput(e.target.value)}
+      />
+      <button type="button" className="toggle-btn" onClick={consultaCNPJ} disabled={loading}>
+        {loading ? "Consultando..." : "Consultar"}
+      </button>
+    </div>
 
-          {/* Form da empresa — só aparece após a consulta */}
-          {empresaFormVisivel && (
-            <>
-              <div style={{ height: 8 }} />
-              <label htmlFor="razao_social">Razão social</label>
-              <input
-                id="razao_social"
-                value={empresa.razao_social}
-                onChange={(e) => setEmpresa({ ...empresa, razao_social: e.target.value })}
-              />
+    {/* Form da empresa — só aparece após a consulta */}
+    {empresaFormVisivel && (
+      <>
+        <div style={{ height: 8 }} />
+        <label htmlFor="razao_social">Razão social</label>
+        <input
+          id="razao_social"
+          value={empresa.razao_social}
+          onChange={(e) => setEmpresa({ ...empresa, razao_social: e.target.value })}
+        />
 
-              <label htmlFor="nome_fantasia">Nome fantasia</label>
-              <input
-                id="nome_fantasia"
-                value={empresa.nome_fantasia}
-                onChange={(e) => setEmpresa({ ...empresa, nome_fantasia: e.target.value })}
-              />
+        <label htmlFor="nome_fantasia">Nome fantasia</label>
+        <input
+          id="nome_fantasia"
+          value={empresa.nome_fantasia}
+          onChange={(e) => setEmpresa({ ...empresa, nome_fantasia: e.target.value })}
+        />
 
-              <label htmlFor="cnpj_conf">CNPJ (confirmação)</label>
-              <input
-                id="cnpj_conf"
-                value={empresa.cnpj}
-                onChange={(e) => setEmpresa({ ...empresa, cnpj: e.target.value })}
-              />
+        <label htmlFor="cnpj_conf">CNPJ (confirmação)</label>
+        <input
+          id="cnpj_conf"
+          value={empresa.cnpj}
+          onChange={(e) => setEmpresa({ ...empresa, cnpj: e.target.value })}
+        />
 
-              <label htmlFor="telefone">Telefone</label>
-              <input
-                id="telefone"
-                value={empresa.telefone}
-                onChange={(e) => setEmpresa({ ...empresa, telefone: e.target.value })}
-              />
+        <label htmlFor="telefone">Telefone</label>
+        <input
+          id="telefone"
+          value={empresa.telefone}
+          onChange={(e) => setEmpresa({ ...empresa, telefone: e.target.value })}
+        />
 
-              <label htmlFor="email_emp">Email</label>
-              <input
-                id="email_emp"
-                type="email"
-                value={empresa.email}
-                onChange={(e) => setEmpresa({ ...empresa, email: e.target.value })}
-              />
+        <label htmlFor="email_emp">Email</label>
+        <input
+          id="email_emp"
+          type="email"
+          value={empresa.email}
+          onChange={(e) => setEmpresa({ ...empresa, email: e.target.value })}
+        />
 
-              <small style={{ color: "var(--muted)" }}>
-                {empresaByApi
-                  ? "Os campos foram preenchidos automaticamente. Revise antes de continuar."
-                  : "A busca não retornou dados. Preencha os campos manualmente para prosseguir."}
-              </small>
+        <small style={{ color: "var(--muted)" }}>
+          {empresaByApi
+            ? "Os campos foram preenchidos automaticamente. Revise antes de continuar."
+            : "A busca não retornou dados. Preencha os campos manualmente para prosseguir."}
+        </small>
 
-              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <button type="button" className="toggle-btn" onClick={nextFromStep1}>
-                  Continuar
-                </button>
-                <button
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button type="button" className="toggle-btn" onClick={nextFromStep1}>
+            Continuar
+          </button>
+          <button
             type="button"
             className="toggle-btn"
             onClick={() => navigate("/login")}
@@ -374,11 +374,11 @@ export default function Register() {
           >
             Cancelar
           </button>
-              </div>
-            </>
-          )}
         </div>
-      )}
+      </>
+    )}
+  </div>
+)}
 
       {/* ===== Etapa 2 ===== */}
       {step === 2 && (
