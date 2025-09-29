@@ -3,40 +3,40 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
-  const isDev = !!me?.isSuper || me?.roles?.includes("desenvolvedor");
-  const isAdm = isDev || me?.roles?.includes("administrador");
-  const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
-
   const [open, setOpen] = useState(false);
-  const { pathname } = useLocation();
+  const loc = useLocation();
 
-  // Fechar quando a rota mudar (melhor UX no mobile)
-  useEffect(() => { setOpen(false); }, [pathname]);
+  // Fecha ao trocar de rota
+  useEffect(() => { setOpen(false); }, [loc.pathname]);
 
-  // Fechar no Esc
+  // Travar scroll do body quando o drawer está aberto
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+  }, [open]);
+
+  const isDev  = !!me?.isSuper || me?.roles?.includes("desenvolvedor");
+  const isAdm  = isDev || me?.roles?.includes("administrador");
+  const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
 
   return (
     <>
-      {/* Botão hambúrguer (só aparece no mobile) */}
+      {/* Botão hambúrguer (mobile) */}
       <button
         type="button"
         className="menu-toggle"
-        aria-label={open ? "Fechar menu" : "Abrir menu"}
+        aria-label="Abrir menu"
         aria-expanded={open ? "true" : "false"}
         aria-controls="app-sidebar"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(v => !v)}
       >
-        {/* ícone simples */}
-        <span aria-hidden="true" className="menu-toggle-icon">☰</span>
-        <span className="menu-toggle-text">Menu</span>
+        <span className="menu-toggle-icon">☰</span> Menu
       </button>
 
-      {/* Backdrop para fechar no mobile */}
+      {/* Backdrop por trás do drawer */}
       <div
         className={`sidebar-backdrop ${open ? "show" : ""}`}
         onClick={() => setOpen(false)}
@@ -108,14 +108,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               <Item to="/folhas-itens" label="Itens de Folha" />
             </Group>
           )}
-
-          {isDev && (
-            <Group title="Dev">
-              <Item to="/dev-inspecao" label="Inspeção / SQL" />
-              <Item to="/dev-auditoria" label="Auditoria" />
-              <Item to="/dev-config" label="Configurações" />
-            </Group>
-          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -147,7 +139,6 @@ function Group({ title, children }) {
     </div>
   );
 }
-
 function Item({ to, label }) {
   return (
     <NavLink to={to} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`} end>
