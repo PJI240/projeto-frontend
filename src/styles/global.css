@@ -632,3 +632,152 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
+
+/* ===== Estilos específicos para o Menu Component ===== */
+
+/* Grupo de menu */
+.menu-group {
+  margin-bottom: 8px;
+}
+
+.menu-group-title {
+  padding: 8px 16px;
+  font-size: var(--fs-12);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-weight: 600;
+}
+
+.menu-group-items {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Informação da empresa */
+.empresa-info {
+  font-size: var(--fs-12);
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+/* Estados específicos para mobile */
+.dashboard-sidebar.mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100dvh;
+  width: 82%;
+  max-width: 320px;
+  transform: translateX(-100%);
+  transition: transform .25s ease;
+  z-index: 999;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.dashboard-sidebar.mobile.is-open {
+  transform: translateX(0);
+}
+
+/* Ajustes para o conteúdo principal quando menu está aberto no mobile */
+.dashboard-container.menu-open .dashboard-main {
+  transform: translateX(82%);
+  max-width: 320px;
+  transition: transform .25s ease;
+}
+
+/* Melhorias para acessibilidade e usabilidade */
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  color: var(--muted);
+  text-decoration: none;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: var(--panel-muted);
+  color: var(--accent);
+}
+
+.nav-item.active {
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  color: var(--accent);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-item span {
+  font-weight: 500;
+}
+
+/* Ajustes responsivos adicionais */
+@media (max-width: 900px) {
+  .dashboard-container {
+    transition: transform .25s ease;
+  }
+  
+  .user-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .user-details {
+    width: 100%;
+  }
+  
+  .logout-btn {
+    align-self: flex-end;
+    margin-top: 0.5rem;
+  }
+  
+  .sidebar-header {
+    position: relative;
+    padding-right: 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-sidebar.mobile {
+    width: 90%;
+    max-width: none;
+  }
+  
+  .dashboard-container.menu-open .dashboard-main {
+    transform: translateX(90%);
+  }
+  
+  .menu-group-title {
+    padding: 8px 12px;
+  }
+  
+  .nav-item {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Melhorias de acessibilidade */
+.nav-item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.logout-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Animações suaves */
+.dashboard-sidebar,
+.dashboard-main,
+.menu-toggle {
+  transition: all 0.25s ease;
+}
