@@ -1,33 +1,42 @@
+// src/components/menu.jsx
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
-  const [open, setOpen] = useState(false);
-  const loc = useLocation();
-
-  // fecha ao trocar de rota
-  useEffect(() => { setOpen(false); }, [loc.pathname]);
-
-  const isDev  = !!me?.isSuper || me?.roles?.includes("desenvolvedor");
-  const isAdm  = isDev || me?.roles?.includes("administrador");
+  const isDev = !!me?.isSuper || me?.roles?.includes("desenvolvedor");
+  const isAdm = isDev || me?.roles?.includes("administrador");
   const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
+
+  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  // Fechar quando a rota mudar (melhor UX no mobile)
+  useEffect(() => { setOpen(false); }, [pathname]);
+
+  // Fechar no Esc
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <>
-      {/* BOTÃO MENU – aparece só no mobile (controlado via CSS) */}
-      <div className="menu-bar-mobile">
-        <button
-          type="button"
-          className="menu-btn"
-          aria-expanded={open ? "true" : "false"}
-          aria-controls="app-sidebar"
-          onClick={() => setOpen(v => !v)}
-        >
-          <span className="menu-btn-ico" aria-hidden>☰</span> Menu
-        </button>
-      </div>
+      {/* Botão hambúrguer (só aparece no mobile) */}
+      <button
+        type="button"
+        className="menu-toggle"
+        aria-label={open ? "Fechar menu" : "Abrir menu"}
+        aria-expanded={open ? "true" : "false"}
+        aria-controls="app-sidebar"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {/* ícone simples */}
+        <span aria-hidden="true" className="menu-toggle-icon">☰</span>
+        <span className="menu-toggle-text">Menu</span>
+      </button>
 
-      {/* Backdrop atrás do drawer */}
+      {/* Backdrop para fechar no mobile */}
       <div
         className={`sidebar-backdrop ${open ? "show" : ""}`}
         onClick={() => setOpen(false)}
@@ -99,6 +108,14 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               <Item to="/folhas-itens" label="Itens de Folha" />
             </Group>
           )}
+
+          {isDev && (
+            <Group title="Dev">
+              <Item to="/dev-inspecao" label="Inspeção / SQL" />
+              <Item to="/dev-auditoria" label="Auditoria" />
+              <Item to="/dev-config" label="Configurações" />
+            </Group>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -130,6 +147,7 @@ function Group({ title, children }) {
     </div>
   );
 }
+
 function Item({ to, label }) {
   return (
     <NavLink to={to} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`} end>
