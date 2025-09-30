@@ -129,6 +129,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
         <nav className="sidebar-nav" aria-label="Navegação principal">
           <MenuGroup title="Geral">
+            <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
             <MenuItem to="/dashboard" label="Visão Geral" icon={<ChartBarIcon />} onClick={closeMenu} />
             {isFunc && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} onClick={closeMenu} />}
             {isAdm && <MenuItem to="/dashboard_adm" label="Painel do Admin" icon={<ShieldCheckIcon />} onClick={closeMenu} />}
@@ -138,7 +139,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
             <MenuGroup title="Cadastros">
               <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
-              <MenuItem to="/empresas" label="Empresas" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
               <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
               <MenuItem to="/funcionarios" label="Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
             </MenuGroup>
