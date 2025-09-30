@@ -34,6 +34,7 @@ export default function Usuarios() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("");
+  const [showForm, setShowForm] = useState(false);
 
   const isDev   = me.roles?.some((r) => String(r).toLowerCase() === "desenvolvedor");
   const isAdmin = me.roles?.some((r) => String(r).toLowerCase() === "administrador");
@@ -113,6 +114,7 @@ export default function Usuarios() {
   function novo() {
     setErr("");
     setForm(EMPTY_FORM);
+    setShowForm(true);
   }
 
   function editar(item) {
@@ -126,6 +128,12 @@ export default function Usuarios() {
       perfil_id: item.perfil_id || "",
       ativo: item.ativo ? 1 : 0,
     });
+    setShowForm(true);
+  }
+
+  function cancelar() {
+    setForm(EMPTY_FORM);
+    setShowForm(false);
   }
 
   function validaPerfil(perfilId) {
@@ -199,6 +207,7 @@ export default function Usuarios() {
 
       await carregarLista();
       setForm(EMPTY_FORM);
+      setShowForm(false);
     } catch (e) {
       setErr(e.message || "Falha ao salvar usuário.");
     } finally {
@@ -215,7 +224,10 @@ export default function Usuarios() {
         credentials: "include",
       });
       await carregarLista();
-      if (form.id === item.id) setForm(EMPTY_FORM);
+      if (form.id === item.id) {
+        setForm(EMPTY_FORM);
+        setShowForm(false);
+      }
     } catch (e) {
       setErr(e.message || "Falha ao excluir usuário.");
     }
@@ -228,186 +240,177 @@ export default function Usuarios() {
           <h1>Usuários</h1>
           <p>Gerencie os acessos vinculados às pessoas da empresa.</p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="refresh-btn" onClick={carregarLista} disabled={loading}>
-            <RefreshIcon /> {loading ? "Atualizando..." : "Atualizar"}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="toggle-btn" onClick={novo}>
+            <PlusIcon /> Novo Usuário
           </button>
-          <button className="toggle-btn" onClick={novo} title="Novo usuário">
-            <PlusIcon /> Novo
+          <button className="toggle-btn" onClick={carregarLista} disabled={loading}>
+            <RefreshIcon /> {loading ? "Atualizando..." : "Atualizar"}
           </button>
         </div>
       </header>
 
       {err && (
-        <div className="error-alert" role="alert" style={{ marginBottom: 12 }}>
+        <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>
           {err}
         </div>
       )}
 
-      {/* Formulário */}
-      <section style={{ marginBottom: 16 }}>
-        <form className="form" onSubmit={salvar} aria-labelledby="form-usuarios">
-          <h2 id="form-usuarios" className="title" style={{ margin: 0 }}>
-            {form.id ? "Editar Usuário" : "Novo Usuário"}
-          </h2>
+      <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
+        <input
+          placeholder="Buscar por nome, e-mail, pessoa ou perfil…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)" }}
+        />
+      </div>
 
-          {/* Pessoa (só na criação) */}
-          {!form.id && (
-            <>
-              <label htmlFor="u_pessoa">Pessoa</label>
-              <select
-                id="u_pessoa"
-                value={form.pessoa_id}
-                onChange={(e) => setField("pessoa_id", e.target.value)}
-                disabled={loadingOpts}
-                required
-              >
-                <option value="">Selecione…</option>
-                {pessoasSemUsuario.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
-                  </option>
-                ))}
-              </select>
-              <small className="register-link">
-                Precisa cadastrar uma <Link to="/pessoas"><strong>pessoa</strong></Link> antes?
-              </small>
-            </>
-          )}
-
-          <label htmlFor="u_nome">Nome</label>
-          <input
-            id="u_nome"
-            value={form.nome}
-            onChange={(e) => setField("nome", e.target.value)}
-            required
-          />
-
-          <label htmlFor="u_email">E-mail</label>
-          <input
-            id="u_email"
-            type="email"
-            value={form.email}
-            onChange={(e) => setField("email", e.target.value)}
-            required
-          />
-
-          <label htmlFor="u_senha">Senha {form.id ? "(deixe em branco para manter)" : ""}</label>
-          <input
-            id="u_senha"
-            type="password"
-            value={form.senha}
-            onChange={(e) => setField("senha", e.target.value)}
-            placeholder={form.id ? "••••••••" : ""}
-            required={!form.id}
-          />
-
-          <label htmlFor="u_perfil">Perfil</label>
-          <select
-            id="u_perfil"
-            value={form.perfil_id}
-            onChange={(e) => setField("perfil_id", e.target.value)}
-            disabled={loadingOpts}
-            required
-          >
-            <option value="">Selecione…</option>
-            {perfis.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
-          </select>
-          {(!isAdmin && !isDev) && (
-            <small className="register-link">
-              Você não pode atribuir o perfil <strong>administrador</strong>.
-            </small>
-          )}
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              id="u_ativo"
-              type="checkbox"
-              checked={!!form.ativo}
-              onChange={(e) => setField("ativo", e.target.checked ? 1 : 0)}
-            />
-            <label htmlFor="u_ativo">Ativo</label>
-          </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit" className="toggle-btn" disabled={saving}>
-              {saving ? "Salvando..." : form.id ? "Salvar alterações" : "Cadastrar"}
-            </button>
-            <button
-              type="button"
-              className="toggle-btn"
-              onClick={() => setForm(EMPTY_FORM)}
-              disabled={saving}
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </section>
-
-      {/* Filtro + Tabela */}
-      <section>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <h2 className="title" style={{ margin: 0, fontSize: "var(--fs-18)" }}>Lista</h2>
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filtrar por nome/e-mail/pessoa/perfil…"
-            aria-label="Filtrar usuários"
-            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "8px" }}
-          />
-        </div>
-
-        <div style={{
-          overflowX: "auto",
-          background: "var(--panel)",
-          border: "1px solid var(--border)",
-          borderRadius: "12px",
-        }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: "var(--panel-muted)" }}>
-                <th style={th}>Nome</th>
-                <th style={th}>E-mail</th>
-                <th style={th}>Pessoa</th>
-                <th style={th}>Perfil</th>
-                <th style={th}>Ativo</th>
-                <th style={th}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={6} style={td}>Carregando…</td></tr>
-              ) : filtrados.length === 0 ? (
-                <tr><td colSpan={6} style={td}>Nenhum usuário encontrado.</td></tr>
-              ) : (
-                filtrados.map((u) => (
-                  <tr key={u.id} style={{ borderTop: "1px solid var(--border)" }}>
-                    <td style={td}>{u.nome}</td>
-                    <td style={td}>{u.email}</td>
-                    <td style={td}>{u.pessoa_nome || "—"}</td>
-                    <td style={td}>{u.perfil_nome || "—"}</td>
-                    <td style={td}>{u.ativo ? "Sim" : "Não"}</td>
-                    <td style={tdActions}>
-                      <button className="toggle-btn" onClick={() => editar(u)} title="Editar"><EditIcon /></button>
-                      <button className="toggle-btn" onClick={() => excluir(u)} title="Excluir"><TrashIcon /></button>
+      <div className="stats-grid" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="stat-card" style={{ padding: 0 }}>
+          {loading ? (
+            <div style={{ padding: 16, color: "var(--muted)" }}>Carregando…</div>
+          ) : filtrados.length === 0 ? (
+            <div style={{ padding: 16, color: "var(--muted)" }}>
+              Nenhum usuário encontrado.
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: 12 }}>Nome</th>
+                  <th style={{ padding: 12 }}>E-mail</th>
+                  <th style={{ padding: 12 }}>Pessoa</th>
+                  <th style={{ padding: 12 }}>Perfil</th>
+                  <th style={{ padding: 12 }}>Ativo</th>
+                  <th style={{ padding: 12, width: 160 }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map((u) => (
+                  <tr key={u.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: 12 }}>{u.nome}</td>
+                    <td style={{ padding: 12 }}>{u.email}</td>
+                    <td style={{ padding: 12 }}>{u.pessoa_nome || "—"}</td>
+                    <td style={{ padding: 12 }}>{u.perfil_nome || "—"}</td>
+                    <td style={{ padding: 12 }}>{u.ativo ? "Sim" : "Não"}</td>
+                    <td style={{ padding: 12, display: "flex", gap: 8 }}>
+                      <button className="toggle-btn" onClick={() => editar(u)}>
+                        <EditIcon /> Editar
+                      </button>
+                      <button className="toggle-btn" onClick={() => excluir(u)}>
+                        <TrashIcon /> Excluir
+                      </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
-      </section>
+      </div>
+
+      {/* Drawer/ formulário */}
+      {showForm && (
+        <div className="stat-card" style={{ marginTop: 16 }}>
+          <h2 className="title" style={{ margin: 0, marginBottom: 12 }}>
+            {form.id ? "Editar Usuário" : "Novo Usuário"}
+          </h2>
+          <form className="form" onSubmit={salvar}>
+            {/* Pessoa (só na criação) */}
+            {!form.id && (
+              <>
+                <label htmlFor="u_pessoa">Pessoa</label>
+                <select
+                  id="u_pessoa"
+                  value={form.pessoa_id}
+                  onChange={(e) => setField("pessoa_id", e.target.value)}
+                  disabled={loadingOpts}
+                  required
+                  style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)", width: "100%" }}
+                >
+                  <option value="">Selecione…</option>
+                  {pessoasSemUsuario.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <small style={{ color: "var(--muted)" }}>
+                  Precisa cadastrar uma <Link to="/pessoas"><strong>pessoa</strong></Link> antes?
+                </small>
+              </>
+            )}
+
+            <label htmlFor="u_nome">Nome</label>
+            <input
+              id="u_nome"
+              value={form.nome}
+              onChange={(e) => setField("nome", e.target.value)}
+              required
+            />
+
+            <label htmlFor="u_email">E-mail</label>
+            <input
+              id="u_email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setField("email", e.target.value)}
+              required
+            />
+
+            <label htmlFor="u_senha">Senha {form.id ? "(deixe em branco para manter)" : ""}</label>
+            <input
+              id="u_senha"
+              type="password"
+              value={form.senha}
+              onChange={(e) => setField("senha", e.target.value)}
+              placeholder={form.id ? "••••••••" : ""}
+              required={!form.id}
+            />
+
+            <label htmlFor="u_perfil">Perfil</label>
+            <select
+              id="u_perfil"
+              value={form.perfil_id}
+              onChange={(e) => setField("perfil_id", e.target.value)}
+              disabled={loadingOpts}
+              required
+              style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)", width: "100%" }}
+            >
+              <option value="">Selecione…</option>
+              {perfis.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+            {(!isAdmin && !isDev) && (
+              <small style={{ color: "var(--muted)" }}>
+                Você não pode atribuir o perfil <strong>administrador</strong>.
+              </small>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+              <input
+                id="u_ativo"
+                type="checkbox"
+                checked={!!form.ativo}
+                onChange={(e) => setField("ativo", e.target.checked ? 1 : 0)}
+              />
+              <label htmlFor="u_ativo">Ativo</label>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button type="button" className="toggle-btn" onClick={cancelar}>
+                Cancelar
+              </button>
+              <button type="submit" className="toggle-btn" disabled={saving}>
+                {saving ? "Salvando..." : form.id ? "Salvar alterações" : "Criar usuário"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   );
 }
-
-/* helpers visuais */
-const th = { textAlign: "left", padding: "12px", fontWeight: 600, color: "var(--fg)", borderBottom: "1px solid var(--border)" };
-const td = { padding: "10px 12px", color: "var(--fg)" };
-const tdActions = { ...td, display: "flex", gap: 6, justifyContent: "flex-end" };
