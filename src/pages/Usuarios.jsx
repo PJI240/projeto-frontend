@@ -238,7 +238,7 @@ export default function Usuarios() {
       <header className="main-header">
         <div className="header-content">
           <h1>Usuários</h1>
-          <p>Gerencie os acessos vinculados às pessoas da empresa.</p>
+          <p>Gerencie os acessos do sistema. Cada pessoa pode ter apenas um usuário vinculado.</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="toggle-btn" onClick={novo}>
