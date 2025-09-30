@@ -242,7 +242,7 @@ export default function Usuarios() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="toggle-btn" onClick={novo}>
-            <PlusIcon /> Novo Usuário
+            Novo Usuário
           </button>
           <button className="toggle-btn" onClick={carregarLista} disabled={loading}>
             <RefreshIcon /> {loading ? "Atualizando..." : "Atualizar"}
