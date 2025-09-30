@@ -1,4 +1,4 @@
-// src/pages/Escalas.jsx - VERSÃO COMPATÍVEL COM BACKEND
+// src/pages/Escalas.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
@@ -415,7 +415,7 @@ export default function Escalas() {
     <>
       <header className="main-header">
         <div className="header-content">
-          <h1>Escalas - Visual Timeline</h1>
+          <h1>Escalas</h1>
           <p>Clique em qualquer horário para adicionar ou editar escalas</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
