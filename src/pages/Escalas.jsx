@@ -55,8 +55,8 @@ function calcularDuracao(entrada, saida) {
 const DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
-// Horários do dia (6h às 22h)
-const HORARIOS_DIA = Array.from({ length, 17 }, (_, i) => {
+// Horários do dia (6h às 22h) - CORRIGIDO
+const HORARIOS_DIA = Array.from({ length: 17 }, (_, i) => {
   const hora = i + 6;
   return `${hora.toString().padStart(2, '0')}:00`;
 });
@@ -156,8 +156,6 @@ export default function Escalas() {
     saida: "",
     origem: "FIXA",
   });
-
-  const [celulaSelecionada, setCelulaSelecionada] = useState(null);
 
   const api = useCallback(async (path, init = {}) => {
     const r = await fetch(`${API_BASE}${path}`, { credentials: "include", ...init });
