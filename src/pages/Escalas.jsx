@@ -122,15 +122,13 @@ export default function Escalas() {
 
   const [funcionarios, setFuncionarios] = useState([]);
   const [escalas, setEscalas] = useState([]);
-  const [feriados, setFeriados] = useState([]);
   
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [sucesso, setSucesso] = useState("");
 
-  // Estados para modais
+  // Estados para modal
   const [modalAberto, setModalAberto] = useState(false);
-  const [modalFeriadoAberto, setModalFeriadoAberto] = useState(false);
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState({
     funcionario_id: "",
@@ -139,11 +137,6 @@ export default function Escalas() {
     entrada: "",
     saida: "",
     origem: "FIXA",
-  });
-  
-  const [formFeriado, setFormFeriado] = useState({
-    data: toISO(new Date()),
-    descricao: ""
   });
 
   const api = useCallback(async (path, init = {}) => {
@@ -166,17 +159,6 @@ export default function Escalas() {
     setEscalas(d.escalas || []);
   }, [api, dias]);
 
-  const carregarFeriados = useCallback(async () => {
-    try {
-      const de = toISO(dias[0]);
-      const ate = toISO(dias[6]);
-      const d = await api(`/api/feriados?from=${de}&to=${ate}`);
-      setFeriados(d.feriados || []);
-    } catch (e) {
-      console.error("Erro ao carregar feriados:", e);
-    }
-  }, [api, dias]);
-
   const recarregar = useCallback(async () => {
     setLoading(true);
     setErr("");
@@ -184,15 +166,14 @@ export default function Escalas() {
     try {
       await Promise.all([
         carregarFuncionarios(),
-        carregarEscalas(),
-        carregarFeriados()
+        carregarEscalas()
       ]);
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
     } finally {
       setLoading(false);
     }
-  }, [carregarFuncionarios, carregarEscalas, carregarFeriados]);
+  }, [carregarFuncionarios, carregarEscalas]);
 
   useEffect(() => {
     recarregar();
@@ -222,12 +203,6 @@ export default function Escalas() {
     }
     return map;
   }, [escalas]);
-
-  const feriadoPorData = useMemo(() => {
-    const map = new Map();
-    feriados.forEach(f => map.set(f.data, f));
-    return map;
-  }, [feriados]);
 
   // Calcular totais por dia
   const calcularTotaisDia = (escalasDia) => {
@@ -323,22 +298,6 @@ export default function Escalas() {
     }
   };
 
-  const salvarFeriado = async () => {
-    setErr("");
-    try {
-      await api(`/api/feriados`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formFeriado),
-      });
-      setModalFeriadoAberto(false);
-      setSucesso("Feriado adicionado com sucesso!");
-      await carregarFeriados();
-    } catch (e) {
-      setErr(e.message || "Falha ao salvar feriado.");
-    }
-  };
-
   return (
     <>
       <header className="main-header">
@@ -355,9 +314,6 @@ export default function Escalas() {
           </button>
           <button className="toggle-btn" onClick={semanaSeguinte}>
             Seguinte →
-          </button>
-          <button className="toggle-btn" onClick={() => setModalFeriadoAberto(true)}>
-            + Feriado
           </button>
           <button className="toggle-btn" onClick={recarregar} disabled={loading}>
             {loading ? "Atualizando..." : "Atualizar"}
@@ -408,36 +364,21 @@ export default function Escalas() {
         }}>
           {/* Cabeçalho dos dias */}
           <div style={{ background: "var(--panel)", padding: "12px" }}></div>
-          {dias.map((dia, index) => {
-            const feriado = feriadoPorData.get(toISO(dia));
-            return (
-              <div key={index} style={{ 
-                background: "var(--panel)", 
-                padding: "12px",
-                textAlign: "center",
-                borderBottom: "2px solid var(--border)"
-              }}>
-                <div style={{ fontWeight: 600, fontSize: "14px" }}>
-                  {DIAS_SEMANA_CURTO[index]}
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-                  {formatDateBR(dia)}
-                </div>
-                {feriado && (
-                  <div style={{ 
-                    fontSize: "11px", 
-                    color: "#dc2626",
-                    background: "#fef2f2",
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    marginTop: "4px"
-                  }}>
-                    🎉 {feriado.descricao}
-                  </div>
-                )}
+          {dias.map((dia, index) => (
+            <div key={index} style={{ 
+              background: "var(--panel)", 
+              padding: "12px",
+              textAlign: "center",
+              borderBottom: "2px solid var(--border)"
+            }}>
+              <div style={{ fontWeight: 600, fontSize: "14px" }}>
+                {DIAS_SEMANA_CURTO[index]}
               </div>
-            );
-          })}
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
+                {formatDateBR(dia)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -487,7 +428,6 @@ export default function Escalas() {
               {dias.map((dia, diaIndex) => {
                 const key = `${func.id}|${toISO(dia)}`;
                 const escalasDia = escalasPorFuncionarioDia.get(key) || [];
-                const feriado = feriadoPorData.get(toISO(dia));
                 const totalDia = calcularTotaisDia(escalasDia);
 
                 return (
@@ -497,86 +437,73 @@ export default function Escalas() {
                     minHeight: "120px",
                     position: "relative"
                   }}>
-                    {feriado ? (
-                      <div style={{ 
-                        textAlign: "center", 
-                        color: "#dc2626",
-                        fontSize: "12px",
-                        padding: "8px"
-                      }}>
-                        🎉 Feriado
-                      </div>
+                    {escalasDia.length === 0 ? (
+                      <button
+                        className="toggle-btn"
+                        style={{ width: "100%", fontSize: "12px", padding: "8px" }}
+                        onClick={() => abrirNovo(func.id, toISO(dia))}
+                      >
+                        + Add
+                      </button>
                     ) : (
-                      <>
-                        {escalasDia.length === 0 ? (
-                          <button
-                            className="toggle-btn"
-                            style={{ width: "100", fontSize: "12px", padding: "8px" }}
-                            onClick={() => abrirNovo(func.id, toISO(dia))}
-                          >
-                            + Add
-                          </button>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                            {escalasDia.map((escala, turnoIndex) => (
-                              <div key={escala.id} style={{
-                                border: "1px solid var(--border)",
-                                borderRadius: "6px",
-                                padding: "6px",
-                                fontSize: "11px",
-                                background: "var(--panel-muted)"
-                              }}>
-                                <div style={{ fontWeight: 600 }}>
-                                  T{escala.turno_ordem}: {escala.entrada || "--:--"} às {escala.saida || "--:--"}
-                                </div>
-                                <div style={{ color: "var(--muted)", marginTop: "2px" }}>
-                                  {calcularDuracao(escala.entrada, escala.saida)}h
-                                </div>
-                                <div style={{ display: "flex", gap: "4px", marginTop: "4px" }}>
-                                  <button
-                                    className="toggle-btn"
-                                    style={{ padding: "2px 4px", fontSize: "10px" }}
-                                    onClick={() => abrirEdicao(escala)}
-                                  >
-                                    Editar
-                                  </button>
-                                  <button
-                                    className="toggle-btn"
-                                    style={{ padding: "2px 4px", fontSize: "10px" }}
-                                    onClick={() => excluirEscala(escala)}
-                                  >
-                                    Excluir
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            <button
-                              className="toggle-btn"
-                              style={{ fontSize: "11px", padding: "4px" }}
-                              onClick={() => abrirNovo(func.id, toISO(dia))}
-                            >
-                              + Turno
-                            </button>
-                          </div>
-                        )}
-                        
-                        {escalasDia.length > 0 && (
-                          <div style={{
-                            position: "absolute",
-                            bottom: "4px",
-                            right: "4px",
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            color: "var(--success)",
-                            background: "var(--panel)",
-                            padding: "2px 4px",
-                            borderRadius: "4px",
-                            border: "1px solid var(--border)"
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {escalasDia.map((escala, turnoIndex) => (
+                          <div key={escala.id} style={{
+                            border: "1px solid var(--border)",
+                            borderRadius: "6px",
+                            padding: "6px",
+                            fontSize: "11px",
+                            background: "var(--panel-muted)"
                           }}>
-                            Total: {totalDia}h
+                            <div style={{ fontWeight: 600 }}>
+                              T{escala.turno_ordem}: {escala.entrada || "--:--"} às {escala.saida || "--:--"}
+                            </div>
+                            <div style={{ color: "var(--muted)", marginTop: "2px" }}>
+                              {calcularDuracao(escala.entrada, escala.saida)}h
+                            </div>
+                            <div style={{ display: "flex", gap: "4px", marginTop: "4px" }}>
+                              <button
+                                className="toggle-btn"
+                                style={{ padding: "2px 4px", fontSize: "10px" }}
+                                onClick={() => abrirEdicao(escala)}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                className="toggle-btn"
+                                style={{ padding: "2px 4px", fontSize: "10px" }}
+                                onClick={() => excluirEscala(escala)}
+                              >
+                                Excluir
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </>
+                        ))}
+                        <button
+                          className="toggle-btn"
+                          style={{ fontSize: "11px", padding: "4px" }}
+                          onClick={() => abrirNovo(func.id, toISO(dia))}
+                        >
+                          + Turno
+                        </button>
+                      </div>
+                    )}
+                    
+                    {escalasDia.length > 0 && (
+                      <div style={{
+                        position: "absolute",
+                        bottom: "4px",
+                        right: "4px",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        color: "var(--success)",
+                        background: "var(--panel)",
+                        padding: "2px 4px",
+                        borderRadius: "4px",
+                        border: "1px solid var(--border)"
+                      }}>
+                        Total: {totalDia}h
+                      </div>
                     )}
                   </div>
                 );
@@ -706,59 +633,6 @@ export default function Escalas() {
               Duração: <strong>{calcularDuracao(form.entrada, form.saida)} horas</strong>
             </div>
           )}
-        </div>
-      </Modal>
-
-      {/* Modal Feriado */}
-      <Modal
-        open={modalFeriadoAberto}
-        onClose={() => setModalFeriadoAberto(false)}
-        title="Adicionar Feriado"
-        footer={
-          <>
-            <button className="toggle-btn" onClick={() => setModalFeriadoAberto(false)}>
-              Cancelar
-            </button>
-            <button className="toggle-btn" onClick={salvarFeriado}>
-              Adicionar
-            </button>
-          </>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "14px" }}>
-              Data do Feriado
-            </label>
-            <input
-              type="date"
-              value={formFeriado.data}
-              onChange={(e) => setFormFeriado({ ...formFeriado, data: e.target.value })}
-              style={{ 
-                width: "100%", 
-                padding: "8px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)" 
-              }}
-            />
-          </div>
-          <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "14px" }}>
-              Descrição
-            </label>
-            <input
-              type="text"
-              value={formFeriado.descricao}
-              onChange={(e) => setFormFeriado({ ...formFeriado, descricao: e.target.value })}
-              placeholder="Ex: Natal, Ano Novo, Feriado Municipal..."
-              style={{ 
-                width: "100%", 
-                padding: "8px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)" 
-              }}
-            />
-          </div>
         </div>
       </Modal>
     </>
