@@ -1,13 +1,5 @@
 // src/pages/Perfis.jsx
 import { useEffect, useState } from "react";
-import {
-  PlusIcon,
-  PencilSquareIcon,
-  TrashIcon,
-  XMarkIcon,
-  CheckIcon,
-  ArrowPathIcon,
-} from "@heroicons/react/24/outline";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
@@ -19,27 +11,31 @@ export default function Perfis() {
   const [success, setSuccess] = useState("");
 
   // painel de formulário (inline)
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [editing, setEditing] = useState(null); // objeto perfil ou null
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ nome: "", ativo: 1 });
 
-  function openCreate() {
-    setErr(""); setSuccess("");
-    setEditing(null);
+  function abrirNovo() {
+    setErr(""); 
+    setSuccess("");
+    setEditId(null);
     setForm({ nome: "", ativo: 1 });
-    setPanelOpen(true);
-  }
-  function openEdit(p) {
-    setErr(""); setSuccess("");
-    setEditing(p);
-    setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 });
-    setPanelOpen(true);
-  }
-  function closePanel() {
-    setPanelOpen(false);
+    setShowForm(true);
   }
 
-  async function load() {
+  function abrirEdicao(p) {
+    setErr(""); 
+    setSuccess("");
+    setEditId(p.id);
+    setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 });
+    setShowForm(true);
+  }
+
+  function fecharForm() {
+    setShowForm(false);
+  }
+
+  async function carregar() {
     setLoading(true);
     setErr("");
     try {
@@ -54,20 +50,28 @@ export default function Perfis() {
       setLoading(false);
     }
   }
-  useEffect(() => { load(); }, []);
 
-  async function save(e) {
+  useEffect(() => { 
+    carregar(); 
+  }, []);
+
+  async function salvar(e) {
     e?.preventDefault?.();
     setSaving(true);
-    setErr(""); setSuccess("");
+    setErr(""); 
+    setSuccess("");
 
     try {
-      const body = { nome: form.nome?.trim(), ativo: form.ativo ? 1 : 0 };
+      const body = { 
+        nome: form.nome?.trim(), 
+        ativo: form.ativo ? 1 : 0 
+      };
+      
       if (!body.nome) throw new Error("Informe o nome do perfil.");
 
       let r;
-      if (editing) {
-        r = await fetch(`${API_BASE}/api/perfis/${editing.id}`, {
+      if (editId) {
+        r = await fetch(`${API_BASE}/api/perfis/${editId}`, {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -81,12 +85,13 @@ export default function Perfis() {
           body: JSON.stringify(body),
         });
       }
+      
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao salvar.");
 
-      setSuccess(editing ? "Perfil atualizado." : "Perfil criado.");
-      setPanelOpen(false);
-      await load();
+      setSuccess(editId ? "Perfil atualizado." : "Perfil criado.");
+      setShowForm(false);
+      await carregar();
     } catch (e) {
       setErr(e.message || "Falha ao salvar perfil.");
     } finally {
@@ -94,14 +99,16 @@ export default function Perfis() {
     }
   }
 
-  async function removePerfil(p) {
-    setErr(""); setSuccess("");
+  async function excluir(p) {
+    setErr(""); 
+    setSuccess("");
 
     const nomeLower = String(p.nome || "").trim().toLowerCase();
     if (nomeLower === "administrador") {
       setErr("Este perfil não pode ser excluído.");
       return;
     }
+    
     if (!confirm(`Excluir o perfil "${p.nome}"?`)) return;
 
     try {
@@ -112,7 +119,7 @@ export default function Perfis() {
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao excluir.");
       setSuccess("Perfil excluído.");
-      await load();
+      await carregar();
     } catch (e) {
       setErr(e.message || "Não foi possível excluir o perfil.");
     }
@@ -125,20 +132,12 @@ export default function Perfis() {
           <h1>Perfis</h1>
           <p>Gerencie os perfis de acesso desta empresa.</p>
         </div>
-        <div className="toggles">
-          <button
-            className="toggle-btn"
-            onClick={load}
-            disabled={loading}
-            aria-busy={loading ? "true" : "false"}
-            title="Atualizar"
-          >
-            <ArrowPathIcon className={`icon-sm ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Atualizando..." : "Atualizar"}
-          </button>
-          <button className="toggle-btn" onClick={openCreate} title="Novo perfil">
-            <PlusIcon className="icon-sm" />
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="toggle-btn" onClick={abrirNovo}>
             Novo Perfil
+          </button>
+          <button className="toggle-btn" onClick={carregar} disabled={loading}>
+            {loading ? "Atualizando..." : "Atualizar"}
           </button>
         </div>
       </header>
@@ -148,159 +147,120 @@ export default function Perfis() {
           {err}
         </div>
       )}
+      
       {success && (
         <div className="success-alert" role="status" style={{ marginBottom: 16 }}>
           {success}
         </div>
       )}
 
-      {/* Painel inline de criação/edição */}
-      {panelOpen && (
-        <section style={{ marginBottom: 16 }}>
-          <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <h3 style={{ margin: 0 }}>{editing ? "Editar perfil" : "Novo perfil"}</h3>
-              <button className="toggle-btn" onClick={closePanel} title="Fechar">
-                <XMarkIcon className="icon-sm" />
-                Fechar
-              </button>
+      <div className="stats-grid" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="stat-card" style={{ padding: 0 }}>
+          {loading ? (
+            <div style={{ padding: 16, color: "var(--muted)" }}>Carregando…</div>
+          ) : perfis.length === 0 ? (
+            <div style={{ padding: 16, color: "var(--muted)" }}>
+              Nenhum perfil encontrado.
             </div>
-
-            <form className="form" onSubmit={save}>
-              <label htmlFor="perfil-nome">Nome do perfil</label>
-              <input
-                id="perfil-nome"
-                value={form.nome}
-                onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-                placeholder='Ex.: "Supervisor", "RH", "Financeiro"'
-                maxLength={100}
-                required
-              />
-
-              <label className="checkbox" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={!!form.ativo}
-                  onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked ? 1 : 0 }))}
-                />
-                <span>Ativo</span>
-              </label>
-
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button type="button" className="toggle-btn" onClick={closePanel}>
-                  Cancelar
-                </button>
-                <button type="submit" className="toggle-btn" disabled={saving}>
-                  <CheckIcon className="icon-sm" />
-                  {saving ? "Salvando..." : editing ? "Atualizar" : "Criar"}
-                </button>
-              </div>
-            </form>
-
-            <p style={{ marginTop: 8, color: "var(--muted)", fontSize: "var(--fs-14)" }}>
-              Observação: o perfil <strong>Administrador</strong> é base do sistema, não pode ser excluído e a empresa nunca pode
-              ficar sem pelo menos um usuário com esse perfil.
-            </p>
-          </div>
-        </section>
-      )}
-
-      {/* Tabela */}
-      <section>
-        <div className="card">
-          <div className="table-responsive">
-            <table className="table">
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr>
-                  <th style={{ width: "60%" }}>Nome</th>
-                  <th style={{ width: "20%" }}>Ativo</th>
-                  <th style={{ width: "20%" }}>Ações</th>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: 12 }}>Nome</th>
+                  <th style={{ padding: 12 }}>Status</th>
+                  <th style={{ padding: 12, width: 160 }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr><td colSpan={3}>Carregando…</td></tr>
-                ) : perfis.length === 0 ? (
-                  <tr><td colSpan={3}>Nenhum perfil encontrado.</td></tr>
-                ) : (
-                  perfis.map((p) => {
-                    const isAdmin = String(p.nome || "").trim().toLowerCase() === "administrador";
-                    return (
-                      <tr key={p.id}>
-                        <td>
-                          <strong>{p.nome}</strong>
+                {perfis.map((p) => {
+                  const isAdmin = String(p.nome || "").trim().toLowerCase() === "administrador";
+                  return (
+                    <tr key={p.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {p.nome}
                           {isAdmin && (
                             <span
                               style={{
-                                marginLeft: 8,
-                                fontSize: "var(--fs-12)",
+                                fontSize: "12px",
                                 color: "var(--muted)",
                                 border: "1px solid var(--border)",
-                                padding: "2px 6px",
-                                borderRadius: 999,
-                                verticalAlign: "middle",
+                                padding: "2px 8px",
+                                borderRadius: "12px",
                               }}
-                              title="Perfil base"
                             >
                               base
                             </span>
                           )}
-                        </td>
-                        <td>
-                          {p.ativo ? (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "2px 8px",
-                                borderRadius: 999,
-                                fontSize: "var(--fs-12)",
-                                background: "color-mix(in srgb, var(--success) 18%, white)",
-                                color: "#065f46",
-                              }}
-                            >
-                              Ativo
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "2px 8px",
-                                borderRadius: 999,
-                                fontSize: "var(--fs-12)",
-                                background: "#f3f4f6",
-                                color: "#374151",
-                              }}
-                            >
-                              Inativo
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button className="toggle-btn" onClick={() => openEdit(p)} title="Editar">
-                              <PencilSquareIcon className="icon-sm" />
-                              Editar
-                            </button>
-                            <button
-                              className="toggle-btn"
-                              onClick={() => removePerfil(p)}
-                              title="Excluir"
-                              disabled={isAdmin}
-                            >
-                              <TrashIcon className="icon-sm" />
-                              Excluir
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                        </div>
+                      </td>
+                      <td style={{ padding: 12 }}>
+                        {p.ativo ? "Ativo" : "Inativo"}
+                      </td>
+                      <td style={{ padding: 12, display: "flex", gap: 8 }}>
+                        <button className="toggle-btn" onClick={() => abrirEdicao(p)}>
+                          Editar
+                        </button>
+                        <button 
+                          className="toggle-btn" 
+                          onClick={() => excluir(p)}
+                          disabled={isAdmin}
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-          </div>
+          )}
         </div>
-      </section>
+      </div>
+
+      {/* Drawer/ formulário */}
+      {showForm && (
+        <div className="stat-card" style={{ marginTop: 16 }}>
+          <h2 className="title" style={{ margin: 0, marginBottom: 12 }}>
+            {editId ? "Editar Perfil" : "Novo Perfil"}
+          </h2>
+          <form className="form" onSubmit={salvar}>
+            <label htmlFor="perfil-nome">Nome do perfil</label>
+            <input
+              id="perfil-nome"
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              placeholder='Ex.: "Supervisor", "RH", "Financeiro"'
+              maxLength={100}
+              required
+            />
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+              <input
+                id="perfil-ativo"
+                type="checkbox"
+                checked={!!form.ativo}
+                onChange={(e) => setForm({ ...form, ativo: e.target.checked ? 1 : 0 })}
+              />
+              <label htmlFor="perfil-ativo">Ativo</label>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button type="button" className="toggle-btn" onClick={fecharForm}>
+                Cancelar
+              </button>
+              <button type="submit" className="toggle-btn" disabled={saving}>
+                {saving ? "Salvando..." : editId ? "Salvar alterações" : "Criar perfil"}
+              </button>
+            </div>
+
+            <small style={{ color: "var(--muted)", display: "block", marginTop: 12 }}>
+              Observação: o perfil <strong>Administrador</strong> é base do sistema, não pode ser excluído e a empresa nunca pode
+              ficar sem pelo menos um usuário com esse perfil.
+            </small>
+          </form>
+        </div>
+      )}
     </>
   );
 }
