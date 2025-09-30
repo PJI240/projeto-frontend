@@ -107,9 +107,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
         </div>
 
         <div className="user-info" role="group" aria-label="Usuário">
-          <div className="user-avatar">
-            {me?.nome?.[0]?.toUpperCase() || 'U'}
-          </div>
+
           <div className="user-details">
             <div className="user-name">{me?.nome || "Usuário"}</div>
             <div className="user-email">{me?.email}</div>
