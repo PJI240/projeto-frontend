@@ -129,10 +129,11 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
         <nav className="sidebar-nav" aria-label="Navegação principal">
           <MenuGroup title="Geral">
-            <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
+            
             <MenuItem to="/dashboard" label="Visão Geral" icon={<ChartBarIcon />} onClick={closeMenu} />
             {isFunc && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} onClick={closeMenu} />}
             {isAdm && <MenuItem to="/dashboard_adm" label="Painel do Admin" icon={<ShieldCheckIcon />} onClick={closeMenu} />}
+            <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
           </MenuGroup>
 
           {(isDev || isAdm) && (
