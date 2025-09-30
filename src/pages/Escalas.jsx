@@ -620,3 +620,38 @@ export default function Escalas() {
     </>
   );
 }
+
+const thStyle = {
+  position: "sticky",
+  top: 0,
+  background: "var(--panel)",
+  borderBottom: "1px solid var(--border)",
+  padding: "12px 10px",
+  textAlign: "center",
+  fontWeight: 700,
+  color: "var(--fg)",
+  zIndex: 1,
+};
+const tdNameStyle = {
+  verticalAlign: "top",
+  borderTop: "1px solid var(--border)",
+  padding: 12,
+  minWidth: 220,
+  background: "var(--panel)",
+};
+const cellStyle = (today) => ({
+  verticalAlign: "top",
+  borderTop: "1px solid var(--border)",
+  borderLeft: "1px solid var(--border)",
+  padding: 12,
+  minWidth: 220,
+  background: today ? "color-mix(in srgb, var(--info) 8%, #fff)" : "var(--panel)",
+});
+const selectStyle = {
+  padding: "12px 14px",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius)",
+  fontSize: "var(--fs-16)",
+  background: "#fff",
+  color: "#111",
+};
