@@ -138,8 +138,8 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
           {(isDev || isAdm) && (
             <MenuGroup title="Cadastros">
-              <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
+              <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
               <MenuItem to="/funcionarios" label="Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
             </MenuGroup>
@@ -147,7 +147,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
           {(isDev || isAdm) && (
             <MenuGroup title="Vínculos / Segurança">
-              <MenuItem to="/empresas-usuarios" label="Empresas × Usuários" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
               <MenuItem to="/usuarios-perfis" label="Usuários × Perfis" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/perfis-permissoes" label="Perfis × Permissões" icon={<KeyIcon />} onClick={closeMenu} />
             </MenuGroup>
