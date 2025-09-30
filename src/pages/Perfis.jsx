@@ -18,34 +18,32 @@ export default function Perfis() {
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
 
-  // modal state
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(null); // perfil em edição (obj) ou null
+  // painel de formulário (inline)
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // objeto perfil ou null
   const [form, setForm] = useState({ nome: "", ativo: 1 });
 
   function openCreate() {
     setErr(""); setSuccess("");
     setEditing(null);
     setForm({ nome: "", ativo: 1 });
-    setOpen(true);
+    setPanelOpen(true);
   }
   function openEdit(p) {
     setErr(""); setSuccess("");
     setEditing(p);
     setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 });
-    setOpen(true);
+    setPanelOpen(true);
   }
-  function closeModal() {
-    setOpen(false);
+  function closePanel() {
+    setPanelOpen(false);
   }
 
   async function load() {
     setLoading(true);
     setErr("");
     try {
-      const r = await fetch(`${API_BASE}/api/perfis`, {
-        credentials: "include",
-      });
+      const r = await fetch(`${API_BASE}/api/perfis`, { credentials: "include" });
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || `HTTP ${r.status}`);
       setPerfis(data.perfis || []);
@@ -56,7 +54,6 @@ export default function Perfis() {
       setLoading(false);
     }
   }
-
   useEffect(() => { load(); }, []);
 
   async function save(e) {
@@ -68,7 +65,7 @@ export default function Perfis() {
       const body = { nome: form.nome?.trim(), ativo: form.ativo ? 1 : 0 };
       if (!body.nome) throw new Error("Informe o nome do perfil.");
 
-      let r, data;
+      let r;
       if (editing) {
         r = await fetch(`${API_BASE}/api/perfis/${editing.id}`, {
           method: "PUT",
@@ -84,14 +81,13 @@ export default function Perfis() {
           body: JSON.stringify(body),
         });
       }
-      data = await r.json().catch(() => null);
+      const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao salvar.");
 
       setSuccess(editing ? "Perfil atualizado." : "Perfil criado.");
-      setOpen(false);
+      setPanelOpen(false);
       await load();
     } catch (e) {
-      // mensagens vindas do backend (ex.: “não pode renomear/excluir administrador”, etc)
       setErr(e.message || "Falha ao salvar perfil.");
     } finally {
       setSaving(false);
@@ -129,13 +125,19 @@ export default function Perfis() {
           <h1>Perfis</h1>
           <p>Gerencie os perfis de acesso desta empresa.</p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="toggle-btn" onClick={load} disabled={loading} aria-busy={loading ? "true" : "false"}>
-            <ArrowPathIcon width="18" height="18" />
+        <div className="toggles">
+          <button
+            className="toggle-btn"
+            onClick={load}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+            title="Atualizar"
+          >
+            <ArrowPathIcon className={`icon-sm ${loading ? "animate-spin" : ""}`} />
             {loading ? "Atualizando..." : "Atualizar"}
           </button>
-          <button className="toggle-btn" onClick={openCreate}>
-            <PlusIcon width="18" height="18" />
+          <button className="toggle-btn" onClick={openCreate} title="Novo perfil">
+            <PlusIcon className="icon-sm" />
             Novo Perfil
           </button>
         </div>
@@ -152,6 +154,58 @@ export default function Perfis() {
         </div>
       )}
 
+      {/* Painel inline de criação/edição */}
+      {panelOpen && (
+        <section style={{ marginBottom: 16 }}>
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <h3 style={{ margin: 0 }}>{editing ? "Editar perfil" : "Novo perfil"}</h3>
+              <button className="toggle-btn" onClick={closePanel} title="Fechar">
+                <XMarkIcon className="icon-sm" />
+                Fechar
+              </button>
+            </div>
+
+            <form className="form" onSubmit={save}>
+              <label htmlFor="perfil-nome">Nome do perfil</label>
+              <input
+                id="perfil-nome"
+                value={form.nome}
+                onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+                placeholder='Ex.: "Supervisor", "RH", "Financeiro"'
+                maxLength={100}
+                required
+              />
+
+              <label className="checkbox" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={!!form.ativo}
+                  onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked ? 1 : 0 }))}
+                />
+                <span>Ativo</span>
+              </label>
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button type="button" className="toggle-btn" onClick={closePanel}>
+                  Cancelar
+                </button>
+                <button type="submit" className="toggle-btn" disabled={saving}>
+                  <CheckIcon className="icon-sm" />
+                  {saving ? "Salvando..." : editing ? "Atualizar" : "Criar"}
+                </button>
+              </div>
+            </form>
+
+            <p style={{ marginTop: 8, color: "var(--muted)", fontSize: "var(--fs-14)" }}>
+              Observação: o perfil <strong>Administrador</strong> é base do sistema, não pode ser excluído e a empresa nunca pode
+              ficar sem pelo menos um usuário com esse perfil.
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Tabela */}
       <section>
         <div className="card">
           <div className="table-responsive">
@@ -165,103 +219,88 @@ export default function Perfis() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={3}>Carregando…</td>
-                  </tr>
+                  <tr><td colSpan={3}>Carregando…</td></tr>
                 ) : perfis.length === 0 ? (
-                  <tr>
-                    <td colSpan={3}>Nenhum perfil encontrado.</td>
-                  </tr>
+                  <tr><td colSpan={3}>Nenhum perfil encontrado.</td></tr>
                 ) : (
-                  perfis.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <strong>{p.nome}</strong>
-                        {String(p.nome || "").trim().toLowerCase() === "administrador" && (
-                          <span className="badge" title="Perfil fixo">
-                            base
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {p.ativo ? (
-                          <span className="chip chip-success">Ativo</span>
-                        ) : (
-                          <span className="chip chip-muted">Inativo</span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="btns">
-                          <button className="icon-btn" onClick={() => openEdit(p)} title="Editar">
-                            <PencilSquareIcon width="18" height="18" />
-                          </button>
-                          <button
-                            className="icon-btn danger"
-                            onClick={() => removePerfil(p)}
-                            title="Excluir"
-                            disabled={String(p.nome || "").trim().toLowerCase() === "administrador"}
-                          >
-                            <TrashIcon width="18" height="18" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  perfis.map((p) => {
+                    const isAdmin = String(p.nome || "").trim().toLowerCase() === "administrador";
+                    return (
+                      <tr key={p.id}>
+                        <td>
+                          <strong>{p.nome}</strong>
+                          {isAdmin && (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                fontSize: "var(--fs-12)",
+                                color: "var(--muted)",
+                                border: "1px solid var(--border)",
+                                padding: "2px 6px",
+                                borderRadius: 999,
+                                verticalAlign: "middle",
+                              }}
+                              title="Perfil base"
+                            >
+                              base
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {p.ativo ? (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                fontSize: "var(--fs-12)",
+                                background: "color-mix(in srgb, var(--success) 18%, white)",
+                                color: "#065f46",
+                              }}
+                            >
+                              Ativo
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                fontSize: "var(--fs-12)",
+                                background: "#f3f4f6",
+                                color: "#374151",
+                              }}
+                            >
+                              Inativo
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button className="toggle-btn" onClick={() => openEdit(p)} title="Editar">
+                              <PencilSquareIcon className="icon-sm" />
+                              Editar
+                            </button>
+                            <button
+                              className="toggle-btn"
+                              onClick={() => removePerfil(p)}
+                              title="Excluir"
+                              disabled={isAdmin}
+                            >
+                              <TrashIcon className="icon-sm" />
+                              Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
       </section>
-
-      {/* Modal simples */}
-      {open && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal-header">
-              <h3 className="modal-title">{editing ? "Editar perfil" : "Novo perfil"}</h3>
-              <button className="icon-btn" onClick={closeModal} aria-label="Fechar">
-                <XMarkIcon width="20" height="20" />
-              </button>
-            </div>
-
-            <form className="form" onSubmit={save}>
-              <label htmlFor="p-nome">Nome do perfil</label>
-              <input
-                id="p-nome"
-                value={form.nome}
-                onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-                placeholder='Ex.: "Supervisor", "RH", "Financeiro"'
-                maxLength={100}
-                required
-              />
-
-              <label className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={!!form.ativo}
-                  onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked ? 1 : 0 }))}
-                />
-                <span>Ativo</span>
-              </label>
-
-              <div className="modal-actions">
-                <button type="button" className="toggle-btn" onClick={closeModal}>
-                  Cancelar
-                </button>
-                <button type="submit" className="toggle-btn" disabled={saving}>
-                  <CheckIcon width="18" height="18" />
-                  {saving ? "Salvando..." : editing ? "Atualizar" : "Criar"}
-                </button>
-              </div>
-            </form>
-
-            <p className="hint">
-              Observação: o perfil <strong>Administrador</strong> é base do sistema, não pode ser excluído e a empresa nunca pode ficar sem pelo menos um usuário com esse perfil.
-            </p>
-          </div>
-        </div>
-      )}
     </>
   );
 }
