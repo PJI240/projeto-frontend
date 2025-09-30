@@ -1,4 +1,4 @@
-// src/pages/Escalas.jsx
+// src/pages/Escalas.jsx - VERSÃO COMPATÍVEL COM BACKEND
 import { useEffect, useMemo, useState, useCallback } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
@@ -55,7 +55,7 @@ function calcularDuracao(entrada, saida) {
 const DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
-// Horários do dia (6h às 22h) - CORRIGIDO
+// Horários do dia (6h às 22h)
 const HORARIOS_DIA = Array.from({ length: 17 }, (_, i) => {
   const hora = i + 6;
   return `${hora.toString().padStart(2, '0')}:00`;
@@ -133,7 +133,7 @@ function Modal({ open, onClose, title, children, footer }) {
   );
 }
 
-/* ========== Página Escalas - VERSÃO TIMELINE ========== */
+/* ========== Página Escalas ========== */
 export default function Escalas() {
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
   const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(dataRef, i)), [dataRef]);
@@ -158,35 +158,73 @@ export default function Escalas() {
   });
 
   const api = useCallback(async (path, init = {}) => {
-    const r = await fetch(`${API_BASE}${path}`, { credentials: "include", ...init });
+    const url = `${API_BASE}${path}`;
+    console.log('🌐 API Call:', init.method || 'GET', url);
+    
+    const r = await fetch(url, { 
+      credentials: "include", 
+      ...init 
+    });
+    
     let data = null;
-    try { data = await r.json(); } catch {}
-    if (!r.ok || !data?.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+    try { 
+      data = await r.json(); 
+    } catch (e) {
+      console.error('❌ Erro ao parsear JSON:', e);
+      throw new Error(`Resposta inválida do servidor: ${r.status}`);
+    }
+    
+    console.log('📦 API Response:', data);
+    
+    if (!r.ok || data?.ok === false) {
+      throw new Error(data?.error || `HTTP ${r.status}`);
+    }
+    
     return data;
   }, []);
 
   const carregarFuncionarios = useCallback(async () => {
-    const d = await api(`/api/funcionarios?ativos=1`);
-    setFuncionarios(d.funcionarios || []);
+    try {
+      const d = await api(`/api/funcionarios?ativos=1`);
+      console.log('👥 Funcionários carregados:', d.funcionarios?.length);
+      setFuncionarios(d.funcionarios || []);
+    } catch (e) {
+      console.error('❌ Erro ao carregar funcionários:', e);
+      throw e;
+    }
   }, [api]);
 
   const carregarEscalas = useCallback(async () => {
     const de = toISO(dias[0]);
     const ate = toISO(dias[6]);
-    const d = await api(`/api/escalas?from=${de}&to=${ate}`);
-    setEscalas(d.escalas || []);
+    
+    console.log('📅 Carregando escalas de', de, 'até', ate);
+    
+    try {
+      const d = await api(`/api/escalas?from=${de}&to=${ate}`);
+      console.log('🕒 Escalas carregadas:', d.escalas?.length);
+      setEscalas(d.escalas || []);
+    } catch (e) {
+      console.error('❌ Erro ao carregar escalas:', e);
+      throw e;
+    }
   }, [api, dias]);
 
   const recarregar = useCallback(async () => {
     setLoading(true);
     setErr("");
     setSucesso("");
+    
+    console.log('🔄 Iniciando recarregamento...');
+    
     try {
       await Promise.all([
         carregarFuncionarios(),
         carregarEscalas()
       ]);
+      console.log('✅ Recarregamento concluído');
     } catch (e) {
+      console.error('❌ Erro no recarregar:', e);
       setErr(e.message || "Falha ao carregar dados.");
     } finally {
       setLoading(false);
@@ -197,6 +235,13 @@ export default function Escalas() {
     recarregar();
   }, [recarregar]);
 
+  // Recarregar quando mudar a semana
+  useEffect(() => {
+    if (escalas.length > 0) { // Só recarrega se já tiver dados carregados
+      carregarEscalas();
+    }
+  }, [dataRef]);
+
   // Navegação
   const semanaAnterior = () => setDataRef(addDays(dataRef, -7));
   const semanaSeguinte = () => setDataRef(addDays(dataRef, 7));
@@ -206,15 +251,25 @@ export default function Escalas() {
   const escalasAgrupadas = useMemo(() => {
     const mapa = new Map();
     
+    console.log('📊 Processando', escalas.length, 'escalas para agrupamento...');
+    
     escalas.forEach(escala => {
-      if (!escala.entrada || !escala.saida) return;
+      if (!escala.entrada || !escala.saida) {
+        console.log('⏰ Escala sem horários:', escala);
+        return;
+      }
       
       const funcionario = funcionarios.find(f => f.id === escala.funcionario_id);
-      if (!funcionario) return;
+      if (!funcionario) {
+        console.log('👤 Funcionário não encontrado para escala:', escala.funcionario_id);
+        return;
+      }
       
       // Para cada hora do turno, adicionar ao mapa
       const [horaEntrada] = escala.entrada.split(':').map(Number);
       const [horaSaida] = escala.saida.split(':').map(Number);
+      
+      console.log(`⏱️  Processando escala ${escala.id}: ${escala.entrada}-${escala.saida} (${horaEntrada}-${horaSaida}h)`);
       
       for (let hora = horaEntrada; hora < horaSaida; hora++) {
         const chave = `${escala.data}|${hora.toString().padStart(2, '0')}`;
@@ -232,13 +287,15 @@ export default function Escalas() {
       }
     });
     
+    console.log('🗂️  Agrupamento concluído:', mapa.size, 'chaves');
     return mapa;
   }, [escalas, funcionarios]);
 
   // Encontrar escala em uma célula específica
   const encontrarEscalaNaCelula = (dataISO, hora) => {
     const chave = `${dataISO}|${hora}`;
-    return escalasAgrupadas.get(chave) || [];
+    const escalas = escalasAgrupadas.get(chave) || [];
+    return escalas;
   };
 
   // Modal handlers
@@ -249,7 +306,7 @@ export default function Escalas() {
       data: dataISO || toISO(new Date()),
       turno_ordem: 1,
       entrada: hora,
-      saida: calcularHoraSaida(hora, 8), // 8 horas por padrão
+      saida: calcularHoraSaida(hora, 8),
       origem: "FIXA",
     });
     setModalAberto(true);
@@ -278,6 +335,8 @@ export default function Escalas() {
 
   const salvarEscala = async () => {
     setErr("");
+    setSucesso("");
+    
     try {
       const payload = {
         funcionario_id: Number(form.funcionario_id),
@@ -287,6 +346,8 @@ export default function Escalas() {
         saida: form.saida || null,
         origem: form.origem || "FIXA",
       };
+
+      console.log('💾 Salvando escala:', payload);
 
       if (!payload.funcionario_id || !payload.data) {
         throw new Error("Selecione funcionário e data.");
@@ -309,19 +370,27 @@ export default function Escalas() {
       }
 
       setModalAberto(false);
+      // Recarregar os dados após salvar
       await carregarEscalas();
     } catch (e) {
+      console.error('❌ Erro ao salvar escala:', e);
       setErr(e.message || "Falha ao salvar escala.");
     }
   };
 
   const excluirEscala = async (escala) => {
-    if (!confirm(`Remover escala de ${escala.funcionario_nome}?`)) return;
+    if (!confirm(`Remover escala de ${escala.funcionario_nome} no dia ${escala.data}?`)) return;
+    
+    setErr("");
+    setSucesso("");
+    
     try {
+      console.log('🗑️ Excluindo escala:', escala.id);
       await api(`/api/escalas/${escala.id}`, { method: "DELETE" });
-      await carregarEscalas();
       setSucesso("Escala removida com sucesso!");
+      await carregarEscalas();
     } catch (e) {
+      console.error('❌ Erro ao excluir escala:', e);
       setErr(e.message || "Falha ao excluir escala.");
     }
   };
@@ -329,11 +398,11 @@ export default function Escalas() {
   // Handler para clique na célula
   const handleCliqueCelula = (dataISO, hora) => {
     const escalasNaCelula = encontrarEscalaNaCelula(dataISO, hora);
+    console.log('🖱️ Célula clicada:', dataISO, hora, 'Escalas:', escalasNaCelula.length);
+    
     if (escalasNaCelula.length > 0) {
-      // Se já tem escala, abrir para edição da primeira
       abrirEdicao(escalasNaCelula[0]);
     } else {
-      // Se está vazia, abrir novo
       abrirNovo(null, dataISO, hora + ":00");
     }
   };
@@ -393,6 +462,18 @@ export default function Escalas() {
             <span>De: {formatDateBR(dias[0])}</span>
             <span>À: {formatDateBR(dias[6])}</span>
           </div>
+        </div>
+        
+        {/* Debug info */}
+        <div style={{ 
+          marginTop: 8, 
+          padding: 8, 
+          background: "var(--panel-muted)", 
+          borderRadius: 4,
+          fontSize: "12px",
+          color: "var(--muted)"
+        }}>
+          📊 {funcionarios.length} funcionários • {escalas.length} escalas carregadas
         </div>
       </div>
 
@@ -494,7 +575,7 @@ export default function Escalas() {
                           e.stopPropagation();
                           abrirEdicao(escala);
                         }}
-                        title={`${escala.funcionario_nome} - ${escala.entrada} às ${escala.saida}`}
+                        title={`${escala.funcionario_nome} - ${escala.entrada} às ${escala.saida} (Turno ${escala.turno_ordem})`}
                       >
                         <div style={{ 
                           overflow: "hidden",
@@ -534,32 +615,34 @@ export default function Escalas() {
       </div>
 
       {/* Legenda de funcionários */}
-      <div style={{ 
-        display: "flex", 
-        gap: "16px", 
-        marginTop: "20px",
-        flexWrap: "wrap",
-        padding: "16px",
-        background: "var(--panel)",
-        borderRadius: "8px",
-        border: "1px solid var(--border)"
-      }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--muted)" }}>
-          Legenda:
-        </div>
-        {funcionarios.map(func => (
-          <div key={func.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{
-              width: "16px",
-              height: "16px",
-              background: getCorFuncionario(func.id),
-              borderRadius: "4px",
-              border: "1px solid var(--border)"
-            }}></div>
-            <span style={{ fontSize: "14px" }}>{func.pessoa_nome}</span>
+      {funcionarios.length > 0 && (
+        <div style={{ 
+          display: "flex", 
+          gap: "16px", 
+          marginTop: "20px",
+          flexWrap: "wrap",
+          padding: "16px",
+          background: "var(--panel)",
+          borderRadius: "8px",
+          border: "1px solid var(--border)"
+        }}>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--muted)" }}>
+            Legenda:
           </div>
-        ))}
-      </div>
+          {funcionarios.map(func => (
+            <div key={func.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{
+                width: "16px",
+                height: "16px",
+                background: getCorFuncionario(func.id),
+                borderRadius: "4px",
+                border: "1px solid var(--border)"
+              }}></div>
+              <span style={{ fontSize: "14px" }}>{func.pessoa_nome}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal Escala */}
       <Modal
@@ -589,7 +672,7 @@ export default function Escalas() {
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div>
             <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Funcionário
+              Funcionário *
             </label>
             <select
               value={form.funcionario_id}
@@ -601,6 +684,7 @@ export default function Escalas() {
                 border: "1px solid var(--border)",
                 fontSize: "14px"
               }}
+              required
             >
               <option value="">Selecione um funcionário...</option>
               {funcionarios.map((f) => (
@@ -613,7 +697,7 @@ export default function Escalas() {
 
           <div>
             <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Data
+              Data *
             </label>
             <input
               type="date"
@@ -626,6 +710,7 @@ export default function Escalas() {
                 border: "1px solid var(--border)",
                 fontSize: "14px"
               }}
+              required
             />
           </div>
 
