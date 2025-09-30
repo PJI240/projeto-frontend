@@ -112,7 +112,7 @@ export default function Pessoas() {
       <header className="main-header">
         <div className="header-content">
           <h1>Pessoas</h1>
-          <p>Gerencie cadastros vinculados à sua empresa.</p>
+          <p>Gerencie os dados pessoais das pessoas da sua empresa.</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="toggle-btn" onClick={abrirNovo}>Nova Pessoa</button>
