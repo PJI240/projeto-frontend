@@ -130,7 +130,7 @@ export default function Perfis() {
       <header className="main-header">
         <div className="header-content">
           <h1>Perfis</h1>
-          <p>Defina os perfis de acesso da empresa: cada perfil estabelece o que o usuário pode visualizar e executar no sistema.</p>
+          <p>Gerencie os perfis de acesso para ser atribuido aos usuários.</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="toggle-btn" onClick={abrirNovo}>
