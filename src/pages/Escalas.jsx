@@ -249,47 +249,51 @@ export default function Escalas() {
 
   // Agrupar escalas por hora e dia para visualização
   const escalasAgrupadas = useMemo(() => {
-    const mapa = new Map();
-    
-    console.log('📊 Processando', escalas.length, 'escalas para agrupamento...');
-    
-    escalas.forEach(escala => {
-      if (!escala.entrada || !escala.saida) {
-        console.log('⏰ Escala sem horários:', escala);
-        return;
+  const mapa = new Map();
+
+  escalas.forEach((escala) => {
+    // tolera diferentes formatos vindos do backend
+    const funcId =
+      escala.funcionario_id ??
+      escala.funcionarioId ??
+      escala.funcionario ??
+      null;
+
+    const entradaStr = escala.entrada || escala.hora_entrada || null;
+    const saidaStr   = escala.saida   || escala.hora_saida   || null;
+
+    if (!funcId || !entradaStr || !saidaStr) return;
+
+    const funcionario = funcionarios.find((f) => f.id === funcId);
+    if (!funcionario) return;
+
+    // inclui também a “hora cheia” final se a saída tiver minutos > 0
+    const [h1, m1] = entradaStr.split(":").map(Number);
+    const [h2, m2] = saidaStr.split(":").map(Number);
+
+    const startHour = Number.isFinite(h1) ? h1 : 0;
+    // se saiu 18:00, último bloco é 17; se saiu 12:50, último bloco é 12
+    const endHour = Number.isFinite(h2)
+      ? (m2 === 0 ? h2 - 1 : h2)
+      : startHour;
+
+    for (let hora = startHour; hora <= endHour; hora++) {
+      const chave = `${escala.data}|${String(hora).padStart(2, "0")}`;
+      if (!mapa.has(chave)) mapa.set(chave, []);
+      if (!mapa.get(chave).some((e) => e.id === escala.id)) {
+        mapa.get(chave).push({
+          ...escala,
+          funcionario_id: funcId,
+          funcionario_nome: funcionario.pessoa_nome,
+          cargo: funcionario.cargo_nome,
+          cor: getCorFuncionario(funcId),
+        });
       }
-      
-      const funcionario = funcionarios.find(f => f.id === escala.funcionario_id);
-      if (!funcionario) {
-        console.log('👤 Funcionário não encontrado para escala:', escala.funcionario_id);
-        return;
-      }
-      
-      // Para cada hora do turno, adicionar ao mapa
-      const [horaEntrada] = escala.entrada.split(':').map(Number);
-      const [horaSaida] = escala.saida.split(':').map(Number);
-      
-      console.log(`⏱️  Processando escala ${escala.id}: ${escala.entrada}-${escala.saida} (${horaEntrada}-${horaSaida}h)`);
-      
-      for (let hora = horaEntrada; hora < horaSaida; hora++) {
-        const chave = `${escala.data}|${hora.toString().padStart(2, '0')}`;
-        if (!mapa.has(chave)) mapa.set(chave, []);
-        
-        // Evitar duplicatas
-        if (!mapa.get(chave).some(e => e.id === escala.id)) {
-          mapa.get(chave).push({
-            ...escala,
-            funcionario_nome: funcionario.pessoa_nome,
-            cargo: funcionario.cargo_nome,
-            cor: getCorFuncionario(escala.funcionario_id)
-          });
-        }
-      }
-    });
-    
-    console.log('🗂️  Agrupamento concluído:', mapa.size, 'chaves');
-    return mapa;
-  }, [escalas, funcionarios]);
+    }
+  });
+
+  return mapa;
+}, [escalas, funcionarios]);
 
   // Encontrar escala em uma célula específica
   const encontrarEscalaNaCelula = (dataISO, hora) => {
