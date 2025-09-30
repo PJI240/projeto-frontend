@@ -316,31 +316,6 @@ export default function Usuarios() {
             {form.id ? "Editar Usuário" : "Novo Usuário"}
           </h2>
           <form className="form" onSubmit={salvar}>
-            {/* Pessoa (só na criação) */}
-            {!form.id && (
-              <>
-                <label htmlFor="u_pessoa">Pessoa</label>
-                <select
-                  id="u_pessoa"
-                  value={form.pessoa_id}
-                  onChange={(e) => setField("pessoa_id", e.target.value)}
-                  disabled={loadingOpts}
-                  required
-                  style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)", width: "100%" }}
-                >
-                  <option value="">Selecione…</option>
-                  {pessoasSemUsuario.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <small style={{ color: "var(--muted)" }}>
-                  Precisa cadastrar uma <Link to="/pessoas"><strong>pessoa</strong></Link> antes?
-                </small>
-              </>
-            )}
-
             <label htmlFor="u_nome">Nome</label>
             <input
               id="u_nome"
@@ -367,7 +342,30 @@ export default function Usuarios() {
               placeholder={form.id ? "••••••••" : ""}
               required={!form.id}
             />
-
+            {/* Pessoa (só na criação) */}
+            {!form.id && (
+              <>
+                <label htmlFor="u_pessoa">Pessoa</label>
+                <select
+                  id="u_pessoa"
+                  value={form.pessoa_id}
+                  onChange={(e) => setField("pessoa_id", e.target.value)}
+                  disabled={loadingOpts}
+                  required
+                  style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)", width: "100%" }}
+                >
+                  <option value="">Selecione…</option>
+                  {pessoasSemUsuario.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <small style={{ color: "var(--muted)" }}>
+                  Precisa cadastrar uma <Link to="/pessoas"><strong>pessoa</strong></Link> antes?
+                </small>
+              </>
+            )}
             <label htmlFor="u_perfil">Perfil</label>
             <select
               id="u_perfil"
