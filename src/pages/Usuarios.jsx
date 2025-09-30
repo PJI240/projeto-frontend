@@ -295,10 +295,10 @@ export default function Usuarios() {
                     <td style={{ padding: 12 }}>{u.ativo ? "Sim" : "Não"}</td>
                     <td style={{ padding: 12, display: "flex", gap: 8 }}>
                       <button className="toggle-btn" onClick={() => editar(u)}>
-                        <EditIcon /> Editar
+                        Editar
                       </button>
                       <button className="toggle-btn" onClick={() => excluir(u)}>
-                        <TrashIcon /> Excluir
+                        Excluir
                       </button>
                     </td>
                   </tr>
