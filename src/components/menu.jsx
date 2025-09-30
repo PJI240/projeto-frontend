@@ -139,8 +139,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
               <MenuItem to="/empresas" label="Empresas" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
-              <MenuItem to="/perfis" label="Perfis" icon={<ShieldCheckIcon />} onClick={closeMenu} />
-              <MenuItem to="/permissoes" label="Permissões" icon={<KeyIcon />} onClick={closeMenu} />
               <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
               <MenuItem to="/funcionarios" label="Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
             </MenuGroup>
