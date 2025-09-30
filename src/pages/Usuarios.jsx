@@ -245,7 +245,7 @@ export default function Usuarios() {
             Novo Usuário
           </button>
           <button className="toggle-btn" onClick={carregarLista} disabled={loading}>
-            <RefreshIcon /> {loading ? "Atualizando..." : "Atualizar"}
+            {loading ? "Atualizando..." : "Atualizar"}
           </button>
         </div>
       </header>
