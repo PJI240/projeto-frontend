@@ -139,12 +139,12 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           {(isDev || isAdm) && (
             <MenuGroup title="Cadastros">
               <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
-              <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
             </MenuGroup>
           )}
 
           {(isDev || isAdm) && (
             <MenuGroup title="Vínculos / Segurança">
+              <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={closeMenu} />
             </MenuGroup>
           )}
