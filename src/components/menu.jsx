@@ -145,8 +145,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
           {(isDev || isAdm) && (
             <MenuGroup title="Vínculos / Segurança">
-              <MenuItem to="/usuarios-perfis" label="Usuários × Perfis" icon={<UserGroupIcon />} onClick={closeMenu} />
-              <MenuItem to="/perfis-permissoes" label="Perfis × Permissões" icon={<KeyIcon />} onClick={closeMenu} />
+              <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={closeMenu} />
             </MenuGroup>
           )}
 
