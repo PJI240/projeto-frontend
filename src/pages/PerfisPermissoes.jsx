@@ -12,8 +12,8 @@ const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 const API = {
   perfis: `${API_BASE}/api/perfis`,
   permissoes: `${API_BASE}/api/permissoes`,
-  getPerfilPerms: (id) => `${API_BASE}/api/perfis_permissoes?perfil_id=${id}`,
-  syncPerfilPerms: `${API_BASE}/api/perfis_permissoes/sync`,
+  getPerfilPerms: (id) => `${API_BASE}/api/perfis-permissoes?perfil_id=${id}`,
+  syncPerfilPerms: `${API_BASE}/api/perfis-permissoes/sync`,
 };
 
 export default function PerfisPermissoes() {
