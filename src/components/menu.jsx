@@ -140,8 +140,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
             <MenuGroup title="Cadastros">
               <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
               <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
-              <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
-              <MenuItem to="/funcionarios" label="Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
             </MenuGroup>
           )}
 
@@ -162,6 +160,8 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
           {(isDev || isAdm) && (
             <MenuGroup title="Folha">
+              <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
+              <MenuItem to="/funcionarios" label="Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={closeMenu} />
               <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
               <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={closeMenu} />
