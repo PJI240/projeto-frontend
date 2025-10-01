@@ -41,7 +41,7 @@ export default function Register() {
   const [cnpjInput, setCnpjInput] = useState("");
   const [empresa, setEmpresa] = useState(initialEmpresa);
   const [empresaByApi, setEmpresaByApi] = useState(false);
-  const [empresaFormVisivel, setEmpresaFormVisivel] = useState(false);
+  const [empresaFormVisivel, setEmpresaFormVisivel] = useState(false); // controla exibição dos campos após consulta
 
   // Etapa 2
   const [pessoa, setPessoa] = useState(initialPessoa);
@@ -66,7 +66,7 @@ export default function Register() {
   ];
   const progressPct = (step / steps.length) * 100;
 
-  // ===== API: Consulta CNPJ (agora trata 409) =====
+  // ===== API: Consulta CNPJ =====
   async function consultaCNPJ() {
     setErr("");
     setEmpresaFormVisivel(false);
@@ -83,24 +83,16 @@ export default function Register() {
         credentials: "include",
         body: JSON.stringify({ cnpj: num }),
       });
-
-      // Caso especial: empresa já cadastrada
-      if (r.status === 409) {
-        const data = await r.json().catch(() => null);
-        const razao = data?.razao_social ? ` (${data.razao_social})` : "";
-        setErr((data?.error || "Sua empresa já tem cadastro, procure o seu administrador.") + razao);
-        setEmpresaFormVisivel(false);           // não mostra o form
-        setEmpresa({ ...initialEmpresa, cnpj: num }); // mantém CNPJ digitado
-        return;
-      }
-
       const data = await r.json().catch(() => null);
 
       if (!r.ok || !data?.ok) {
-        // falha genérica: libera formulário em branco (com CNPJ já preenchido)
+        // falha: libera formulário em branco (com CNPJ já preenchido)
         setEmpresaByApi(false);
         setErr(data?.error || "Não foi possível consultar o CNPJ. Preencha manualmente.");
-        setEmpresa({ ...initialEmpresa, cnpj: num });
+        setEmpresa({
+          ...initialEmpresa,
+          cnpj: num,
+        });
         setEmpresaFormVisivel(true);
         return;
       }
@@ -122,11 +114,13 @@ export default function Register() {
       });
       setEmpresaByApi(true);
       setEmpresaFormVisivel(true);
-      setErr("");
     } catch (e) {
       setEmpresaByApi(false);
       setErr("Falha na consulta. Preencha os dados da empresa manualmente.");
-      setEmpresa({ ...initialEmpresa, cnpj: num });
+      setEmpresa({
+        ...initialEmpresa,
+        cnpj: num,
+      });
       setEmpresaFormVisivel(true);
     } finally {
       setLoading(false);
@@ -255,7 +249,10 @@ export default function Register() {
         Cadastro em 3 passos
       </h1>
 
-      {/* Barra de progresso */}
+
+
+
+      {/* Barra de progresso (acessível) */}
       <div aria-label="Progresso do cadastro" style={{ marginBottom: 16 }}>
         <div
           style={{
@@ -290,112 +287,116 @@ export default function Register() {
       )}
 
       {/* ===== Etapa 1 ===== */}
-      {step === 1 && (
-        <div className="form" aria-labelledby="etapa-empresa">
-          <h2 id="etapa-empresa" className="title" style={{ marginBottom: 8 }}>
-            Cadastro da empresa
-          </h2>
-          <p style={{ color: "var(--muted)", marginTop: 0 }}>
-            Busque pelo seu <strong>CNPJ</strong> para preencher automaticamente os dados da empresa.
-          </p>
 
-          {/* Campo único de busca */}
-          <label htmlFor="cnpj">CNPJ</label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              id="cnpj"
-              inputMode="numeric"
-              autoComplete="off"
-              placeholder="00.000.000/0000-00"
-              value={cnpjInput}
-              onChange={(e) => setCnpjInput(e.target.value)}
-            />
-            <button
-              type="button"
-              className="toggle-btn"
-              onClick={consultaCNPJ}
-              disabled={loading}
-            >
-              {loading ? "Consultando..." : "Buscar"}
-            </button>
-          </div>
+{step === 1 && (
+  <div className="form" aria-labelledby="etapa-empresa">
+    <h2 id="etapa-empresa" className="title" style={{ marginBottom: 8 }}>
+      Cadastro da empresa
+    </h2>
+    <p style={{ color: "var(--muted)", marginTop: 0 }}>
+      Busque pelo seu <strong>CNPJ</strong> para preencher automaticamente os dados da empresa.
+    </p>
 
-          {/* Form da empresa — aparece após a consulta (exceto 409) */}
-          {empresaFormVisivel && (
-            <>
-              <div style={{ height: 8 }} />
-              <label htmlFor="razao_social">Razão social</label>
-              <input
-                id="razao_social"
-                value={empresa.razao_social}
-                onChange={(e) => setEmpresa({ ...empresa, razao_social: e.target.value })}
-              />
+    {/* Campo único de busca (visível inicialmente) */}
+    <label htmlFor="cnpj">CNPJ</label>
+    <div style={{ display: "flex", gap: 8 }}>
+      <input
+        id="cnpj"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="00.000.000/0000-00"
+        value={cnpjInput}
+        onChange={(e) => setCnpjInput(e.target.value)}
+      />
+      <button
+        type="button"
+        className="toggle-btn"
+        onClick={consultaCNPJ}
+        disabled={loading}
+      >
+        {loading ? "Consultando..." : "Buscar"}
+      </button>
+    </div>
 
-              <label htmlFor="nome_fantasia">Nome fantasia</label>
-              <input
-                id="nome_fantasia"
-                value={empresa.nome_fantasia}
-                onChange={(e) => setEmpresa({ ...empresa, nome_fantasia: e.target.value })}
-              />
+    {/* Form da empresa — só aparece após a consulta */}
+    {empresaFormVisivel && (
+      <>
+        <div style={{ height: 8 }} />
+        <label htmlFor="razao_social">Razão social</label>
+        <input
+          id="razao_social"
+          value={empresa.razao_social}
+          onChange={(e) => setEmpresa({ ...empresa, razao_social: e.target.value })}
+        />
 
-              <label htmlFor="cnpj_conf">CNPJ (confirmação)</label>
-              <input
-                id="cnpj_conf"
-                value={empresa.cnpj}
-                onChange={(e) => setEmpresa({ ...empresa, cnpj: e.target.value })}
-              />
+        <label htmlFor="nome_fantasia">Nome fantasia</label>
+        <input
+          id="nome_fantasia"
+          value={empresa.nome_fantasia}
+          onChange={(e) => setEmpresa({ ...empresa, nome_fantasia: e.target.value })}
+        />
 
-              <label htmlFor="telefone">Telefone</label>
-              <input
-                id="telefone"
-                value={empresa.telefone}
-                onChange={(e) => setEmpresa({ ...empresa, telefone: e.target.value })}
-              />
+        <label htmlFor="cnpj_conf">CNPJ (confirmação)</label>
+        <input
+          id="cnpj_conf"
+          value={empresa.cnpj}
+          onChange={(e) => setEmpresa({ ...empresa, cnpj: e.target.value })}
+        />
 
-              <label htmlFor="email_emp">Email</label>
-              <input
-                id="email_emp"
-                type="email"
-                value={empresa.email}
-                onChange={(e) => setEmpresa({ ...empresa, email: e.target.value })}
-              />
+        <label htmlFor="telefone">Telefone</label>
+        <input
+          id="telefone"
+          value={empresa.telefone}
+          onChange={(e) => setEmpresa({ ...empresa, telefone: e.target.value })}
+        />
 
-              <small style={{ color: "var(--muted)" }}>
-                {empresaByApi
-                  ? "Os campos foram preenchidos automaticamente. Revise antes de continuar."
-                  : "A busca não retornou dados. Preencha os campos manualmente para prosseguir."}
-              </small>
-            </>
-          )}
+        <label htmlFor="email_emp">Email</label>
+        <input
+          id="email_emp"
+          type="email"
+          value={empresa.email}
+          onChange={(e) => setEmpresa({ ...empresa, email: e.target.value })}
+        />
 
-          {/* Ações */}
-          {(() => {
-            const canContinueStep1 = empresaFormVisivel && canGoStep2();
-            return (
-              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="toggle-btn"
-                  onClick={() => navigate("/login")}
-                  style={{ background: "var(--error)", color: "#fff" }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="toggle-btn"
-                  onClick={nextFromStep1}
-                  disabled={!canContinueStep1}
-                  aria-disabled={!canContinueStep1}
-                  title={!canContinueStep1 ? "Consulte o CNPJ e preencha os campos obrigatórios" : undefined}
-                >
-                  Continuar
-                </button>
-              </div>
-            );
-          })()}
-        </div>
-      )}
+        <small style={{ color: "var(--muted)" }}>
+          {empresaByApi
+            ? "Os campos foram preenchidos automaticamente. Revise antes de continuar."
+            : "A busca não retornou dados. Preencha os campos manualmente para prosseguir."}
+        </small>
+      </>
+    )}
+
+    {/* Ações — SEMPRE visíveis. 
+        “Continuar” fica desabilitado até existir formulário e validar. */}
+    {(() => {
+      const canContinueStep1 = empresaFormVisivel && canGoStep2();
+      return (
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+         
+          <button
+            type="button"
+            className="toggle-btn"
+            onClick={() => navigate("/login")}
+            style={{ background: "var(--error)", color: "#fff" }}
+          >
+            Cancelar
+          </button>
+ <button
+            type="button"
+            className="toggle-btn"
+            onClick={nextFromStep1}
+            disabled={!canContinueStep1}
+            aria-disabled={!canContinueStep1}
+            title={!canContinueStep1 ? "Consulte o CNPJ e preencha os campos obrigatórios" : undefined}
+          >
+            Continuar
+          </button>
+
+               </div>
+      );
+    })()}
+  </div>
+)}
 
       {/* ===== Etapa 2 ===== */}
       {step === 2 && (
@@ -561,6 +562,7 @@ export default function Register() {
               </div>
             </>
           )}
+
         </div>
       )}
 
