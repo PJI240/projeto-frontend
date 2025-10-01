@@ -349,7 +349,7 @@ export default function Apontamentos() {
           <p>Cadastre batidas/turnos, edite e importe CSV. Total no período: <strong>{fmtHHMM(totalMinutosPeriodo)}</strong></p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="toggle-btn" onClick={abrirNovo}>+ Novo apontamento</button>
+          <button className="toggle-btn" onClick={abrirNovo}>Novo apontamento</button>
           <button className="toggle-btn" onClick={() => setOpenImport(true)}>Importar CSV</button>
           <button className="toggle-btn" onClick={recarregar} disabled={loading}>{loading ? "Atualizando..." : "Atualizar"}</button>
         </div>
