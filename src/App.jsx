@@ -11,7 +11,7 @@ import DashboardAdm from "./pages/DashboardAdm.jsx";
 import DashboardFunc from "./pages/DashboardFunc.jsx";
 
 import Usuarios from "./pages/Usuarios.jsx";
-import Pessoas from "./pages/Pessoas.jsx;
+import Pessoas from "./pages/Pessoas.jsx";
 import Empresas from "./pages/Empresas.jsx";
 import Perfis from "./pages/Perfis.jsx";
 import Permissoes from "./pages/Permissoes.jsx";
