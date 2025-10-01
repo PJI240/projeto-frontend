@@ -20,37 +20,37 @@ import {
   CogIcon,
   MagnifyingGlassIcon,
   ClipboardDocumentListIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 
 // Base da API
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-/** Códigos canônicos de permissão de MENU */
+/** Códigos de permissão no MESMO formato do banco (menu.xxx.ver) */
 const PERM = {
-  DASHBOARD:           "menu:dashboard",
-  DASHBOARD_FUNC:      "menu:dashboard_func",
-  DASHBOARD_ADM:       "menu:dashboard_adm",
-  EMPRESAS:            "menu:empresas",
+  DASHBOARD:           "menu.dashboard.ver",
+  DASHBOARD_FUNC:      "menu.dashboard_func.ver",
+  DASHBOARD_ADM:       "menu.dashboard_adm.ver",
+  EMPRESAS:            "menu.empresas.ver",
 
-  PESSOAS:             "menu:pessoas",
+  PESSOAS:             "menu.pessoas.ver",
 
-  USUARIOS:            "menu:usuarios",
-  PERFIS_PERMISSOES:   "menu:perfis-permissoes",
+  USUARIOS:            "menu.usuarios.ver",
+  PERFIS_PERMISSOES:   "menu.perfis-permissoes.ver",
 
-  ESCALAS:             "menu:escalas",
-  APONTAMENTOS:        "menu:apontamentos",
-  OCORRENCIAS:         "menu:ocorrencias",
+  ESCALAS:             "menu.escalas.ver",
+  APONTAMENTOS:        "menu.apontamentos.ver",
+  OCORRENCIAS:         "menu.ocorrencias.ver",
 
-  CARGOS:              "menu:cargos",
-  FUNCIONARIOS:        "menu:funcionarios",
-  FOLHAS:              "menu:folhas",
-  FOLHAS_FUNC:         "menu:folhas-funcionarios",
-  FOLHAS_ITENS:        "menu:folhas-itens",
+  CARGOS:              "menu.cargos.ver",
+  FUNCIONARIOS:        "menu.funcionarios.ver",
+  FOLHAS:              "menu.folhas.ver",
+  FOLHAS_FUNC:         "menu.folhas-funcionarios.ver",
+  FOLHAS_ITENS:        "menu.folhas-itens.ver",
 
-  DEV_INSPECAO:        "menu:dev-inspecao",
-  DEV_AUDITORIA:       "menu:dev-auditoria",
-  DEV_CONFIG:          "menu:dev-config",
+  DEV_INSPECAO:        "menu.dev-inspecao.ver",
+  DEV_AUDITORIA:       "menu.dev-auditoria.ver",
+  DEV_CONFIG:          "menu.dev-config.ver",
 };
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
@@ -61,72 +61,51 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   const isAdm = isDev || me?.roles?.includes("administrador");
   const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
 
-  // permissões de menu efetivas (Set<string>)
-const [perms, setPerms] = useState(new Set());
-const [permsLoaded, setPermsLoaded] = useState(false);
+  // permissões efetivas (set de strings)
+  const [perms, setPerms] = useState(() => new Set());
+  const [permsLoaded, setPermsLoaded] = useState(false);
 
-function canonMenuCode(code = "") {
-  // já está no novo formato?
-  if (code.includes(":")) return code.trim();
-
-  // antigo: menu.dashboard.ver → menu:dashboard
-  // pega a 1ª e 2ª partes e ignora o sufixo ".ver"
-  const m = String(code).trim().match(/^menu\.([a-z0-9_-]+)(?:\.ver)?$/i);
-  if (m) return `menu:${m[1].toLowerCase()}`;
-
-  // outros casos antigos (ex: menu.funcionarios.ver)
-  const m2 = String(code).trim().match(/^menu\.([a-z0-9_-]+)\.([a-z0-9_-]+)$/i);
-  if (m2) return `menu:${m2[1].toLowerCase()}`;
-
-  return code.trim();
-}
-
-useEffect(() => {
-  let alive = true;
-
-  async function fetchPerms() {
-    if (isDev || isAdm) {
-      if (alive) {
-        setPerms(new Set(Object.values(PERM)));
-        setPermsLoaded(true);
+  // Carrega permissões (formato exatamente igual ao BD: menu.xxx.ver)
+  useEffect(() => {
+    let alive = true;
+    async function fetchPerms() {
+      if (isDev || isAdm) {
+        // Admin/Dev enxerga tudo
+        if (alive) {
+          setPerms(new Set(Object.values(PERM)));
+          setPermsLoaded(true);
+        }
+        return;
       }
-      return;
-    }
-
-    async function getCodesFrom(url) {
-      const r = await fetch(url, { credentials: "include" });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json().catch(() => ({}));
-      return Array.isArray(data?.codes) ? data.codes : [];
-    }
-
-    try {
-      // tenta rota nova
-      let codes;
       try {
-        codes = await getCodesFrom(`${API_BASE}/api/permissoes_menu/minhas`);
+        // tenta rota nova; se não existir, cai na antiga
+        const tryFetch = async (url) => {
+          const r = await fetch(url, { credentials: "include" });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const data = await r.json().catch(() => ({}));
+          return Array.isArray(data?.codes) ? data.codes : [];
+        };
+        let codes;
+        try {
+          codes = await tryFetch(`${API_BASE}/api/permissoes_menu/minhas`);
+        } catch {
+          codes = await tryFetch(`${API_BASE}/api/permissoes/minhas`);
+        }
+        if (alive) {
+          setPerms(new Set(codes)); // sem conversão!
+          setPermsLoaded(true);
+        }
       } catch {
-        // fallback para a rota antiga
-        codes = await getCodesFrom(`${API_BASE}/api/permissoes/minhas`);
-      }
-
-      const normalized = codes.map(canonMenuCode);
-      if (alive) {
-        setPerms(new Set(normalized));
-        setPermsLoaded(true);
-      }
-    } catch {
-      if (alive) {
-        // fallback seguro para colaborador
-        setPerms(new Set(["menu:dashboard", "menu:dashboard_func"]));
-        setPermsLoaded(true);
+        if (alive) {
+          // fallback mínimo
+          setPerms(new Set([PERM.DASHBOARD, PERM.DASHBOARD_FUNC]));
+          setPermsLoaded(true);
+        }
       }
     }
-  }
-
-  fetchPerms();
-  return () => { alive = false; };
-}, [isDev, isAdm]);
+    fetchPerms();
+    return () => { alive = false; };
+  }, [isDev, isAdm]);
 
   const has = (code) => perms.has(code);
 
@@ -138,7 +117,7 @@ useEffect(() => {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Fecha o menu ao navegar (mobile)
+  // Fecha o menu ao mudar rota no mobile
   useEffect(() => {
     if (!isMobile) return;
     const onPop = () => setIsMenuOpen(false);
@@ -146,15 +125,13 @@ useEffect(() => {
     return () => window.removeEventListener("popstate", onPop);
   }, [isMobile]);
 
-  const toggleMenu = () => setIsMenuOpen(v => !v);
+  const toggleMenu = () => setIsMenuOpen((v) => !v);
   const closeMenu = () => setIsMenuOpen(false);
 
-  // Evita “piscar” de itens enquanto carrega permissões
   const canRender = permsLoaded || isAdm || isDev;
 
   return (
     <>
-      {/* Toggle mobile */}
       {isMobile && (
         <button
           className="menu-toggle"
@@ -168,12 +145,10 @@ useEffect(() => {
         </button>
       )}
 
-      {/* Backdrop */}
       {isMobile && isMenuOpen && (
         <div className="sidebar-backdrop show" onClick={closeMenu} aria-hidden="true" />
       )}
 
-      {/* Sidebar */}
       <aside
         id="dashboard-sidebar"
         className={`dashboard-sidebar ${isMenuOpen ? "is-open" : ""} ${isMobile ? "mobile" : ""}`}
@@ -199,12 +174,7 @@ useEffect(() => {
               </div>
             )}
           </div>
-          <button
-            className="logout-btn"
-            onClick={onLogout}
-            title="Sair"
-            aria-label="Sair do sistema"
-          >
+          <button className="logout-btn" onClick={onLogout} title="Sair" aria-label="Sair do sistema">
             <ArrowRightOnRectangleIcon className="logout-icon" />
           </button>
         </div>
@@ -251,20 +221,10 @@ useEffect(() => {
                   <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.APONTAMENTOS) && (
-                  <MenuItem
-                    to="/apontamentos"
-                    label="Apontamentos"
-                    icon={<ClipboardDocumentListIcon />}
-                    onClick={closeMenu}
-                  />
+                  <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.OCORRENCIAS) && (
-                  <MenuItem
-                    to="/ocorrencias"
-                    label="Ocorrências"
-                    icon={<ExclamationTriangleIcon />}
-                    onClick={closeMenu}
-                  />
+                  <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} onClick={closeMenu} />
                 )}
               </MenuGroup>
             )}
@@ -275,31 +235,16 @@ useEffect(() => {
                   <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.FUNCIONARIOS) && (
-                  <MenuItem
-                    to="/funcionarios"
-                    label="Funcionários x Salários"
-                    icon={<UserGroupIcon />}
-                    onClick={closeMenu}
-                  />
+                  <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.FOLHAS) && (
                   <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.FOLHAS_FUNC) && (
-                  <MenuItem
-                    to="/folhas-funcionarios"
-                    label="Folhas × Funcionários"
-                    icon={<UserGroupIcon />}
-                    onClick={closeMenu}
-                  />
+                  <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.FOLHAS_ITENS) && (
-                  <MenuItem
-                    to="/folhas-itens"
-                    label="Itens de Folha"
-                    icon={<DocumentTextIcon />}
-                    onClick={closeMenu}
-                  />
+                  <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={closeMenu} />
                 )}
               </MenuGroup>
             )}
@@ -310,12 +255,7 @@ useEffect(() => {
                   <MenuItem to="/dev-inspecao" label="Inspeção / SQL" icon={<MagnifyingGlassIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.DEV_AUDITORIA) && (
-                  <MenuItem
-                    to="/dev-auditoria"
-                    label="Auditoria"
-                    icon={<ClipboardDocumentListIcon />}
-                    onClick={closeMenu}
-                  />
+                  <MenuItem to="/dev-auditoria" label="Auditoria" icon={<ClipboardDocumentListIcon />} onClick={closeMenu} />
                 )}
                 {has(PERM.DEV_CONFIG) && (
                   <MenuItem to="/dev-config" label="Configurações" icon={<CogIcon />} onClick={closeMenu} />
