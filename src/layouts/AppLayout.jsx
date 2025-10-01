@@ -29,9 +29,13 @@ export default function AppLayout() {
 
         if (alive) {
           setMe({ ...data.user, roles: data.roles || [] });
-          // se cair em "/", manda para o landing apropriado
+          
+          // CORREÇÃO: Se cair em "/", manda para o dashboard apropriado baseado nas roles
           if (location.pathname === "/") {
-            navigate(data.landing || "/dashboard", { replace: true });
+            const roles = (data.roles || []).map((s) => String(s).toLowerCase());
+            const isAdm = roles.includes("administrador") || roles.includes("desenvolvedor");
+            const landingPath = isAdm ? "/dashboard_adm" : "/dashboard_func";
+            navigate(landingPath, { replace: true });
           }
         }
       } catch {
