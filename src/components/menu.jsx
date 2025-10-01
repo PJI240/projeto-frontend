@@ -62,45 +62,71 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
 
   // permissões de menu efetivas (Set<string>)
-  const [perms, setPerms] = useState(new Set());
-  const [permsLoaded, setPermsLoaded] = useState(false);
+const [perms, setPerms] = useState(new Set());
+const [permsLoaded, setPermsLoaded] = useState(false);
 
-  // Carrega permissões de MENU (apenas para não-admin/dev)
-  useEffect(() => {
-    let alive = true;
+function canonMenuCode(code = "") {
+  // já está no novo formato?
+  if (code.includes(":")) return code.trim();
 
-    async function loadMenuPerms() {
-      if (isDev || isAdm) {
-        // Admin/Dev enxergam tudo no menu
-        if (alive) {
-          setPerms(new Set(Object.values(PERM)));
-          setPermsLoaded(true);
-        }
-        return;
+  // antigo: menu.dashboard.ver → menu:dashboard
+  // pega a 1ª e 2ª partes e ignora o sufixo ".ver"
+  const m = String(code).trim().match(/^menu\.([a-z0-9_-]+)(?:\.ver)?$/i);
+  if (m) return `menu:${m[1].toLowerCase()}`;
+
+  // outros casos antigos (ex: menu.funcionarios.ver)
+  const m2 = String(code).trim().match(/^menu\.([a-z0-9_-]+)\.([a-z0-9_-]+)$/i);
+  if (m2) return `menu:${m2[1].toLowerCase()}`;
+
+  return code.trim();
+}
+
+useEffect(() => {
+  let alive = true;
+
+  async function fetchPerms() {
+    if (isDev || isAdm) {
+      if (alive) {
+        setPerms(new Set(Object.values(PERM)));
+        setPermsLoaded(true);
       }
-      try {
-        const r = await fetch(`${API_BASE}/api/permissoes_menu/minhas`, {
-          credentials: "include",
-        });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json().catch(() => ({}));
-        const codes = Array.isArray(data?.codes) ? data.codes : [];
-        if (alive) {
-          setPerms(new Set(codes));
-          setPermsLoaded(true);
-        }
-      } catch (_e) {
-        // Falha segura: mostra só itens básicos do colaborador
-        if (alive) {
-          setPerms(new Set([PERM.DASHBOARD, PERM.DASHBOARD_FUNC]));
-          setPermsLoaded(true);
-        }
-      }
+      return;
     }
 
-    loadMenuPerms();
-    return () => { alive = false; };
-  }, [isDev, isAdm]);
+    async function getCodesFrom(url) {
+      const r = await fetch(url, { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json().catch(() => ({}));
+      return Array.isArray(data?.codes) ? data.codes : [];
+    }
+
+    try {
+      // tenta rota nova
+      let codes;
+      try {
+        codes = await getCodesFrom(`${API_BASE}/api/permissoes_menu/minhas`);
+      } catch {
+        // fallback para a rota antiga
+        codes = await getCodesFrom(`${API_BASE}/api/permissoes/minhas`);
+      }
+
+      const normalized = codes.map(canonMenuCode);
+      if (alive) {
+        setPerms(new Set(normalized));
+        setPermsLoaded(true);
+      }
+    } catch {
+      if (alive) {
+        // fallback seguro para colaborador
+        setPerms(new Set(["menu:dashboard", "menu:dashboard_func"]));
+        setPermsLoaded(true);
+      }
+    }
+  }
+
+  fetchPerms();
+  return () => { alive = false; };
+}, [isDev, isAdm]);
 
   const has = (code) => perms.has(code);
 
