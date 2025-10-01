@@ -11,6 +11,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Função para determinar o redirecionamento baseado nas roles
+  const getLandingPath = (roles) => {
+    const rolesLower = (roles || []).map((s) => String(s).toLowerCase());
+    const isAdm = rolesLower.includes("administrador") || rolesLower.includes("desenvolvedor");
+    return isAdm ? "/dashboard_adm" : "/dashboard_func";
+  };
+
   // Se já estiver logado, manda pro landing apropriado
   useEffect(() => {
     (async () => {
@@ -18,7 +25,9 @@ export default function Login() {
         const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
         const data = await r.json().catch(() => null);
         if (r.ok && data?.ok && data.user) {
-          navigate(data.landing || "/dashboard", { replace: true });
+          // CORREÇÃO: Usar a lógica baseada em roles
+          const landingPath = getLandingPath(data.roles);
+          navigate(landingPath, { replace: true });
         }
       } catch {
         /* silencioso */
@@ -47,8 +56,9 @@ export default function Login() {
         return;
       }
 
-      // usa o landing decidido no backend (boas práticas)
-      navigate(data.landing || "/dashboard", { replace: true });
+      // CORREÇÃO: Determinar landing baseado nas roles do usuário
+      const landingPath = getLandingPath(data.roles);
+      navigate(landingPath, { replace: true });
     } catch (e) {
       console.error("LOGIN_ERROR", e);
       setErr("Erro de conexão com o servidor.");
