@@ -52,7 +52,13 @@ function Landing() {
         if (r.ok && data?.ok && data.user) {
           const roles = (data.roles || []).map((s) => String(s).toLowerCase());
           const isAdm = roles.includes("administrador") || roles.includes("desenvolvedor");
-          setState({ loading: false, path: isAdm ? "/dashboard_adm" : "/dashboard_func" });
+          
+          // CORREÇÃO: Redireciona para dashboard_func se não for admin
+          if (isAdm) {
+            setState({ loading: false, path: "/dashboard_adm" });
+          } else {
+            setState({ loading: false, path: "/dashboard_func" });
+          }
         } else {
           setState({ loading: false, path: "/login" });
         }
