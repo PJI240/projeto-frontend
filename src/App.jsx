@@ -84,7 +84,7 @@ export default function App() {
 
         {/* 🔒 internas: com menu via AppLayout */}
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard_func" element={<Dashboard />} />
           <Route path="/dashboard_adm" element={<DashboardAdm />} />
           <Route path="/dashboard_func" element={<DashboardFunc />} />
 
