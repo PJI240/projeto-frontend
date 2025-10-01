@@ -1,82 +1,90 @@
-// ===== API: Consulta CNPJ (primeiro verifica local, depois API externa) =====
-async function consultaCNPJ() {
-  setErr("");
-  setEmpresaFormVisivel(false);
-  const num = onlyDigits(cnpjInput);
-  if (num.length !== 14) {
-    setErr("Informe um CNPJ válido (14 dígitos).");
-    return;
-  }
-  setLoading(true);
+/* =========================================================
+   1) Consulta CNPJ (pública, checa banco antes da Receita)
+   ========================================================= */
+
+// helper: fetch com timeout (pode reaproveitar o seu)
+async function fetchJson(url, { timeoutMs = 12000 } = {}) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    // PRIMEIRO: Verificar se CNPJ já existe no banco local
-    const checkLocal = await fetch(`${API_BASE}/api/empresas/verificar-cnpj/${num}`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    });
-
-    // Se CNPJ já existe localmente (status 200)
-    if (checkLocal.status === 200) {
-      const data = await checkLocal.json().catch(() => null);
-      const razao = data?.razao_social ? ` (${data.razao_social})` : "";
-      setErr((data?.error || "Sua empresa já tem cadastro, procure o seu administrador.") + razao);
-      setEmpresaFormVisivel(false);
-      setEmpresa({ ...initialEmpresa, cnpj: num });
-      return;
-    }
-
-    // Se CNPJ não existe (status 404), prossegue com API externa
-    if (checkLocal.status === 404) {
-      // SEGUNDO: Buscar na API externa
-      const r = await fetch(`${API_BASE}/api/empresas/consulta-cnpj`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ cnpj: num }),
-      });
-
-      const data = await r.json().catch(() => null);
-
-      if (!r.ok || !data?.ok) {
-        // falha na API externa: libera formulário em branco
-        setEmpresaByApi(false);
-        setErr(data?.error || "Não foi possível consultar o CNPJ. Preencha manualmente.");
-        setEmpresa({ ...initialEmpresa, cnpj: num });
-        setEmpresaFormVisivel(true);
-        return;
-      }
-
-      // Sucesso na API externa: preenche os dados
-      const emp = data.empresa || {};
-      setEmpresa({
-        razao_social: emp.razao_social || "",
-        nome_fantasia: emp.nome_fantasia || "",
-        cnpj: onlyDigits(emp.cnpj || num),
-        inscricao_estadual: emp.inscricao_estadual || "",
-        data_abertura: emp.data_abertura || "",
-        telefone: emp.telefone || "",
-        email: emp.email || "",
-        capital_social: emp.capital_social ?? "",
-        natureza_juridica: emp.natureza_juridica || "",
-        situacao_cadastral: emp.situacao_cadastral || emp.situicao || "",
-        data_situacao: emp.data_situicao || "",
-        socios_receita: JSON.stringify(emp.socios_receita ?? emp.qsa ?? []),
-      });
-      setEmpresaByApi(true);
-      setEmpresaFormVisivel(true);
-      setErr("");
-    } else {
-      // Outro status inesperado
-      throw new Error("Erro inesperado ao verificar CNPJ");
-    }
-    
-  } catch (e) {
-    setEmpresaByApi(false);
-    setErr("Falha na consulta. Preencha os dados da empresa manualmente.");
-    setEmpresa({ ...initialEmpresa, cnpj: num });
-    setEmpresaFormVisivel(true);
+    const r = await fetch(url, { signal: ac.signal });
+    const data = await r.json().catch(() => null);
+    return { ok: r.ok, status: r.status, data };
   } finally {
-    setLoading(false);
+    clearTimeout(timer);
   }
 }
+
+// 🔓 PÚBLICA — não usa requireAuth
+router.post("/consulta-cnpj", async (req, res) => {
+  try {
+    const num = onlyDigits(req.body?.cnpj);
+    if (num.length !== 14) {
+      return res.status(400).json({ ok: false, error: "CNPJ inválido (14 dígitos)." });
+    }
+    if (num === "00000000000000") {
+      return res.status(400).json({ ok: false, error: "CNPJ reservado ao sistema (GLOBAL)." });
+    }
+
+    // 1) Verifica se já existe no banco (NORMALIZADO)
+    const [[ja]] = await pool.query(
+      `SELECT id, razao_social
+         FROM empresas
+        WHERE REPLACE(REPLACE(REPLACE(cnpj,'/',''),'.',''),'-','') = ?
+        LIMIT 1`,
+      [num]
+    );
+    if (ja) {
+      return res.status(409).json({
+        ok: false,
+        code: "already_registered",
+        error: "Sua empresa já tem cadastro, procure o seu administrador.",
+        empresa_id: ja.id,
+        razao_social: ja.razao_social
+      });
+    }
+
+    // 2) Não existe? Consulta ReceitaWS
+    const { ok, status, data } = await fetchJson(`https://www.receitaws.com.br/v1/cnpj/${num}`, { timeoutMs: 12000 });
+    if (!ok || !data || data.status !== "OK") {
+      return res.status(502).json({
+        ok: false,
+        error: "Falha ao consultar a Receita (tente novamente em instantes).",
+        upstream: status,
+      });
+    }
+
+    // 3) Mapeia para o formato da sua tabela
+    const d = data;
+    const empresa = {
+      razao_social:       d.nome || "",
+      nome_fantasia:      d.fantasia || "",
+      cnpj:               num, // normalizado
+      inscricao_estadual: null,
+      data_abertura:      d.abertura ? d.abertura.split("/").reverse().join("-") : null,
+      telefone:           d.telefone || "",
+      email:              d.email || "",
+      capital_social:     (() => {
+        const raw = String(d.capital_social ?? "")
+          .replace(/[^\d,.-]/g, "")
+          .replace(/\./g, "")
+          .replace(",", ".");
+        const val = parseFloat(raw);
+        return Number.isFinite(val) ? val : null;
+      })(),
+      natureza_juridica:  d.natureza_juridica || "",
+      situacao_cadastral: d.situacao || "",
+      data_situacao:      d.data_situicao ? d.data_situicao.split("/").reverse().join("-") : null,
+      socios_receita:     JSON.stringify(d.qsa || []),
+    };
+
+    return res.json({ ok: true, empresa });
+  } catch (e) {
+    console.error("EMPRESAS_CONSULTA_CNPJ_ERR", e?.message || e);
+    const timeout = /abort|timeout|ECONNABORTED/i.test(String(e?.message || ""));
+    return res.status(timeout ? 504 : 500).json({
+      ok: false,
+      error: timeout ? "Tempo de consulta esgotado." : "Erro ao consultar CNPJ.",
+    });
+  }
+});
