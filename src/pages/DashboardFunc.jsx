@@ -1,3 +1,4 @@
+// src/pages/DashboardFunc.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
@@ -6,10 +7,25 @@ const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 const pad2 = (n) => String(n).padStart(2, "0");
 const toISO = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const hojeISO = () => toISO(new Date());
-const agoraHHMM = () => {
+
+// AGORA com segundos para enviar ao backend (evita 400)
+const agoraHHMMSS = () => {
   const d = new Date();
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 };
+
+// Normaliza string para HH:MM:SS (aceita HH:MM e completa com :00)
+const toHHMMSS = (s) => {
+  if (!s) return null;
+  const m = String(s).trim().match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+  if (!m) return null;
+  const hh = m[1], mm = m[2], ss = m[3] ?? "00";
+  return `${hh}:${mm}:${ss}`;
+};
+
+// Para exibir só HH:MM
+const showHHMM = (s) => (s ? String(s).slice(0, 5) : "—");
+
 const weekdayPt = (d) =>
   d.toLocaleDateString("pt-BR", { weekday: "long" }).replace(/^\w/, (c) => c.toUpperCase());
 
@@ -39,7 +55,7 @@ const OrigemBadge = ({ origem }) => {
 };
 
 export default function DashboardFunc() {
-  const [tick, setTick] = useState(0); // só p/ relogar o relógio
+  const [tick, setTick] = useState(0);
   const [me, setMe] = useState(null);
   const [func, setFunc] = useState(null); // { id, pessoa_nome, cargo_nome }
   const [escalaHoje, setEscalaHoje] = useState([]); // [{entrada,saida,turno_ordem}]
@@ -94,7 +110,6 @@ export default function DashboardFunc() {
       try {
         const d = await api("/api/funcionarios?ativos=1");
         const lista = d?.funcionarios || [];
-        // heurística: casa por pessoa_nome ≈ me.nome
         const cand =
           lista.find(
             (f) =>
@@ -173,12 +188,10 @@ export default function DashboardFunc() {
 
   /* ========= estado do botão de ponto ========= */
   const estadoPonto = useMemo(() => {
-    // se existe algum apontamento de hoje com entrada preenchida e saída vazia → está "TRABALHANDO"
     const aberto = apontsHoje.find((a) => a.entrada && !a.saida);
     if (aberto) {
       return { status: "TRABALHANDO", label: "Registrar Saída", aberto };
     }
-    // senão, vai registrar nova ENTRADA
     return { status: "FORA", label: "Registrar Entrada", aberto: null };
   }, [apontsHoje]);
 
@@ -189,10 +202,10 @@ export default function DashboardFunc() {
     setMsg("");
 
     const iso = hojeISO();
-    const hhmm = agoraHHMM();
+    const hhmmss = agoraHHMMSS();
 
     try {
-      // refresh rápido do estado antes de bater
+      // refresh do estado antes de bater
       const atuais = await loadApontsHoje(func.id);
       const aberto = atuais.find((a) => a.entrada && !a.saida);
 
@@ -204,8 +217,8 @@ export default function DashboardFunc() {
             funcionario_id: func.id,
             data: iso,
             turno_ordem: aberto.turno_ordem || 1,
-            entrada: aberto.entrada,
-            saida: hhmm,
+            entrada: toHHMMSS(aberto.entrada), // normaliza backend
+            saida: toHHMMSS(hhmmss),           // normaliza backend
             origem: "APONTADO",
             obs: null,
           }),
@@ -213,15 +226,14 @@ export default function DashboardFunc() {
         setMsg("Saída registrada com sucesso!");
       } else {
         // abrir um novo turno: turno_ordem = max + 1
-        const maxTurno =
-          atuais.reduce((m, a) => Math.max(m, Number(a.turno_ordem || 1)), 0) || 0;
+        const maxTurno = atuais.reduce((m, a) => Math.max(m, Number(a.turno_ordem || 1)), 0) || 0;
         await api(`/api/apontamentos`, {
           method: "POST",
           body: JSON.stringify({
             funcionario_id: func.id,
             data: iso,
             turno_ordem: maxTurno + 1,
-            entrada: hhmm,
+            entrada: toHHMMSS(hhmmss), // normaliza backend
             saida: null,
             origem: "APONTADO",
             obs: null,
@@ -342,11 +354,9 @@ export default function DashboardFunc() {
                 fontSize: "20px",
                 padding: "18px 28px",
                 borderWidth: 2,
-                background:
-                  estadoPonto.status === "TRABALHANDO" ? "var(--warning)" : "var(--accent)",
+                background: estadoPonto.status === "TRABALHANDO" ? "var(--warning)" : "var(--accent)",
                 color: estadoPonto.status === "TRABALHANDO" ? "#111" : "#fff",
-                borderColor:
-                  estadoPonto.status === "TRABALHANDO" ? "var(--warning)" : "var(--accent-strong)",
+                borderColor: estadoPonto.status === "TRABALHANDO" ? "var(--warning)" : "var(--accent-strong)",
                 boxShadow: "0 6px 18px rgba(0,0,0,.08)",
               }}
               aria-label={estadoPonto.label}
@@ -383,7 +393,7 @@ export default function DashboardFunc() {
                 >
                   <div>Turno {t.turno_ordem}</div>
                   <div style={{ fontWeight: 600 }}>
-                    {(t.entrada || "—")} — {(t.saida || "—")}
+                    {showHHMM(t.entrada)} — {showHHMM(t.saida)}
                   </div>
                 </li>
               ))}
@@ -402,9 +412,7 @@ export default function DashboardFunc() {
         }}
       >
         <div className="stat-header" style={{ marginBottom: 8 }}>
-          <div style={{ fontWeight: 700 }}>
-            Meus apontamentos de hoje • {agoraTexto.data}
-          </div>
+          <div style={{ fontWeight: 700 }}>Meus apontamentos de hoje • {agoraTexto.data}</div>
           <button className="toggle-btn" onClick={recarregar} disabled={loading}>
             Recarregar
           </button>
@@ -429,10 +437,10 @@ export default function DashboardFunc() {
               >
                 <div style={{ color: "var(--muted)" }}>Turno {a.turno_ordem}</div>
                 <div>
-                  Entrada: <strong>{a.entrada || "—"}</strong>
+                  Entrada: <strong>{showHHMM(a.entrada)}</strong>
                 </div>
                 <div>
-                  Saída: <strong>{a.saida || "—"}</strong>
+                  Saída: <strong>{showHHMM(a.saida)}</strong>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <OrigemBadge origem={a.origem} />
