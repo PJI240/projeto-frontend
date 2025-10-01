@@ -1,6 +1,6 @@
 // src/components/menu.jsx
 import { NavLink } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 
 // Heroicons
 import {
@@ -23,10 +23,10 @@ import {
   ArrowRightOnRectangleIcon
 } from "@heroicons/react/24/outline";
 
-// Use a mesma base do resto do front
+// Base da API
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-/** Mapeia cada rota/entrada do menu para um "permission code" */
+/** Códigos canônicos de permissão de MENU */
 const PERM = {
   DASHBOARD:           "menu:dashboard",
   DASHBOARD_FUNC:      "menu:dashboard_func",
@@ -61,22 +61,25 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   const isAdm = isDev || me?.roles?.includes("administrador");
   const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
 
-  // permissões efetivas (set de strings)
-  const [perms, setPerms] = useState(() => new Set());
+  // permissões de menu efetivas (Set<string>)
+  const [perms, setPerms] = useState(new Set());
   const [permsLoaded, setPermsLoaded] = useState(false);
 
-  // busca permissões do usuário (apenas se não é admin/dev)
+  // Carrega permissões de MENU (apenas para não-admin/dev)
   useEffect(() => {
     let alive = true;
-    async function fetchPerms() {
+
+    async function loadMenuPerms() {
       if (isDev || isAdm) {
-        // Admin/Dev enxerga tudo
-        setPerms(new Set(Object.values(PERM)));
-        setPermsLoaded(true);
+        // Admin/Dev enxergam tudo no menu
+        if (alive) {
+          setPerms(new Set(Object.values(PERM)));
+          setPermsLoaded(true);
+        }
         return;
       }
       try {
-        const r = await fetch(`${API_BASE}/api/permissoes/minhas`, {
+        const r = await fetch(`${API_BASE}/api/permissoes_menu/minhas`, {
           credentials: "include",
         });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -86,19 +89,19 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           setPerms(new Set(codes));
           setPermsLoaded(true);
         }
-      } catch {
-        // Falha segura → só mostra o básico do colaborador
+      } catch (_e) {
+        // Falha segura: mostra só itens básicos do colaborador
         if (alive) {
           setPerms(new Set([PERM.DASHBOARD, PERM.DASHBOARD_FUNC]));
           setPermsLoaded(true);
         }
       }
     }
-    fetchPerms();
+
+    loadMenuPerms();
     return () => { alive = false; };
   }, [isDev, isAdm]);
 
-  // helper para checar permissão
   const has = (code) => perms.has(code);
 
   // Detecta mobile
@@ -109,7 +112,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Fecha o menu ao mudar rota no mobile
+  // Fecha o menu ao navegar (mobile)
   useEffect(() => {
     if (!isMobile) return;
     const onPop = () => setIsMenuOpen(false);
@@ -120,11 +123,12 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   const toggleMenu = () => setIsMenuOpen(v => !v);
   const closeMenu = () => setIsMenuOpen(false);
 
-  // Enquanto não carregou as permissões, evita “piscar” de itens
+  // Evita “piscar” de itens enquanto carrega permissões
   const canRender = permsLoaded || isAdm || isDev;
 
   return (
     <>
+      {/* Toggle mobile */}
       {isMobile && (
         <button
           className="menu-toggle"
@@ -138,10 +142,12 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
         </button>
       )}
 
+      {/* Backdrop */}
       {isMobile && isMenuOpen && (
         <div className="sidebar-backdrop show" onClick={closeMenu} aria-hidden="true" />
       )}
 
+      {/* Sidebar */}
       <aside
         id="dashboard-sidebar"
         className={`dashboard-sidebar ${isMenuOpen ? "is-open" : ""} ${isMobile ? "mobile" : ""}`}
@@ -167,7 +173,12 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               </div>
             )}
           </div>
-          <button className="logout-btn" onClick={onLogout} title="Sair" aria-label="Sair do sistema">
+          <button
+            className="logout-btn"
+            onClick={onLogout}
+            title="Sair"
+            aria-label="Sair do sistema"
+          >
             <ArrowRightOnRectangleIcon className="logout-icon" />
           </button>
         </div>
