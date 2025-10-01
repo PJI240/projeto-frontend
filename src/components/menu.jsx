@@ -185,7 +185,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               {has(PERM.DASHBOARD) && (
                 <MenuItem to="/dashboard" label="Visão Geral" icon={<ChartBarIcon />} onClick={closeMenu} />
               )}
-              {isFunc && has(PERM.DASHBOARD_FUNC) && (
+             {has(PERM.DASHBOARD_FUNC) && (
                 <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} onClick={closeMenu} />
               )}
               {isAdm && has(PERM.DASHBOARD_ADM) && (
