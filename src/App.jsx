@@ -1,5 +1,6 @@
 // src/App.jsx
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import AppLayout from "./layouts/AppLayout.jsx";
 
 import Login from "./pages/Login.jsx";
@@ -10,7 +11,7 @@ import DashboardAdm from "./pages/DashboardAdm.jsx";
 import DashboardFunc from "./pages/DashboardFunc.jsx";
 
 import Usuarios from "./pages/Usuarios.jsx";
-import Pessoas from "./pages/Pessoas.jsx";
+import Pessoas from "./pages/Pessoas.jsx;
 import Empresas from "./pages/Empresas.jsx";
 import Perfis from "./pages/Perfis.jsx";
 import Permissoes from "./pages/Permissoes.jsx";
@@ -33,12 +34,45 @@ import DevInspecao from "./pages/DevInspecao.jsx";
 import DevAuditoria from "./pages/DevAuditoria.jsx";
 import DevConfig from "./pages/DevConfig.jsx";
 
+const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+
+/** Decide a rota inicial com base nos papéis do usuário. */
+function Landing() {
+  const [state, setState] = useState({ loading: true, path: "/login" });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
+        const data = await r.json().catch(() => null);
+
+        if (!alive) return;
+
+        if (r.ok && data?.ok && data.user) {
+          const roles = (data.roles || []).map((s) => String(s).toLowerCase());
+          const isAdm = roles.includes("administrador") || roles.includes("desenvolvedor");
+          setState({ loading: false, path: isAdm ? "/dashboard_adm" : "/dashboard_func" });
+        } else {
+          setState({ loading: false, path: "/login" });
+        }
+      } catch {
+        if (alive) setState({ loading: false, path: "/login" });
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (state.loading) return null; // opcional: tela de splash
+  return <Navigate to={state.path} replace />;
+}
+
 export default function App() {
   return (
     <Router>
       <Routes>
         {/* 🔓 públicas: sem menu */}
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
