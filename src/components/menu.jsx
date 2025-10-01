@@ -1,8 +1,8 @@
 // src/components/menu.jsx
 import { NavLink } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
-// Importando Heroicons
+// Heroicons
 import {
   Bars3Icon,
   XMarkIcon,
@@ -20,9 +20,38 @@ import {
   CogIcon,
   MagnifyingGlassIcon,
   ClipboardDocumentListIcon,
-  WrenchScrewdriverIcon,
   ArrowRightOnRectangleIcon
 } from "@heroicons/react/24/outline";
+
+// Use a mesma base do resto do front
+const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
+
+/** Mapeia cada rota/entrada do menu para um "permission code" */
+const PERM = {
+  DASHBOARD:           "menu:dashboard",
+  DASHBOARD_FUNC:      "menu:dashboard_func",
+  DASHBOARD_ADM:       "menu:dashboard_adm",
+  EMPRESAS:            "menu:empresas",
+
+  PESSOAS:             "menu:pessoas",
+
+  USUARIOS:            "menu:usuarios",
+  PERFIS_PERMISSOES:   "menu:perfis-permissoes",
+
+  ESCALAS:             "menu:escalas",
+  APONTAMENTOS:        "menu:apontamentos",
+  OCORRENCIAS:         "menu:ocorrencias",
+
+  CARGOS:              "menu:cargos",
+  FUNCIONARIOS:        "menu:funcionarios",
+  FOLHAS:              "menu:folhas",
+  FOLHAS_FUNC:         "menu:folhas-funcionarios",
+  FOLHAS_ITENS:        "menu:folhas-itens",
+
+  DEV_INSPECAO:        "menu:dev-inspecao",
+  DEV_AUDITORIA:       "menu:dev-auditoria",
+  DEV_CONFIG:          "menu:dev-config",
+};
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
   const [isMobile, setIsMobile] = useState(false);
@@ -32,39 +61,73 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   const isAdm = isDev || me?.roles?.includes("administrador");
   const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
 
-  // Detecta se está em mobile
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsMobile(window.innerWidth <= 900);
-    };
+  // permissões efetivas (set de strings)
+  const [perms, setPerms] = useState(() => new Set());
+  const [permsLoaded, setPermsLoaded] = useState(false);
 
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    
-    return () => window.removeEventListener('resize', checkScreenSize);
+  // busca permissões do usuário (apenas se não é admin/dev)
+  useEffect(() => {
+    let alive = true;
+    async function fetchPerms() {
+      if (isDev || isAdm) {
+        // Admin/Dev enxerga tudo
+        setPerms(new Set(Object.values(PERM)));
+        setPermsLoaded(true);
+        return;
+      }
+      try {
+        const r = await fetch(`${API_BASE}/api/permissoes/minhas`, {
+          credentials: "include",
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json().catch(() => ({}));
+        const codes = Array.isArray(data?.codes) ? data.codes : [];
+        if (alive) {
+          setPerms(new Set(codes));
+          setPermsLoaded(true);
+        }
+      } catch {
+        // Falha segura → só mostra o básico do colaborador
+        if (alive) {
+          setPerms(new Set([PERM.DASHBOARD, PERM.DASHBOARD_FUNC]));
+          setPermsLoaded(true);
+        }
+      }
+    }
+    fetchPerms();
+    return () => { alive = false; };
+  }, [isDev, isAdm]);
+
+  // helper para checar permissão
+  const has = (code) => perms.has(code);
+
+  // Detecta mobile
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Fecha o menu ao mudar de rota no mobile
+  // Fecha o menu ao mudar rota no mobile
   useEffect(() => {
-    if (isMobile) {
-      setIsMenuOpen(false);
-    }
-  }, [isMobile, window.location.pathname]);
+    if (!isMobile) return;
+    const onPop = () => setIsMenuOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [isMobile]);
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
+  const toggleMenu = () => setIsMenuOpen(v => !v);
+  const closeMenu = () => setIsMenuOpen(false);
 
-  const closeMenu = () => {
-    setIsMenuOpen(false);
-  };
+  // Enquanto não carregou as permissões, evita “piscar” de itens
+  const canRender = permsLoaded || isAdm || isDev;
 
   return (
     <>
-      {/* Botão hambúrguer para mobile */}
       {isMobile && (
-        <button 
-          className="menu-toggle" 
+        <button
+          className="menu-toggle"
           onClick={toggleMenu}
           aria-expanded={isMenuOpen}
           aria-controls="dashboard-sidebar"
@@ -75,39 +138,26 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
         </button>
       )}
 
-      {/* Backdrop para fechar o menu no mobile */}
       {isMobile && isMenuOpen && (
-        <div 
-          className="sidebar-backdrop show" 
-          onClick={closeMenu}
-          aria-hidden="true"
-        />
+        <div className="sidebar-backdrop show" onClick={closeMenu} aria-hidden="true" />
       )}
 
-      {/* Sidebar/Menu */}
-      <aside 
+      <aside
         id="dashboard-sidebar"
-        className={`dashboard-sidebar ${isMenuOpen ? 'is-open' : ''} ${isMobile ? 'mobile' : ''}`}
+        className={`dashboard-sidebar ${isMenuOpen ? "is-open" : ""} ${isMobile ? "mobile" : ""}`}
         aria-label="Menu lateral"
       >
         <div className="sidebar-header">
           <h1 className="brand">Projeto Integrador</h1>
           <h2 className="subtitle">Menu</h2>
-          
-          {/* Botão fechar no mobile */}
           {isMobile && (
-            <button 
-              className="close-menu"
-              onClick={closeMenu}
-              aria-label="Fechar menu"
-            >
+            <button className="close-menu" onClick={closeMenu} aria-label="Fechar menu">
               <XMarkIcon className="close-menu-icon" />
             </button>
           )}
         </div>
 
         <div className="user-info" role="group" aria-label="Usuário">
-
           <div className="user-details">
             <div className="user-name">{me?.nome || "Usuário"}</div>
             <div className="user-email">{me?.email}</div>
@@ -117,64 +167,126 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               </div>
             )}
           </div>
-          <button 
-            className="logout-btn" 
-            onClick={onLogout} 
-            title="Sair"
-            aria-label="Sair do sistema"
-          >
+          <button className="logout-btn" onClick={onLogout} title="Sair" aria-label="Sair do sistema">
             <ArrowRightOnRectangleIcon className="logout-icon" />
           </button>
         </div>
 
-        <nav className="sidebar-nav" aria-label="Navegação principal">
-          <MenuGroup title="Geral">
-            
-            <MenuItem to="/dashboard" label="Visão Geral" icon={<ChartBarIcon />} onClick={closeMenu} />
-            {isFunc && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} onClick={closeMenu} />}
-            {isAdm && <MenuItem to="/dashboard_adm" label="Painel do Admin" icon={<ShieldCheckIcon />} onClick={closeMenu} />}
-            <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
-          </MenuGroup>
-
-          {(isDev || isAdm) && (
-            <MenuGroup title="Cadastros">
-              <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
+        {canRender && (
+          <nav className="sidebar-nav" aria-label="Navegação principal">
+            <MenuGroup title="Geral">
+              {has(PERM.DASHBOARD) && (
+                <MenuItem to="/dashboard" label="Visão Geral" icon={<ChartBarIcon />} onClick={closeMenu} />
+              )}
+              {isFunc && has(PERM.DASHBOARD_FUNC) && (
+                <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} onClick={closeMenu} />
+              )}
+              {isAdm && has(PERM.DASHBOARD_ADM) && (
+                <MenuItem to="/dashboard_adm" label="Painel do Admin" icon={<ShieldCheckIcon />} onClick={closeMenu} />
+              )}
+              {has(PERM.EMPRESAS) && (
+                <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
+              )}
             </MenuGroup>
-          )}
 
-          {(isDev || isAdm) && (
-            <MenuGroup title="Segurança">
-              <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
-              <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={closeMenu} />
-            </MenuGroup>
-          )}
+            {(isDev || isAdm) && (
+              <MenuGroup title="Cadastros">
+                {has(PERM.PESSOAS) && (
+                  <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
+                )}
+              </MenuGroup>
+            )}
 
-          {(isDev || isAdm || isFunc) && (
-            <MenuGroup title="Operação">
-              <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={closeMenu} />
-              <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} onClick={closeMenu} />
-              <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} onClick={closeMenu} />
-            </MenuGroup>
-          )}
+            {(isDev || isAdm) && (
+              <MenuGroup title="Segurança">
+                {has(PERM.USUARIOS) && (
+                  <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
+                )}
+                {has(PERM.PERFIS_PERMISSOES) && (
+                  <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={closeMenu} />
+                )}
+              </MenuGroup>
+            )}
 
-          {(isDev || isAdm) && (
-            <MenuGroup title="Folha">
-              <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
-              <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} onClick={closeMenu} />
-              <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={closeMenu} />
-              <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
-              <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={closeMenu} />
-            </MenuGroup>
-          )}
+            {(isDev || isAdm || isFunc) && (
+              <MenuGroup title="Operação">
+                {has(PERM.ESCALAS) && (
+                  <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={closeMenu} />
+                )}
+                {has(PERM.APONTAMENTOS) && (
+                  <MenuItem
+                    to="/apontamentos"
+                    label="Apontamentos"
+                    icon={<ClipboardDocumentListIcon />}
+                    onClick={closeMenu}
+                  />
+                )}
+                {has(PERM.OCORRENCIAS) && (
+                  <MenuItem
+                    to="/ocorrencias"
+                    label="Ocorrências"
+                    icon={<ExclamationTriangleIcon />}
+                    onClick={closeMenu}
+                  />
+                )}
+              </MenuGroup>
+            )}
 
-          {isDev && (
-            <MenuGroup title="Dev">
-              <MenuItem to="/dev-inspecao" label="Inspeção / SQL" icon={<MagnifyingGlassIcon />} onClick={closeMenu} />
-              <MenuItem to="/dev-auditoria" label="Auditoria" icon={<ClipboardDocumentListIcon />} onClick={closeMenu} />
-              <MenuItem to="/dev-config" label="Configurações" icon={<CogIcon />} onClick={closeMenu} />
-            </MenuGroup>
-          )}
-        </nav>
+            {(isDev || isAdm) && (
+              <MenuGroup title="Folha">
+                {has(PERM.CARGOS) && (
+                  <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
+                )}
+                {has(PERM.FUNCIONARIOS) && (
+                  <MenuItem
+                    to="/funcionarios"
+                    label="Funcionários x Salários"
+                    icon={<UserGroupIcon />}
+                    onClick={closeMenu}
+                  />
+                )}
+                {has(PERM.FOLHAS) && (
+                  <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={closeMenu} />
+                )}
+                {has(PERM.FOLHAS_FUNC) && (
+                  <MenuItem
+                    to="/folhas-funcionarios"
+                    label="Folhas × Funcionários"
+                    icon={<UserGroupIcon />}
+                    onClick={closeMenu}
+                  />
+                )}
+                {has(PERM.FOLHAS_ITENS) && (
+                  <MenuItem
+                    to="/folhas-itens"
+                    label="Itens de Folha"
+                    icon={<DocumentTextIcon />}
+                    onClick={closeMenu}
+                  />
+                )}
+              </MenuGroup>
+            )}
+
+            {isDev && (
+              <MenuGroup title="Dev">
+                {has(PERM.DEV_INSPECAO) && (
+                  <MenuItem to="/dev-inspecao" label="Inspeção / SQL" icon={<MagnifyingGlassIcon />} onClick={closeMenu} />
+                )}
+                {has(PERM.DEV_AUDITORIA) && (
+                  <MenuItem
+                    to="/dev-auditoria"
+                    label="Auditoria"
+                    icon={<ClipboardDocumentListIcon />}
+                    onClick={closeMenu}
+                  />
+                )}
+                {has(PERM.DEV_CONFIG) && (
+                  <MenuItem to="/dev-config" label="Configurações" icon={<CogIcon />} onClick={closeMenu} />
+                )}
+              </MenuGroup>
+            )}
+          </nav>
+        )}
 
         <div className="sidebar-footer">
           <small style={{ color: "var(--muted)" }}>
@@ -189,10 +301,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 function MenuGroup({ title, children }) {
   return (
     <div className="menu-group">
-      <div 
-        className="menu-group-title"
-        aria-hidden="true"
-      >
+      <div className="menu-group-title" aria-hidden="true">
         {title}
       </div>
       <div className="menu-group-items">{children}</div>
@@ -202,8 +311,8 @@ function MenuGroup({ title, children }) {
 
 function MenuItem({ to, label, icon, onClick }) {
   return (
-    <NavLink 
-      to={to} 
+    <NavLink
+      to={to}
       className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
       onClick={onClick}
       end
