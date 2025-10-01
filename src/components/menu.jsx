@@ -1,6 +1,6 @@
 // src/components/menu.jsx
 import { NavLink } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 // Heroicons
 import {
@@ -26,7 +26,7 @@ import {
 // Base da API
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-/** Códigos de permissão no MESMO formato do banco (menu.xxx.ver) */
+/** Códigos de permissão (exatamente como no BD: menu.xxx.ver) */
 const PERM = {
   DASHBOARD:           "menu.dashboard.ver",
   DASHBOARD_FUNC:      "menu.dashboard_func.ver",
@@ -59,65 +59,67 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
   const isDev = !!me?.isSuper || me?.roles?.includes("desenvolvedor");
   const isAdm = isDev || me?.roles?.includes("administrador");
-  const isFunc = isDev || isAdm || me?.roles?.includes("funcionario");
 
-  // permissões efetivas (set de strings)
+  // permissões (strings exatamente como no BD)
   const [perms, setPerms] = useState(() => new Set());
   const [permsLoaded, setPermsLoaded] = useState(false);
 
-  // Carrega permissões (formato exatamente igual ao BD: menu.xxx.ver)
+  // Carrega permissões efetivas
   useEffect(() => {
     let alive = true;
+
     async function fetchPerms() {
+      // Dev/Admin: vê tudo (qualquer front que dependa só de perm também funcionará)
       if (isDev || isAdm) {
-        // Admin/Dev enxerga tudo
         if (alive) {
           setPerms(new Set(Object.values(PERM)));
           setPermsLoaded(true);
         }
         return;
       }
+
       try {
-        // tenta rota nova; se não existir, cai na antiga
         const tryFetch = async (url) => {
           const r = await fetch(url, { credentials: "include" });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          if (!r.ok) throw new Error(String(r.status));
           const data = await r.json().catch(() => ({}));
           return Array.isArray(data?.codes) ? data.codes : [];
         };
+
+        // tenta rota dedicada; cai para a antiga se necessário
         let codes;
         try {
           codes = await tryFetch(`${API_BASE}/api/permissoes_menu/minhas`);
         } catch {
           codes = await tryFetch(`${API_BASE}/api/permissoes/minhas`);
         }
+
         if (alive) {
-          setPerms(new Set(codes)); // sem conversão!
+          setPerms(new Set(codes)); // sem mapear/renomear → igual ao BD
           setPermsLoaded(true);
         }
       } catch {
         if (alive) {
           // fallback mínimo
-          setPerms(new Set([PERM.DASHBOARD, PERM.DASHBOARD_FUNC]));
+          setPerms(new Set([PERM.DASHBOARD, PERM.EMPRESAS]));
           setPermsLoaded(true);
         }
       }
     }
+
     fetchPerms();
     return () => { alive = false; };
   }, [isDev, isAdm]);
 
   const has = (code) => perms.has(code);
 
-  // Detecta mobile
+  // mobile
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 900);
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-
-  // Fecha o menu ao mudar rota no mobile
   useEffect(() => {
     if (!isMobile) return;
     const onPop = () => setIsMenuOpen(false);
@@ -127,6 +129,24 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
   const toggleMenu = () => setIsMenuOpen((v) => !v);
   const closeMenu = () => setIsMenuOpen(false);
+
+  // Seção só aparece se tiver pelo menos um item permitido
+  const Section = ({ title, items }) => {
+    const anyVisible = useMemo(() => items.some((i) => has(i.perm)), [items, perms]);
+    if (!anyVisible) return null;
+    return (
+      <div className="menu-group">
+        <div className="menu-group-title" aria-hidden="true">{title}</div>
+        <div className="menu-group-items">
+          {items.map((i) =>
+            has(i.perm) ? (
+              <MenuItem key={i.to} to={i.to} label={i.label} icon={i.icon} onClick={closeMenu} />
+            ) : null
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const canRender = permsLoaded || isAdm || isDev;
 
@@ -181,108 +201,71 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
         {canRender && (
           <nav className="sidebar-nav" aria-label="Navegação principal">
-            <MenuGroup title="Geral">
-              {has(PERM.DASHBOARD) && (
-                <MenuItem to="/dashboard" label="Visão Geral" icon={<ChartBarIcon />} onClick={closeMenu} />
-              )}
-             {has(PERM.DASHBOARD_FUNC) && (
-                <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} onClick={closeMenu} />
-              )}
-              {isAdm && has(PERM.DASHBOARD_ADM) && (
-                <MenuItem to="/dashboard_adm" label="Painel do Admin" icon={<ShieldCheckIcon />} onClick={closeMenu} />
-              )}
-              {has(PERM.EMPRESAS) && (
-                <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={closeMenu} />
-              )}
-            </MenuGroup>
+            <Section
+              title="Geral"
+              items={[
+                { perm: PERM.DASHBOARD,       to: "/dashboard",        label: "Visão Geral",        icon: <ChartBarIcon /> },
+                { perm: PERM.DASHBOARD_FUNC,  to: "/dashboard_func",   label: "Meu Painel",         icon: <UserIcon /> },
+                // Se você quiser que o painel do admin apareça só pra admin mesmo,
+                // mantenha a perm apenas para admins no BD; aqui seguimos a permissão.
+                { perm: PERM.DASHBOARD_ADM,   to: "/dashboard_adm",    label: "Painel do Admin",    icon: <ShieldCheckIcon /> },
+                { perm: PERM.EMPRESAS,        to: "/empresas",         label: "Minha Empresa",      icon: <BuildingOfficeIcon /> },
+              ]}
+            />
 
-            {(isDev || isAdm) && (
-              <MenuGroup title="Cadastros">
-                {has(PERM.PESSOAS) && (
-                  <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={closeMenu} />
-                )}
-              </MenuGroup>
-            )}
+            <Section
+              title="Cadastros"
+              items={[
+                { perm: PERM.PESSOAS,         to: "/pessoas",          label: "Pessoas",            icon: <UserIcon /> },
+              ]}
+            />
 
-            {(isDev || isAdm) && (
-              <MenuGroup title="Segurança">
-                {has(PERM.USUARIOS) && (
-                  <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.PERFIS_PERMISSOES) && (
-                  <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={closeMenu} />
-                )}
-              </MenuGroup>
-            )}
+            <Section
+              title="Segurança"
+              items={[
+                { perm: PERM.USUARIOS,        to: "/usuarios",         label: "Usuários",           icon: <UserGroupIcon /> },
+                { perm: PERM.PERFIS_PERMISSOES,to: "/perfis-permissoes",label: "Permissões",        icon: <KeyIcon /> },
+              ]}
+            />
 
-            {(isDev || isAdm || isFunc) && (
-              <MenuGroup title="Operação">
-                {has(PERM.ESCALAS) && (
-                  <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.APONTAMENTOS) && (
-                  <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.OCORRENCIAS) && (
-                  <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} onClick={closeMenu} />
-                )}
-              </MenuGroup>
-            )}
+            <Section
+              title="Operação"
+              items={[
+                { perm: PERM.ESCALAS,         to: "/escalas",          label: "Escalas",            icon: <ClockIcon /> },
+                { perm: PERM.APONTAMENTOS,    to: "/apontamentos",     label: "Apontamentos",       icon: <ClipboardDocumentListIcon /> },
+                { perm: PERM.OCORRENCIAS,     to: "/ocorrencias",      label: "Ocorrências",        icon: <ExclamationTriangleIcon /> },
+              ]}
+            />
 
-            {(isDev || isAdm) && (
-              <MenuGroup title="Folha">
-                {has(PERM.CARGOS) && (
-                  <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.FUNCIONARIOS) && (
-                  <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.FOLHAS) && (
-                  <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.FOLHAS_FUNC) && (
-                  <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.FOLHAS_ITENS) && (
-                  <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={closeMenu} />
-                )}
-              </MenuGroup>
-            )}
+            <Section
+              title="Folha"
+              items={[
+                { perm: PERM.CARGOS,          to: "/cargos",           label: "Cargos",             icon: <BriefcaseIcon /> },
+                { perm: PERM.FUNCIONARIOS,    to: "/funcionarios",     label: "Funcionários x Salários", icon: <UserGroupIcon /> },
+                { perm: PERM.FOLHAS,          to: "/folhas",           label: "Folhas",             icon: <DocumentChartBarIcon /> },
+                { perm: PERM.FOLHAS_FUNC,     to: "/folhas-funcionarios", label: "Folhas × Funcionários", icon: <UserGroupIcon /> },
+                { perm: PERM.FOLHAS_ITENS,    to: "/folhas-itens",     label: "Itens de Folha",     icon: <DocumentTextIcon /> },
+              ]}
+            />
 
-            {isDev && (
-              <MenuGroup title="Dev">
-                {has(PERM.DEV_INSPECAO) && (
-                  <MenuItem to="/dev-inspecao" label="Inspeção / SQL" icon={<MagnifyingGlassIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.DEV_AUDITORIA) && (
-                  <MenuItem to="/dev-auditoria" label="Auditoria" icon={<ClipboardDocumentListIcon />} onClick={closeMenu} />
-                )}
-                {has(PERM.DEV_CONFIG) && (
-                  <MenuItem to="/dev-config" label="Configurações" icon={<CogIcon />} onClick={closeMenu} />
-                )}
-              </MenuGroup>
-            )}
+            <Section
+              title="Dev"
+              items={[
+                { perm: PERM.DEV_INSPECAO,    to: "/dev-inspecao",     label: "Inspeção / SQL",     icon: <MagnifyingGlassIcon /> },
+                { perm: PERM.DEV_AUDITORIA,   to: "/dev-auditoria",    label: "Auditoria",          icon: <ClipboardDocumentListIcon /> },
+                { perm: PERM.DEV_CONFIG,      to: "/dev-config",       label: "Configurações",      icon: <CogIcon /> },
+              ]}
+            />
           </nav>
         )}
 
         <div className="sidebar-footer">
           <small style={{ color: "var(--muted)" }}>
-            v1.0 • Acessível • {isDev ? "Dev" : isAdm ? "Admin" : isFunc ? "Func" : "User"}
+            v1.0 • Acessível
           </small>
         </div>
       </aside>
     </>
-  );
-}
-
-function MenuGroup({ title, children }) {
-  return (
-    <div className="menu-group">
-      <div className="menu-group-title" aria-hidden="true">
-        {title}
-      </div>
-      <div className="menu-group-items">{children}</div>
-    </div>
   );
 }
 
