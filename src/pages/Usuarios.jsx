@@ -93,11 +93,26 @@ export default function Usuarios() {
     })();
   }, []);
 
-  // Pessoas disponíveis para criar usuário (1:1)
+  // Pessoas sem usuário (para criação) = todas - já usadas
   const pessoasSemUsuario = useMemo(() => {
     const usedPessoaIds = new Set((lista || []).map((u) => u.pessoa_id).filter(Boolean));
     return (pessoas || []).filter((p) => !usedPessoaIds.has(p.id));
   }, [pessoas, lista]);
+
+  // Pessoas disponíveis no select (criação: sem usuário; edição: sem usuário + pessoa atual)
+  const pessoasDisponiveis = useMemo(() => {
+    if (!form.id) return pessoasSemUsuario;
+
+    // pessoa atualmente vinculada ao usuário em edição
+    const atual = (pessoas || []).find((p) => p.id === Number(form.pessoa_id));
+    const base = [...pessoasSemUsuario];
+    if (atual && !base.some((x) => x.id === atual.id)) {
+      base.push(atual);
+    }
+
+    // ordena por nome
+    return base.sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
+  }, [form.id, form.pessoa_id, pessoas, pessoasSemUsuario]);
 
   const filtrados = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -121,10 +136,10 @@ export default function Usuarios() {
     setErr("");
     setForm({
       id: item.id,
-      pessoa_id: item.pessoa_id, // bloqueado na edição (mantém 1:1)
+      pessoa_id: item.pessoa_id || "",
       nome: item.nome || "",
       email: item.email || "",
-      senha: "", // não exibimos hash; só troca se informar nova senha
+      senha: "",
       perfil_id: item.perfil_id || "",
       ativo: item.ativo ? 1 : 0,
     });
@@ -151,17 +166,18 @@ export default function Usuarios() {
     setErr("");
     setSaving(true);
     try {
+      // validações comuns
+      if (!String(form.pessoa_id || "").trim()) throw new Error("Selecione a pessoa.");
+      if (!String(form.nome || "").trim()) throw new Error("Informe o nome do usuário.");
+      if (!String(form.email || "").trim()) throw new Error("Informe o e-mail.");
+      if (!String(form.perfil_id || "").trim()) throw new Error("Selecione um perfil.");
+
+      const vp = validaPerfil(form.perfil_id);
+      if (!vp.ok) throw new Error(vp.error);
+
       if (!form.id) {
         // criação
-        if (!String(form.pessoa_id || "").trim()) throw new Error("Selecione a pessoa.");
-        if (!String(form.nome || "").trim()) throw new Error("Informe o nome do usuário.");
-        if (!String(form.email || "").trim()) throw new Error("Informe o e-mail.");
         if (!String(form.senha || "").trim()) throw new Error("Informe a senha.");
-        if (!String(form.perfil_id || "").trim()) throw new Error("Selecione um perfil.");
-
-        // valida permissão para admin
-        const vp = validaPerfil(form.perfil_id);
-        if (!vp.ok) throw new Error(vp.error);
 
         const payload = {
           pessoa_id: Number(form.pessoa_id),
@@ -179,22 +195,16 @@ export default function Usuarios() {
           body: JSON.stringify(payload),
         });
       } else {
-        // edição (pessoa travada; opcional trocar senha)
-        if (!String(form.nome || "").trim()) throw new Error("Informe o nome do usuário.");
-        if (!String(form.email || "").trim()) throw new Error("Informe o e-mail.");
-        if (!String(form.perfil_id || "").trim()) throw new Error("Selecione um perfil.");
-
-        const vp = validaPerfil(form.perfil_id);
-        if (!vp.ok) throw new Error(vp.error);
-
+        // edição — agora com possibilidade de trocar pessoa
         const payload = {
+          pessoa_id: Number(form.pessoa_id), // <-- permite alterar o vínculo
           nome: form.nome.trim(),
           email: form.email.trim().toLowerCase(),
           perfil_id: Number(form.perfil_id),
           ativo: form.ativo ? 1 : 0,
         };
         if (String(form.senha || "").trim()) {
-          payload.senha = form.senha; // backend decide atualizar se presente
+          payload.senha = form.senha;
         }
 
         await fetchJSON(`${API_BASE}/api/usuarios/${form.id}`, {
@@ -342,30 +352,28 @@ export default function Usuarios() {
               placeholder={form.id ? "••••••••" : ""}
               required={!form.id}
             />
-            {/* Pessoa (só na criação) */}
-            {!form.id && (
-              <>
-                <label htmlFor="u_pessoa">Pessoa</label>
-                <select
-                  id="u_pessoa"
-                  value={form.pessoa_id}
-                  onChange={(e) => setField("pessoa_id", e.target.value)}
-                  disabled={loadingOpts}
-                  required
-                  style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)", width: "100%" }}
-                >
-                  <option value="">Selecione…</option>
-                  {pessoasSemUsuario.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <small style={{ color: "var(--muted)" }}>
-                  Precisa cadastrar uma <Link to="/pessoas"><strong>pessoa</strong></Link> antes?
-                </small>
-              </>
-            )}
+
+            {/* Pessoa (AGORA também na edição) */}
+            <label htmlFor="u_pessoa">Pessoa</label>
+            <select
+              id="u_pessoa"
+              value={form.pessoa_id}
+              onChange={(e) => setField("pessoa_id", e.target.value)}
+              disabled={loadingOpts}
+              required
+              style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)", width: "100%" }}
+            >
+              <option value="">Selecione…</option>
+              {pessoasDisponiveis.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome} {p.cpf ? `— ${p.cpf}` : ""}
+                </option>
+              ))}
+            </select>
+            <small style={{ color: "var(--muted)" }}>
+              Precisa cadastrar uma <Link to="/pessoas"><strong>pessoa</strong></Link> antes?
+            </small>
+
             <label htmlFor="u_perfil">Perfil</label>
             <select
               id="u_perfil"
