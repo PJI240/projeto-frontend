@@ -114,7 +114,7 @@ export default function Pessoas() {
           <h1>Pessoas</h1>
           <p>Gerencie as informações pessoais da sua equipe.</p>
         </div>
-        <div className="header-actions">
+        <div style={{ display: "flex", gap: 8 }}>
           <button className="toggle-btn" onClick={abrirNovo}>Nova Pessoa</button>
           <button className="toggle-btn" onClick={carregar} disabled={loading}>
             {loading ? "Atualizando..." : "Atualizar"}
@@ -123,426 +123,122 @@ export default function Pessoas() {
       </header>
 
       {err && (
-        <div className="error-alert" role="alert">
+        <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>
           {err}
         </div>
       )}
 
-      <div className="search-container">
+      <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
         <input
           placeholder="Buscar por nome, CPF ou e-mail…"
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
-          className="search-input"
+          style={{ flex: 1, padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)" }}
         />
       </div>
 
-      <div className="table-container">
-        <div className="stat-card">
+      <div className="stats-grid" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="stat-card" style={{ padding: 0 }}>
           {loading ? (
-            <div className="loading-message">Carregando…</div>
+            <div style={{ padding: 16, color: "var(--muted)" }}>Carregando…</div>
           ) : listaFiltrada.length === 0 ? (
-            <div className="empty-message">
+            <div style={{ padding: 16, color: "var(--muted)" }}>
               Nenhuma pessoa encontrada para sua empresa.
             </div>
           ) : (
-            <>
-              {/* Desktop Table */}
-              <table className="desktop-table">
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>CPF</th>
-                    <th>E-mail</th>
-                    <th>Telefone</th>
-                    <th className="actions-header">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {listaFiltrada.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.nome}</td>
-                      <td>{p.cpf || "—"}</td>
-                      <td>{p.email || "—"}</td>
-                      <td>{p.telefone || "—"}</td>
-                      <td className="actions-cell">
-                        <button className="toggle-btn" onClick={() => abrirEdicao(p)}>Editar</button>
-                        <button className="toggle-btn" onClick={() => excluir(p.id)}>Excluir</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Mobile Cards */}
-              <div className="mobile-cards">
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                  <th style={{ padding: 12 }}>Nome</th>
+                  <th style={{ padding: 12 }}>CPF</th>
+                  <th style={{ padding: 12 }}>E-mail</th>
+                  <th style={{ padding: 12 }}>Telefone</th>
+                  <th style={{ padding: 12, width: 160 }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
                 {listaFiltrada.map((p) => (
-                  <div key={p.id} className="person-card">
-                    <div className="person-info">
-                      <div className="person-name">{p.nome}</div>
-                      <div className="person-details">
-                        <div><strong>CPF:</strong> {p.cpf || "—"}</div>
-                        <div><strong>E-mail:</strong> {p.email || "—"}</div>
-                        <div><strong>Telefone:</strong> {p.telefone || "—"}</div>
-                      </div>
-                    </div>
-                    <div className="person-actions">
+                  <tr key={p.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: 12 }}>{p.nome}</td>
+                    <td style={{ padding: 12 }}>{p.cpf || "—"}</td>
+                    <td style={{ padding: 12 }}>{p.email || "—"}</td>
+                    <td style={{ padding: 12 }}>{p.telefone || "—"}</td>
+                    <td style={{ padding: 12, display: "flex", gap: 8 }}>
                       <button className="toggle-btn" onClick={() => abrirEdicao(p)}>Editar</button>
                       <button className="toggle-btn" onClick={() => excluir(p.id)}>Excluir</button>
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </>
+              </tbody>
+            </table>
           )}
         </div>
       </div>
 
       {/* Drawer/ formulário simples */}
       {showForm && (
-        <div className="form-container">
-          <div className="stat-card">
-            <h2 className="form-title">
-              {editId ? "Editar Pessoa" : "Nova Pessoa"}
-            </h2>
-            <form className="form" onSubmit={salvar}>
-              <div className="form-grid">
-                <div className="form-field">
-                  <label htmlFor="nome">Nome</label>
-                  <input
-                    id="nome"
-                    value={form.nome}
-                    onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                    required
-                  />
-                </div>
+        <div className="stat-card" style={{ marginTop: 16 }}>
+          <h2 className="title" style={{ margin: 0, marginBottom: 12 }}>
+            {editId ? "Editar Pessoa" : "Nova Pessoa"}
+          </h2>
+          <form className="form" onSubmit={salvar}>
+            <label htmlFor="nome">Nome</label>
+            <input
+              id="nome"
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              required
+            />
 
-                <div className="form-field">
-                  <label htmlFor="cpf">CPF</label>
-                  <input
-                    id="cpf"
-                    value={form.cpf}
-                    onChange={(e) => setForm({ ...form, cpf: e.target.value })}
-                    inputMode="numeric"
-                    placeholder="Somente números"
-                  />
-                </div>
+            <label htmlFor="cpf">CPF</label>
+            <input
+              id="cpf"
+              value={form.cpf}
+              onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+              inputMode="numeric"
+              placeholder="Somente números"
+            />
 
-                <div className="form-field">
-                  <label htmlFor="nasc">Data de Nascimento</label>
-                  <input
-                    id="nasc"
-                    type="date"
-                    value={form.data_nascimento}
-                    onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
-                  />
-                </div>
+            <label htmlFor="nasc">Data de Nascimento</label>
+            <input
+              id="nasc"
+              type="date"
+              value={form.data_nascimento}
+              onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
+            />
 
-                <div className="form-field">
-                  <label htmlFor="tel">Telefone</label>
-                  <input
-                    id="tel"
-                    value={form.telefone}
-                    onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                  />
-                </div>
+            <label htmlFor="tel">Telefone</label>
+            <input
+              id="tel"
+              value={form.telefone}
+              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+            />
 
-                <div className="form-field full-width">
-                  <label htmlFor="email">E-mail</label>
-                  <input
-                    id="email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
-                </div>
-              </div>
+            <label htmlFor="email">E-mail</label>
+            <input
+              id="email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
 
-              <div className="form-actions">
-                <button type="button" className="toggle-btn" onClick={() => setShowForm(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="toggle-btn">
-                  {editId ? "Salvar alterações" : "Criar pessoa"}
-                </button>
-              </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button type="button" className="toggle-btn" onClick={() => setShowForm(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="toggle-btn">
+                {editId ? "Salvar alterações" : "Criar pessoa"}
+              </button>
+            </div>
 
-              {!editId && (
-                <small className="form-hint">
-                  * Dica: para a pessoa aparecer nesta lista, vincule-a depois como funcionário (módulo Funcionários).
-                </small>
-              )}
-            </form>
-          </div>
+            {!editId && (
+              <small style={{ color: "var(--muted)" }}>
+                * Dica: para a pessoa aparecer nesta lista, vincule-a depois como funcionário (módulo Funcionários).
+              </small>
+            )}
+          </form>
         </div>
       )}
-
-      <style jsx>{`
-        .main-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 16px;
-          margin-bottom: 16px;
-          flex-wrap: wrap;
-        }
-
-        .header-content {
-          flex: 1;
-          min-width: 250px;
-        }
-
-        .header-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .error-alert {
-          margin-bottom: 16px;
-          padding: 12px 16px;
-          background: var(--error-bg, #fee);
-          color: var(--error-text, #c33);
-          border: 1px solid var(--error-border, #fcc);
-          border-radius: 8px;
-        }
-
-        .search-container {
-          margin-bottom: 16px;
-        }
-
-        .search-input {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          font-size: 14px;
-        }
-
-        .table-container {
-          margin-bottom: 16px;
-        }
-
-        .stat-card {
-          background: var(--card-bg, #fff);
-          border-radius: 12px;
-          border: 1px solid var(--border);
-          overflow: hidden;
-        }
-
-        .loading-message,
-        .empty-message {
-          padding: 20px;
-          text-align: center;
-          color: var(--muted);
-        }
-
-        /* Desktop Table */
-        .desktop-table {
-          width: 100%;
-          border-collapse: collapse;
-          display: table;
-        }
-
-        .desktop-table th {
-          padding: 16px 12px;
-          text-align: left;
-          border-bottom: 1px solid var(--border);
-          background: var(--table-header-bg, #f8f9fa);
-          font-weight: 600;
-          color: var(--text);
-        }
-
-        .desktop-table td {
-          padding: 16px 12px;
-          border-bottom: 1px solid var(--border);
-        }
-
-        .actions-header {
-          width: 160px;
-        }
-
-        .actions-cell {
-          display: flex;
-          gap: 8px;
-        }
-
-        /* Mobile Cards */
-        .mobile-cards {
-          display: none;
-          flex-direction: column;
-          gap: 12px;
-          padding: 16px;
-        }
-
-        .person-card {
-          background: var(--card-bg, #fff);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          padding: 16px;
-        }
-
-        .person-name {
-          font-weight: 600;
-          font-size: 16px;
-          margin-bottom: 8px;
-          color: var(--text);
-        }
-
-        .person-details {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          margin-bottom: 12px;
-          font-size: 14px;
-          color: var(--muted);
-        }
-
-        .person-details strong {
-          color: var(--text);
-        }
-
-        .person-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        /* Form Styles */
-        .form-container {
-          margin-top: 16px;
-        }
-
-        .form-title {
-          margin: 0 0 16px 0;
-          font-size: 20px;
-          font-weight: 600;
-        }
-
-        .form-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 16px;
-        }
-
-        .form-field {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .form-field.full-width {
-          grid-column: 1 / -1;
-        }
-
-        .form-field label {
-          font-weight: 500;
-          color: var(--text);
-          font-size: 14px;
-        }
-
-        .form-field input {
-          padding: 12px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          font-size: 14px;
-          width: 100%;
-          box-sizing: border-box;
-        }
-
-        .form-actions {
-          display: flex;
-          gap: 8px;
-          margin-top: 20px;
-          flex-wrap: wrap;
-        }
-
-        .form-hint {
-          display: block;
-          margin-top: 12px;
-          color: var(--muted);
-          font-size: 12px;
-        }
-
-        /* Toggle Button Base Styles */
-        .toggle-btn {
-          padding: 10px 16px;
-          border: 1px solid var(--border);
-          background: var(--button-bg, #fff);
-          color: var(--button-text, #333);
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 14px;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-        }
-
-        .toggle-btn:hover {
-          background: var(--button-hover-bg, #f5f5f5);
-        }
-
-        .toggle-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        /* Responsive Breakpoints */
-        @media (max-width: 768px) {
-          .main-header {
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .header-actions {
-            justify-content: stretch;
-          }
-
-          .header-actions .toggle-btn {
-            flex: 1;
-            min-width: 120px;
-          }
-
-          .desktop-table {
-            display: none;
-          }
-
-          .mobile-cards {
-            display: flex;
-          }
-
-          .form-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .form-actions {
-            flex-direction: column;
-          }
-
-          .form-actions .toggle-btn {
-            flex: 1;
-          }
-        }
-
-        @media (min-width: 769px) {
-          .form-grid {
-            grid-template-columns: 1fr 1fr;
-          }
-
-          .form-field.full-width {
-            grid-column: 1 / -1;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .person-actions {
-            flex-direction: column;
-          }
-
-          .person-actions .toggle-btn {
-            flex: 1;
-          }
-        }
-      `}</style>
     </>
   );
 }
