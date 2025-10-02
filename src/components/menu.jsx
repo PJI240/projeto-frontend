@@ -206,14 +206,14 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               items={[
                { perm: PERM.DASHBOARD_FUNC,  to: "/dashboard_func",   label: "Meu Painel",         icon: <UserIcon /> },
                 { perm: PERM.DASHBOARD_ADM,   to: "/dashboard_adm",    label: "Painel do Admin",    icon: <ShieldCheckIcon /> },
-                { perm: PERM.EMPRESAS,        to: "/empresas",         label: "Minha Empresa",      icon: <BuildingOfficeIcon /> },
-              ]}
+                              ]}
             />
 
             <Section
               title="Cadastros"
               items={[
                 { perm: PERM.PESSOAS,         to: "/pessoas",          label: "Pessoas",            icon: <UserIcon /> },
+                { perm: PERM.EMPRESAS,        to: "/empresas",         label: "Minha Empresa",      icon: <BuildingOfficeIcon /> },
               ]}
             />
 
