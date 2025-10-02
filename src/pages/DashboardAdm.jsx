@@ -610,25 +610,25 @@ export default function DashboardAdm() {
       {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
 
       {/* KPIs (dia-alvo) */}
-<section className="kpi-grid">
-  <div className="kpi-card">
-    <div className="kpi-label">Escalados (dia)</div>
-    <div className="kpi-value">{kpis.escalados}</div>
+<section className="stats-grid">
+  <div className="stat-card">
+    <div className="stat-value">{kpis.escalados}</div>
+    <div className="stat-title">Escalados (dia)</div>
   </div>
 
-  <div className="kpi-card kpi-green">
-    <div className="kpi-label">Presentes</div>
-    <div className="kpi-value">{kpis.presentes}</div>
+  <div className="stat-card" data-accent="success">
+    <div className="stat-value">{kpis.presentes}</div>
+    <div className="stat-title">Presentes</div>
   </div>
 
-  <div className="kpi-card kpi-red">
-    <div className="kpi-label">Ausentes</div>
-    <div className="kpi-value">{kpis.ausentes}</div>
+  <div className="stat-card" data-accent="error">
+    <div className="stat-value">{kpis.ausentes}</div>
+    <div className="stat-title">Ausentes</div>
   </div>
 
-  <div className="kpi-card kpi-yellow">
-    <div className="kpi-label">Atrasos (turnos)</div>
-    <div className="kpi-value">{kpis.atrasos}</div>
+  <div className="stat-card" data-accent="warning">
+    <div className="stat-value">{kpis.atrasos}</div>
+    <div className="stat-title">Atrasos (turnos)</div>
   </div>
 </section>
 
