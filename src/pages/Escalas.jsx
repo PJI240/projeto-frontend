@@ -52,6 +52,20 @@ function calcularDuracao(entrada, saida) {
   return `${horas}:${minutos.toString().padStart(2, '0')}`;
 }
 
+function calcularDuracaoEmMinutos(entrada, saida) {
+  if (!entrada || !saida) return 0;
+  
+  const [h1, m1] = entrada.split(':').map(Number);
+  const [h2, m2] = saida.split(':').map(Number);
+  
+  return (h2 * 60 + m2) - (h1 * 60 + m1);
+}
+
+function formatarHorasTotais(horas, minutos) {
+  if (horas === 0 && minutos === 0) return "-";
+  return `${horas}:${minutos.toString().padStart(2, '0')}h`;
+}
+
 const DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -516,6 +530,52 @@ export default function Escalas() {
     return mapa;
   }, [escalas, funcionarios]);
 
+  // Calcular horas totais por funcionário por dia
+  const horasTotaisPorDia = useMemo(() => {
+    const resultado = {};
+    
+    // Inicializar estrutura para cada funcionário
+    funcionarios.forEach(func => {
+      resultado[func.id] = {
+        nome: func.pessoa_nome,
+        cor: getCorFuncionario(func.id),
+        totaisPorDia: {}
+      };
+      
+      // Inicializar cada dia com 0 horas
+      dias.forEach(dia => {
+        const dataISO = toISO(dia);
+        resultado[func.id].totaisPorDia[dataISO] = {
+          horas: 0,
+          minutos: 0,
+          escalas: []
+        };
+      });
+    });
+    
+    // Calcular horas para cada escala
+    escalas.forEach(escala => {
+      const funcId = escala.funcionario_id;
+      const dataISO = escala.data;
+      
+      if (resultado[funcId] && resultado[funcId].totaisPorDia[dataISO]) {
+        const duracao = calcularDuracaoEmMinutos(escala.entrada, escala.saida);
+        
+        resultado[funcId].totaisPorDia[dataISO].horas += Math.floor(duracao / 60);
+        resultado[funcId].totaisPorDia[dataISO].minutos += duracao % 60;
+        resultado[funcId].totaisPorDia[dataISO].escalas.push(escala);
+        
+        // Ajustar se minutos passarem de 60
+        if (resultado[funcId].totaisPorDia[dataISO].minutos >= 60) {
+          resultado[funcId].totaisPorDia[dataISO].horas += Math.floor(resultado[funcId].totaisPorDia[dataISO].minutos / 60);
+          resultado[funcId].totaisPorDia[dataISO].minutos = resultado[funcId].totaisPorDia[dataISO].minutos % 60;
+        }
+      }
+    });
+    
+    return resultado;
+  }, [escalas, funcionarios, dias]);
+
   // Encontrar escala em uma célula específica
   const encontrarEscalaNaCelula = (dataISO, hora) => {
     const chave = `${dataISO}|${hora}`;
@@ -618,46 +678,46 @@ export default function Escalas() {
     }
   };
 
-const salvarEscalasMultiplas = async () => {
-  setErr("");
-  setSucesso("");
-  setLoading(true);
-  
-  try {
-    if (!formMultiplo.funcionario_id || formMultiplo.datas.length === 0) {
-      throw new Error("Selecione funcionário e pelo menos uma data.");
-    }
-
-    // Preparar array de escalas para o batch
-    const escalasBatch = formMultiplo.datas.map(data => ({
-      funcionario_id: Number(formMultiplo.funcionario_id),
-      data: data,
-      turno_ordem: Number(formMultiplo.turno_ordem) || 1,
-      entrada: formMultiplo.entrada || null,
-      saida: formMultiplo.saida || null,
-      origem: formMultiplo.origem || "FIXA",
-    }));
-
-    console.log('💾 Salvando escalas em lote:', escalasBatch.length, 'escalas');
-
-    // Usar o novo endpoint batch
-    const resultado = await api(`/api/escalas/batch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ escalas: escalasBatch }),
-    });
-
-    setSucesso(resultado.message || `${escalasBatch.length} escalas adicionadas com sucesso!`);
-    setModalMultiploAberto(false);
-    await carregarEscalas();
+  const salvarEscalasMultiplas = async () => {
+    setErr("");
+    setSucesso("");
+    setLoading(true);
     
-  } catch (e) {
-    console.error('❌ Erro ao salvar escalas múltiplas:', e);
-    setErr(e.message || "Falha ao salvar escalas.");
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      if (!formMultiplo.funcionario_id || formMultiplo.datas.length === 0) {
+        throw new Error("Selecione funcionário e pelo menos uma data.");
+      }
+
+      // Preparar array de escalas para o batch
+      const escalasBatch = formMultiplo.datas.map(data => ({
+        funcionario_id: Number(formMultiplo.funcionario_id),
+        data: data,
+        turno_ordem: Number(formMultiplo.turno_ordem) || 1,
+        entrada: formMultiplo.entrada || null,
+        saida: formMultiplo.saida || null,
+        origem: formMultiplo.origem || "FIXA",
+      }));
+
+      console.log('💾 Salvando escalas em lote:', escalasBatch.length, 'escalas');
+
+      // Usar o novo endpoint batch
+      const resultado = await api(`/api/escalas/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ escalas: escalasBatch }),
+      });
+
+      setSucesso(resultado.message || `${escalasBatch.length} escalas adicionadas com sucesso!`);
+      setModalMultiploAberto(false);
+      await carregarEscalas();
+      
+    } catch (e) {
+      console.error('❌ Erro ao salvar escalas múltiplas:', e);
+      setErr(e.message || "Falha ao salvar escalas.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const excluirEscala = async (escala) => {
     if (!confirm(`Remover escala de ${escala.funcionario_nome} no dia ${escala.data}?`)) return;
@@ -911,6 +971,182 @@ const salvarEscalasMultiplas = async () => {
           ))}
         </div>
       </div>
+
+      {/* Resumo de Horas por Funcionário */}
+      {funcionarios.length > 0 && (
+        <div style={{ 
+          background: "var(--panel)", 
+          borderRadius: "8px", 
+          border: "1px solid var(--border)",
+          overflow: "auto",
+          marginTop: "20px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+        }}>
+          <div style={{ 
+            padding: "16px", 
+            borderBottom: "1px solid var(--border)",
+            background: "var(--panel-muted)"
+          }}>
+            <h3 style={{ 
+              margin: 0, 
+              fontSize: "16px", 
+              color: "var(--fg)",
+              fontWeight: "600"
+            }}>
+              📊 Resumo de Horas por Funcionário
+            </h3>
+            <p style={{ 
+              margin: "4px 0 0", 
+              fontSize: "14px", 
+              color: "var(--muted)" 
+            }}>
+              Total de horas trabalhadas por dia
+            </p>
+          </div>
+          
+          <div style={{ overflow: "auto" }}>
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: "200px repeat(7, 120px)",
+              minWidth: "1100px"
+            }}>
+              
+              {/* Cabeçalho - Nomes dos dias */}
+              <div style={{ 
+                padding: "12px 16px", 
+                borderBottom: "1px solid var(--border)",
+                background: "var(--panel-muted)",
+                fontWeight: "600",
+                fontSize: "14px",
+                position: "sticky",
+                left: 0,
+                background: "var(--panel-muted)",
+                zIndex: 2
+              }}>
+                Funcionário
+              </div>
+              {dias.map((dia, index) => (
+                <div key={index} style={{ 
+                  padding: "12px", 
+                  borderBottom: "1px solid var(--border)",
+                  textAlign: "center",
+                  background: "var(--panel-muted)",
+                  fontWeight: "600",
+                  fontSize: "14px"
+                }}>
+                  <div>{DIAS_SEMANA_CURTO[index]}</div>
+                  <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>
+                    {formatDateBR(dia)}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Linhas dos funcionários */}
+              {funcionarios.map(func => {
+                const totaisFunc = horasTotaisPorDia[func.id];
+                if (!totaisFunc) return null;
+                
+                return (
+                  <div key={func.id} style={{ display: "contents" }}>
+                    {/* Nome do funcionário */}
+                    <div style={{ 
+                      padding: "12px 16px", 
+                      borderBottom: "1px solid var(--border)",
+                      background: "var(--panel)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      position: "sticky",
+                      left: 0,
+                      background: "var(--panel)",
+                      zIndex: 1
+                    }}>
+                      <div style={{
+                        width: "12px",
+                        height: "12px",
+                        background: getCorFuncionario(func.id),
+                        borderRadius: "3px",
+                        border: "1px solid var(--border)"
+                      }}></div>
+                      <span style={{ 
+                        fontSize: "14px",
+                        fontWeight: "500"
+                      }}>
+                        {func.pessoa_nome}
+                      </span>
+                    </div>
+                    
+                    {/* Totais por dia */}
+                    {dias.map(dia => {
+                      const dataISO = toISO(dia);
+                      const totalDia = totaisFunc.totaisPorDia[dataISO];
+                      const horas = totalDia?.horas || 0;
+                      const minutos = totalDia?.minutos || 0;
+                      const hasEscalas = totalDia?.escalas?.length > 0;
+                      
+                      return (
+                        <div
+                          key={dataISO}
+                          style={{
+                            padding: "12px",
+                            borderBottom: "1px solid var(--border)",
+                            borderRight: "1px solid var(--border)",
+                            textAlign: "center",
+                            background: hasEscalas ? "color-mix(in srgb, var(--success) 10%, transparent)" : "var(--panel)",
+                            fontSize: "14px",
+                            fontWeight: hasEscalas ? "600" : "400",
+                            color: hasEscalas ? "var(--success)" : "var(--muted)",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "2px"
+                          }}
+                          title={hasEscalas ? 
+                            `${totalDia.escalas.length} escala(s) neste dia` : 
+                            "Sem escalas"
+                          }
+                        >
+                          <div>{formatarHorasTotais(horas, minutos)}</div>
+                          {hasEscalas && totalDia.escalas.length > 1 && (
+                            <div style={{
+                              fontSize: "10px",
+                              color: "var(--muted)",
+                              background: "var(--panel-muted)",
+                              padding: "1px 4px",
+                              borderRadius: "3px"
+                            }}>
+                              {totalDia.escalas.length} turnos
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Rodapé com totais gerais */}
+          <div style={{ 
+            padding: "12px 16px", 
+            borderTop: "1px solid var(--border)",
+            background: "var(--panel-muted)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: "14px"
+          }}>
+            <span style={{ color: "var(--muted)" }}>
+              {funcionarios.length} funcionário(s) na semana
+            </span>
+            <span style={{ fontWeight: "600", color: "var(--fg)" }}>
+              {escalas.length} escala(s) total
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Legenda de funcionários */}
       {funcionarios.length > 0 && (
