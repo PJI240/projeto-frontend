@@ -615,7 +615,6 @@ export default function DashboardAdm() {
         <Kpi label="Presentes" value={kpis.presentes} />
         <Kpi label="Ausentes" value={kpis.ausentes} />
         <Kpi label="Atrasos (turnos)" value={kpis.atrasos} />
-        <Kpi label="Horas trabalhadas" value={kpis.horasTotaisFmt} sub="Parciais contam até o momento" />
       </section>
 
       {/* Grade estilo Google Agenda */}
@@ -630,9 +629,7 @@ export default function DashboardAdm() {
       <section className="text-xs text-gray-500 mt-3">
         <ul className="list-disc pl-5 space-y-1">
           <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
-          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>
-          <li>Quando não há saída no apontamento, o bloco aparece como <em>parcial</em> e cresce até a linha do tempo atual.</li>
-          <li>A prioridade de múltiplos apontamentos é AJUSTE &gt; IMPORTADO &gt; APONTADO.</li>
+          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>                    
         </ul>
       </section>
     </>
