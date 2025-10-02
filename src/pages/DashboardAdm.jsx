@@ -249,7 +249,7 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncio
         gap: 12
       }}>
         <h3 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
-          Horas Trabalhadas × Atraso
+          Horas Trabalhadas
         </h3>
         
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
