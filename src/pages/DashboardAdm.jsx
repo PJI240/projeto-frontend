@@ -1060,6 +1060,21 @@ export default function DashboardAdm() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+ {/* Navegação por semana/dia */}
+          {isMobile ? (
+            <>
+              <button className="toggle-btn" onClick={diaAnterior}>←</button>
+              <button className="toggle-btn" onClick={irParaHoje}>Hoje</button>
+              <button className="toggle-btn" onClick={diaSeguinte}>→</button>
+            </>
+          ) : (
+            <>
+              <button className="toggle-btn" onClick={semanaAnterior}>←</button>
+              <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
+              <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
+            </>
+          )}
+          
           {/* Filtro de funcionário */}
           <select 
             value={filtroFuncionario}
@@ -1081,20 +1096,7 @@ export default function DashboardAdm() {
             ))}
           </select>
 
-          {/* Navegação por semana/dia */}
-          {isMobile ? (
-            <>
-              <button className="toggle-btn" onClick={diaAnterior}>←</button>
-              <button className="toggle-btn" onClick={irParaHoje}>Hoje</button>
-              <button className="toggle-btn" onClick={diaSeguinte}>→</button>
-            </>
-          ) : (
-            <>
-              <button className="toggle-btn" onClick={semanaAnterior}>←</button>
-              <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
-              <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
-            </>
-          )}
+         
           
           <button className="toggle-btn" onClick={carregarTudo} disabled={loading}>
             {loading ? "Atualizando..." : "Atualizar"}
