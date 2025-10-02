@@ -1,11 +1,18 @@
 // src/pages/DashboardFunc.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowRightOnRectangleIcon, // Entrar
+  ArrowLeftOnRectangleIcon,  // Sair
+} from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
 /* ===== helpers visuais ===== */
 const weekdayPt = (d) =>
-  d.toLocaleDateString("pt-BR", { weekday: "long" }).replace(/^\w/, (c) => c.toUpperCase());
+  d
+    .toLocaleDateString("pt-BR", { weekday: "long" })
+    .replace(/^\w/, (c) => c.toUpperCase());
 
 const OrigemBadge = ({ origem }) => {
   const map = {
@@ -119,7 +126,6 @@ export default function DashboardFunc() {
         body: JSON.stringify({ empresa_id: empresaId || undefined }), // opcional
       });
 
-      // Recarrega do endpoint do dashboard para refletir a mudança
       await carregarHoje();
       const feedback =
         estadoPonto.status === "TRABALHANDO"
@@ -145,59 +151,36 @@ export default function DashboardFunc() {
 
   const horaAgora = new Date().toLocaleTimeString("pt-BR", { hour12: false });
 
-  const primaryBtnStyle =
-    estadoPonto.status === "TRABALHANDO"
-      ? {
-          background: "var(--warning-strong)",
-          color: "#fff",
-          borderColor: "var(--warning-strong)",
-        }
-      : {
-          background: "var(--accent-bg)",
-          color: "#fff",
-          borderColor: "var(--accent-bg-hover)",
-        };
+  // definição de classe/ícone do botão principal conforme estado
+  const isTrabalhando = estadoPonto.status === "TRABALHANDO";
+  const btnClassePrincipal = isTrabalhando ? "btn btn--warning btn--lg" : "btn btn--primary btn--lg";
+  const BtnIcon = isTrabalhando ? ArrowLeftOnRectangleIcon : ArrowRightOnRectangleIcon;
 
   return (
     <div className="container" role="main" aria-labelledby="titulo-pagina" style={{ paddingBlock: 16 }}>
-      {/* skip-link opcional se você tiver no layout global */}
-      <a href="#conteudo" className="visually-hidden focus:not-sr-only">Pular para conteúdo</a>
-
-      {/* Header */}
-      <header
-        style={{
-          background: "var(--panel)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
-          padding: 16,
-          marginBottom: 16,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <h1 id="titulo-pagina" style={{ margin: "0 0 4px 0", fontSize: "clamp(1.5rem, 4vw, 2rem)", color: "var(--fg)" }}>
-            Meu Painel
-          </h1>
-          <p style={{ margin: 0, color: "var(--muted)", fontSize: "clamp(var(--fs-14), 3vw, var(--fs-16))" }}>
+      {/* Header (padrão novo) */}
+      <header className="page-header">
+        <div>
+          <h1 id="titulo-pagina" className="page-title">Meu Painel</h1>
+          <p className="page-subtitle">
             {agoraTexto.semana}, {agoraTexto.data} •{" "}
-            <strong style={{ fontVariantNumeric: "tabular-nums", color: "var(--fg)" }}>{agoraTexto.hora}</strong>
+            <strong style={{ fontVariantNumeric: "tabular-nums", color: "var(--fg)" }}>
+              {agoraTexto.hora}
+            </strong>
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="page-header__toolbar">
           <button
             type="button"
-            className="toggle-btn"
+            className="btn btn--neutral"
             onClick={carregarHoje}
             disabled={loading}
-            aria-live="off"
             aria-busy={loading ? "true" : "false"}
             aria-label="Atualizar painel"
             title="Atualizar"
-            style={{ opacity: loading ? 0.7 : 1 }}
           >
-            {loading ? "Atualizando…" : "Atualizar"}
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
         </div>
       </header>
@@ -208,15 +191,7 @@ export default function DashboardFunc() {
       {/* Alertas */}
       {err && (
         <div
-          style={{
-            background: "#fef2f2",
-            color: "var(--error-strong)",
-            border: "1px solid #fecaca",
-            borderRadius: 8,
-            padding: "12px 16px",
-            marginBottom: 16,
-            fontSize: "var(--fs-14)",
-          }}
+          className="error-alert"
           role="alert"
         >
           {err}
@@ -249,9 +224,7 @@ export default function DashboardFunc() {
               border: "1px solid var(--border)",
               borderRadius: "var(--radius)",
               padding: 20,
-              borderLeft: `4px solid ${
-                estadoPonto.status === "TRABALHANDO" ? "var(--success)" : "var(--accent-bg)"
-              }`,
+              borderLeft: `4px solid ${isTrabalhando ? "var(--success)" : "var(--accent-bg)"}`,
               display: "flex",
               flexDirection: "column",
               gap: 20,
@@ -286,17 +259,13 @@ export default function DashboardFunc() {
               <div style={{ color: "var(--muted)", fontSize: "var(--fs-14)" }}>
                 Data-base: <strong>{dataISO || "—"}</strong>
                 {" • "}Status:{" "}
-                <strong
-                  style={{
-                    color: estadoPonto.status === "TRABALHANDO" ? "var(--success)" : "var(--muted)",
-                  }}
-                >
-                  {estadoPonto.status === "TRABALHANDO" ? "Em jornada" : "Fora da jornada"}
+                <strong style={{ color: isTrabalhando ? "var(--success)" : "var(--muted)" }}>
+                  {isTrabalhando ? "Em jornada" : "Fora da jornada"}
                 </strong>
               </div>
             </div>
 
-            {/* Botão principal */}
+            {/* Botão principal (maior no mobile) */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
               <button
                 type="button"
@@ -304,21 +273,36 @@ export default function DashboardFunc() {
                 disabled={loading || !func || registrando}
                 aria-disabled={loading || !func || registrando ? "true" : "false"}
                 aria-label={estadoPonto.label}
-                className="refresh-btn"
+                className={btnClassePrincipal}
                 style={{
-                  ...primaryBtnStyle,
-                  fontSize: "clamp(var(--fs-16), 4vw, 1.25rem)",
-                  padding: "clamp(12px, 4vw, 18px) clamp(16px, 4vw, 28px)",
-                  borderWidth: 2,
                   width: "100%",
-                  maxWidth: 320,
-                  boxShadow: "var(--shadow)",
-                  opacity: loading || registrando ? 0.8 : 1,
+                  maxWidth: 380,
+                  // cresce bem em telas pequenas:
+                  fontSize: "clamp(1rem, 5vw, 1.25rem)",
+                  padding: "clamp(14px, 5vw, 18px) clamp(18px, 5vw, 28px)",
                 }}
               >
-                {registrando ? "Registrando..." : estadoPonto.label}
+                {registrando ? (
+                  <>
+                    <span className="spinner" aria-hidden="true" />
+                    <span>Registrando…</span>
+                  </>
+                ) : (
+                  <>
+                    <BtnIcon className="icon" aria-hidden="true" />
+                    <span>{estadoPonto.label}</span>
+                  </>
+                )}
               </button>
-              <div style={{ fontSize: "var(--fs-12)", color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  fontSize: "var(--fs-12)",
+                  color: "var(--muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
                 Origem: <OrigemBadge origem="APONTADO" />
               </div>
             </div>
@@ -407,22 +391,25 @@ export default function DashboardFunc() {
                 color: "var(--fg)",
               }}
             >
-              Meus apontamentos de hoje • {new Date(dataISO || Date.now()).toLocaleDateString("pt-BR")}
+              Meus apontamentos de hoje •{" "}
+              {new Date(dataISO || Date.now()).toLocaleDateString("pt-BR")}
             </h2>
             <button
               type="button"
-              className="toggle-btn"
+              className="btn btn--neutral"
               onClick={carregarHoje}
               disabled={loading}
               aria-label="Recarregar apontamentos de hoje"
-              style={{ opacity: loading ? 0.7 : 1 }}
             >
-              Recarregar
+              {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+              <span>{loading ? "Atualizando…" : "Recarregar"}</span>
             </button>
           </div>
 
           {apontsHoje.length === 0 ? (
-            <p style={{ color: "var(--muted)", fontSize: "var(--fs-14)", margin: 0 }}>Nenhum apontamento hoje.</p>
+            <p style={{ color: "var(--muted)", fontSize: "var(--fs-14)", margin: 0 }}>
+              Nenhum apontamento hoje.
+            </p>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {apontsHoje.map((a) => (
@@ -446,11 +433,15 @@ export default function DashboardFunc() {
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     <div>
-                      <div style={{ fontSize: "var(--fs-12)", color: "var(--muted)", marginBottom: 2 }}>Entrada</div>
+                      <div style={{ fontSize: "var(--fs-12)", color: "var(--muted)", marginBottom: 2 }}>
+                        Entrada
+                      </div>
                       <strong>{a.entrada || "—"}</strong>
                     </div>
                     <div>
-                      <div style={{ fontSize: "var(--fs-12)", color: "var(--muted)", marginBottom: 2 }}>Saída</div>
+                      <div style={{ fontSize: "var(--fs-12)", color: "var(--muted)", marginBottom: 2 }}>
+                        Saída
+                      </div>
                       <strong>{a.saida || "—"}</strong>
                     </div>
                   </div>
