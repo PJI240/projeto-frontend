@@ -195,18 +195,77 @@ function CalendarioMultiSelecao({ datasSelecionadas, onDatasChange, mesInicial }
   const hoje = toISO(new Date());
   
   return (
-    <div style={{ background: "var(--panel)", borderRadius: "8px", padding: "16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <button className="toggle-btn" onClick={mesAnterior}>←</button>
-        <h3 style={{ margin: 0, fontSize: "16px" }}>
+    <div style={{ 
+      background: "var(--panel)", 
+      borderRadius: "var(--radius)", 
+      padding: "16px",
+      border: "1px solid var(--border)",
+      boxShadow: "var(--shadow)"
+    }}>
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        marginBottom: "16px" 
+      }}>
+        <button 
+          className="toggle-btn" 
+          onClick={mesAnterior}
+          style={{ 
+            padding: "8px 12px", 
+            background: "var(--panel)", 
+            color: "var(--fg)", 
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)", 
+            cursor: "pointer",
+            fontSize: "var(--fs-14)",
+            fontWeight: "600"
+          }}
+        >
+          ←
+        </button>
+        <h3 style={{ 
+          margin: 0, 
+          fontSize: "var(--fs-16)", 
+          color: "var(--fg)",
+          fontWeight: "600"
+        }}>
           {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
         </h3>
-        <button className="toggle-btn" onClick={mesSeguinte}>→</button>
+        <button 
+          className="toggle-btn" 
+          onClick={mesSeguinte}
+          style={{ 
+            padding: "8px 12px", 
+            background: "var(--panel)", 
+            color: "var(--fg)", 
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)", 
+            cursor: "pointer",
+            fontSize: "var(--fs-14)",
+            fontWeight: "600"
+          }}
+        >
+          →
+        </button>
       </div>
       
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", marginBottom: "8px" }}>
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "repeat(7, 1fr)", 
+        gap: "4px", 
+        marginBottom: "8px" 
+      }}>
         {DIAS_SEMANA_CURTO.map(dia => (
-          <div key={dia} style={{ textAlign: "center", fontSize: "12px", fontWeight: "600", padding: "8px 0" }}>
+          <div key={dia} style={{ 
+            textAlign: "center", 
+            fontSize: "var(--fs-12)", 
+            fontWeight: "600", 
+            padding: "8px 0",
+            color: "var(--muted)",
+            background: "var(--panel-muted)",
+            borderRadius: "4px"
+          }}>
             {dia}
           </div>
         ))}
@@ -227,17 +286,41 @@ function CalendarioMultiSelecao({ datasSelecionadas, onDatasChange, mesInicial }
                 padding: "8px",
                 border: "none",
                 background: isSelecionado 
-                  ? "var(--primary)" 
+                  ? "var(--accent)"  // Azul para selecionado
                   : isHoje 
-                    ? "rgba(59, 130, 246, 0.2)" 
+                    ? "color-mix(in srgb, var(--accent) 20%, transparent)"  // Azul claro para hoje
                     : isMesAtual 
-                      ? "var(--panel-muted)" 
-                      : "var(--panel)",
-                color: isSelecionado ? "white" : isMesAtual ? "var(--fg)" : "var(--muted)",
-                borderRadius: "6px",
+                      ? "var(--panel)"  // Branco para mês atual
+                      : "var(--panel-muted)", // Cinza claro para outros meses
+                color: isSelecionado 
+                  ? "white"  // Branco para selecionado
+                  : isMesAtual 
+                    ? "var(--fg)"  // Texto escuro para mês atual
+                    : "var(--muted)", // Cinza para outros meses
+                borderRadius: "var(--radius)",
                 cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: isHoje ? "600" : "normal"
+                fontSize: "var(--fs-14)",
+                fontWeight: isHoje ? "600" : "normal",
+                border: isHoje ? "2px solid var(--accent)" : "1px solid var(--border)",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                if (!isSelecionado) {
+                  e.target.style.backgroundColor = isMesAtual 
+                    ? "var(--panel-muted)" 
+                    : "color-mix(in srgb, var(--panel-muted) 80%, var(--panel))";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSelecionado) {
+                  e.target.style.backgroundColor = isSelecionado 
+                    ? "var(--accent)"
+                    : isHoje 
+                      ? "color-mix(in srgb, var(--accent) 20%, transparent)"
+                      : isMesAtual 
+                        ? "var(--panel)" 
+                        : "var(--panel-muted)";
+                }
               }}
               title={dia.toLocaleDateString('pt-BR')}
             >
@@ -247,8 +330,16 @@ function CalendarioMultiSelecao({ datasSelecionadas, onDatasChange, mesInicial }
         })}
       </div>
       
-      <div style={{ marginTop: "16px", fontSize: "12px", color: "var(--muted)" }}>
-        {datasSelecionadas.length} datas selecionadas
+      <div style={{ 
+        marginTop: "16px", 
+        fontSize: "var(--fs-12)", 
+        color: "var(--muted)",
+        textAlign: "center",
+        padding: "8px",
+        background: "var(--panel-muted)",
+        borderRadius: "4px"
+      }}>
+        {datasSelecionadas.length} data{datasSelecionadas.length !== 1 ? 's' : ''} selecionada{datasSelecionadas.length !== 1 ? 's' : ''}
       </div>
     </div>
   );
