@@ -610,19 +610,19 @@ export default function Escalas() {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="toggle-btn" onClick={semanaAnterior}>
-            ← Anterior
+            ←
           </button>
           <button className="toggle-btn" onClick={semanaAtual}>
             Hoje
           </button>
           <button className="toggle-btn" onClick={semanaSeguinte}>
-            Seguinte →
+            →
           </button>
           <button className="toggle-btn" onClick={abrirMultiplo}>
-            + Múltiplas Datas
+            Nova Escala
           </button>
           <button className="toggle-btn" onClick={abrirConfig}>
-            ⚙️ Configurar
+            Configurar Exibição
           </button>
           <button className="toggle-btn" onClick={recarregar} disabled={loading}>
             {loading ? "Atualizando..." : "Atualizar"}
