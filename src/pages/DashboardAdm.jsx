@@ -814,11 +814,11 @@ export default function DashboardAdm() {
     <>
       <header className="main-header">
         <div className="header-content">
-          <h1>Dashboard Administrativo</h1>
+          <h1>Painel do Administrador</h1>
           <p>
             {isMobile 
-              ? "Visão do dia - Comparativo Escala × Apontamento" 
-              : "Comparativo visual de Escala × Apontamento (semana)"
+              ? "Escala × Apontamento" 
+              : "Escala × Apontamento"
             }
           </p>
         </div>
