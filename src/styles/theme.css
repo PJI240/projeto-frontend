@@ -1,18 +1,48 @@
-/* Alto contraste — aplica quando <html data-theme="hc"> */
-html[data-theme="hc"] {
-  --bg: #000;
-  --panel: #000;
-  --panel-muted: #000;
-  --fg: #fff;
-  --muted: #d1d5db;
-  --border: #fff;
+/* ===========================
+   Tema: Alto Contraste (HC)
+   Ativo quando: <html data-theme="hc">
+   Objetivo: contraste alto, sem neon estourado,
+   alinhado aos tokens do global.css
+   =========================== */
 
-  --accent: #00ff6a;
-  --accent-strong: #32ff90;
-  --focus: #ffbf00;
+html[data-theme="hc"] {
+  /* Superfícies e texto: evitar #000 em tudo para não “halar” */
+  --bg: #000;              /* plano de fundo */
+  --panel: #0b0b0c;        /* superfície levemente acima do bg */
+  --panel-muted: #101113;  /* segunda superfície */
+  --fg: #ffffff;           /* texto principal */
+  --muted: #e5e7eb;        /* textos secundários mais claros (legíveis no escuro) */
+  --border: #cbd5e1;       /* borda visível em fundos escuros */
+
+  /* Ações e foco */
+  /* --accent: continua sendo cor para ícones/bordas/links;
+     cuidado: NÃO usar --accent para fundo com texto branco. */
+  --accent: #22c55e;          /* verde vibrante mas não neon */
+  --accent-strong: #16a34a;   /* usado como realce/ícone/hover de borda */
+  --focus: #ffbf00;           /* foco bem visível */
+
+  /* ===== Fundos com texto branco (alto contraste real) ===== */
+  /* Use estes quando o componente pinta o FUNDO e coloca texto branco em cima */
+  --accent-bg: #1d4ed8;        /* azul forte com ótimo contraste para #fff */
+  --accent-bg-hover: #1e40af;
+
+  --success-strong: #065f46;   /* verde escuro (texto branco ok) */
+  --warning-strong: #78350f;   /* âmbar escuro (texto branco ok) */
+  --error-strong: #991b1b;     /* vermelho escuro (texto branco ok) */
+  --info-strong: #0c4a6e;      /* azul petróleo (texto branco ok) */
+
+  /* Tipografia/efeitos */
+  --radius: 12px;
+  --shadow: 0 6px 18px rgba(0,0,0,.5); /* sombra mais marcada no escuro */
+
+  /* Escalas (herdam do global; podem ser sobrescritas por data-font) */
+  /* --fs-12 ... --fs-32 ficam como no global.css */
 }
 
-/* Escala de fontes maior — aplica quando <html data-font="lg"> */
+/* ===========================
+   Escala de fontes maior
+   Ativo quando: <html data-font="lg">
+   =========================== */
 html[data-font="lg"] {
   --fs-12: 0.9rem;
   --fs-14: 1rem;
@@ -22,12 +52,22 @@ html[data-font="lg"] {
   --fs-32: 2.25rem;
 }
 
-/* Preferências de acessibilidade do SO */
+/* ===========================
+   Preferências do SO
+   =========================== */
 @media (prefers-contrast: more) {
-  :root { --focus: #ffbf00; }
-}
-@media (prefers-reduced-motion: reduce) {
-  * { scroll-behavior: auto; animation-duration: .01ms !important; transition: none !important; }
+  :root { --focus: #ffbf00; } /* mantém foco forte mesmo fora do HC */
 }
 
-/* IMPORTANTE: sem prefers-color-scheme (dark). Mantemos claro sempre. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+    animation-duration: .01ms !important;
+    transition: none !important;
+  }
+}
+
+/* ===========================
+   Nota: continuamos sem prefers-color-scheme (dark).
+   Mantemos o tema claro por padrão e HC via data-theme="hc".
+   =========================== */
