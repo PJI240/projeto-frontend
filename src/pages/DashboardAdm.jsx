@@ -610,12 +610,27 @@ export default function DashboardAdm() {
       {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
 
       {/* KPIs (dia-alvo) */}
-      <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <Kpi label="Escalados (dia)" value={kpis.escalados} />
-        <Kpi label="Presentes" value={kpis.presentes} />
-        <Kpi label="Ausentes" value={kpis.ausentes} />
-        <Kpi label="Atrasos (turnos)" value={kpis.atrasos} />
-      </section>
+<section className="kpi-grid">
+  <div className="kpi-card">
+    <div className="kpi-label">Escalados (dia)</div>
+    <div className="kpi-value">{kpis.escalados}</div>
+  </div>
+
+  <div className="kpi-card kpi-green">
+    <div className="kpi-label">Presentes</div>
+    <div className="kpi-value">{kpis.presentes}</div>
+  </div>
+
+  <div className="kpi-card kpi-red">
+    <div className="kpi-label">Ausentes</div>
+    <div className="kpi-value">{kpis.ausentes}</div>
+  </div>
+
+  <div className="kpi-card kpi-yellow">
+    <div className="kpi-label">Atrasos (turnos)</div>
+    <div className="kpi-value">{kpis.atrasos}</div>
+  </div>
+</section>
 
       {/* Grade estilo Google Agenda */}
       <DiasAgenda />
