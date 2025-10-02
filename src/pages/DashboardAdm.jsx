@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-/* ====== Utils de data/hora BR ====== */
+/* ====== Utils de data/hora BR (mesmas ideias do Escalas.jsx) ====== */
 function toISO(d) {
   const yy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -46,9 +46,9 @@ function minutesToHHhMM(min) {
   return `${sign}${String(h).padStart(2, "0")}h${String(m).padStart(2, "0")}`;
 }
 
-/* ====== Config da timeline ====== */
+/* ====== Config da timeline (reutilizável) ====== */
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-const CONFIG_HORARIOS = { inicio: 6, fim: 22 };
+const CONFIG_HORARIOS = { inicio: 6, fim: 22 }; // [06:00 .. 22:00]
 
 /* ====== Cores por funcionário ====== */
 const CORES_FUNCIONARIOS = [
@@ -71,11 +71,12 @@ const useApi = () => {
   }, []);
 };
 
-/* ====== Consolidação de apontamentos ====== */
+/* ====== Consolidação de apontamentos por prioridade ====== */
 function consolidateApontamentos(items, dataISO) {
   if (!items?.length) return null;
 
   const pri = { AJUSTE: 3, IMPORTADO: 2, APONTADO: 1 };
+  // menor entrada + maior saída (quebrando empate por prioridade)
   let bestEntrada = null, bestEntradaOrigem = null;
   let bestSaida = null, bestSaidaOrigem = null;
 
@@ -118,7 +119,7 @@ function consolidateApontamentos(items, dataISO) {
   };
 }
 
-/* ====== Componentes Visuais ====== */
+/* ====== Badge ====== */
 function StatusBadge({ children, tone = "gray" }) {
   const map = {
     gray: "bg-gray-100 text-gray-800 ring-gray-200",
@@ -136,85 +137,18 @@ function StatusBadge({ children, tone = "gray" }) {
   );
 }
 
-const KpiCard = ({ label, value, sub, icon, trend }) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
-    <div className="flex items-center justify-between">
-      <div className="flex-1">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-500 mb-1">
-          {icon && <span className="text-lg">{icon}</span>}
-          {label}
-        </div>
-        <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
-        {sub && (
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-500">{sub}</div>
-            {trend && (
-              <span className={`text-xs font-medium ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {trend > 0 ? '↗' : '↘'} {Math.abs(trend)}%
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-);
-
-const EmployeeCard = ({ employee, status, schedule, actual, duration, isCurrent = false }) => (
-  <div className={`bg-white rounded-lg border-l-4 ${
-    isCurrent ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-300'
-  } p-4 shadow-sm hover:shadow-md transition-all duration-200`}>
-    <div className="flex items-center justify-between mb-2">
-      <div className="flex items-center gap-3">
-        <div 
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: getCorFuncionario(employee.id) }}
-        />
-        <h3 className="font-semibold text-gray-900">{employee.nome}</h3>
-      </div>
-      <StatusBadge tone={
-        status === 'working' ? 'green' : 
-        status === 'absent' ? 'red' : 
-        status === 'late' ? 'yellow' : 'gray'
-      }>
-        {status === 'working' ? 'TRABALHANDO' : 
-         status === 'absent' ? 'AUSENTE' : 
-         status === 'late' ? 'ATRASADO' : 'FORA DA ESCALA'}
-      </StatusBadge>
-    </div>
-    
-    <div className="grid grid-cols-2 gap-4 text-sm">
-      <div>
-        <div className="text-gray-500 text-xs font-medium mb-1">ESCALA</div>
-        <div className="text-gray-900 font-medium">{schedule}</div>
-      </div>
-      <div>
-        <div className="text-gray-500 text-xs font-medium mb-1">REAL</div>
-        <div className="text-gray-900 font-medium">{actual}</div>
-      </div>
-    </div>
-    
-    {duration && (
-      <div className="mt-3 pt-3 border-t border-gray-200">
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-gray-500">Duração</span>
-          <span className="text-sm font-medium text-gray-900">{duration}</span>
-        </div>
-        {isCurrent && (
-          <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-              style={{ width: '75%' }} // Isso seria calculado baseado no tempo decorrido
-            />
-          </div>
-        )}
-      </div>
-    )}
+/* ====== KPIs ====== */
+const Kpi = ({ label, value, sub }) => (
+  <div className="bg-white rounded-2xl shadow-sm p-4 ring-1 ring-gray-200">
+    <div className="text-sm text-gray-500">{label}</div>
+    <div className="mt-1 text-2xl font-semibold text-gray-900">{value}</div>
+    {sub ? <div className="mt-1 text-xs text-gray-500">{sub}</div> : null}
   </div>
 );
 
 /* ====== Componente principal ====== */
 export default function DashboardAdm() {
+  // Semana atual
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
   const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(dataRef, i)), [dataRef]);
 
@@ -245,7 +179,7 @@ export default function DashboardAdm() {
       ]);
       setFuncionarios(f.funcionarios || []);
       setEscalas(e.escalas || []);
-      setApontamentos(a.apontamentos || a || []);
+      setApontamentos(a.apontamentos || a || []); // aceita tanto {apontamentos:[]} quanto []
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
     } finally {
@@ -257,10 +191,13 @@ export default function DashboardAdm() {
     carregarTudo();
   }, [carregarTudo]);
 
+  // Recarrega ao trocar semana
   useEffect(() => {
     if (escalas.length || apontamentos.length) carregarTudo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataRef]);
 
+  // Auto refresh 60s
   useEffect(() => {
     if (autoRefresh) {
       refreshRef.current = setInterval(() => carregarTudo(), 60000);
@@ -270,7 +207,8 @@ export default function DashboardAdm() {
     return () => refreshRef.current && clearInterval(refreshRef.current);
   }, [autoRefresh, carregarTudo]);
 
-  /* ========= Processamento de dados ========= */
+  /* ========= Índices para render ========= */
+  // Mapa funcionarios (id -> info + cor)
   const mapFunc = useMemo(() => {
     const m = new Map();
     for (const f of funcionarios) {
@@ -284,8 +222,9 @@ export default function DashboardAdm() {
     return m;
   }, [funcionarios]);
 
+  // Group escalas por dia
   const escalasByDia = useMemo(() => {
-    const m = new Map();
+    const m = new Map(); // key = dataISO -> array
     for (const e of escalas) {
       if (!e.data || !e.funcionario_id) continue;
       const arr = m.get(e.data) || [];
@@ -295,8 +234,9 @@ export default function DashboardAdm() {
     return m;
   }, [escalas]);
 
+  // Group apontamentos por (data, funcionario, turno)
   const apontByKey = useMemo(() => {
-    const m = new Map();
+    const m = new Map(); // key `${data}|${funcId}|${turno}`
     for (const a of apontamentos) {
       const funcId = a.funcionario_id ?? a.funcionarioId ?? a.funcionario;
       if (!a.data || !funcId) continue;
@@ -308,254 +248,379 @@ export default function DashboardAdm() {
     return m;
   }, [apontamentos]);
 
-  /* ========= KPIs e Status em Tempo Real ========= */
-  const { kpis, workingNow, absentToday, offSchedule } = useMemo(() => {
+  /* ========= Cálculos de KPIs ========= */
+  const kpis = useMemo(() => {
     let escalados = 0, presentes = 0, ausentes = 0, atrasos = 0, minutosTotais = 0;
-    const workingNowList = [];
-    const absentTodayList = [];
-    const offScheduleList = [];
 
-    const todayISO = toISO(new Date());
-
+    // percorre por funcionario/dia/turno
     for (const [dataISO, arrEsc] of escalasByDia) {
-      const vistos = new Set();
-      
+      const vistos = new Set(); // funcionários contados no dia
       for (const e of arrEsc) {
         const funcId = e.funcionario_id;
-        const func = mapFunc.get(funcId);
-        if (!func) continue;
-
         const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
         const key = `${dataISO}|${funcId}|${e.turno_ordem ?? 1}`;
         const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
 
+        // Escalado
         if (!vistos.has(funcId)) {
           escalados++;
           vistos.add(funcId);
         }
 
+        // Presença/atraso
         if (cons?.entradaMin != null) {
           presentes++;
-          
-          // Verificar se está trabalhando agora
-          if (dataISO === todayISO && cons.parcial) {
-            workingNowList.push({
-              employee: func,
-              schedule: `${e.entrada || '--'} - ${e.saida || '--'}`,
-              actual: `${String(Math.floor(cons.entradaMin / 60)).padStart(2, '0')}:${String(cons.entradaMin % 60).padStart(2, '0')} - (andamento)`,
-              duration: minutesToHHhMM((cons.saidaMin ?? cons.entradaMin) - cons.entradaMin)
-            });
-          }
-
           if (entradaEsc != null) {
-            const delta = cons.entradaMin - entradaEsc;
+            const delta = cons.entradaMin - entradaEsc; // + => atrasou
             if (delta > 5) atrasos++;
           }
-
+          // horas trabalhadas (parcial se sem saída)
           const fim = cons.saidaMin ?? cons.entradaMin;
           const dur = Math.max(0, (fim ?? 0) - cons.entradaMin);
           minutosTotais += dur;
-        } else if (dataISO === todayISO) {
-          absentTodayList.push({
-            employee: func,
-            schedule: `${e.entrada || '--'} - ${e.saida || '--'}`
-          });
+        } else {
+          ausentes++;
         }
       }
     }
-
-    // Funcionários ativos sem escala hoje
-    const todayEscalas = escalasByDia.get(todayISO) || [];
-    const escaladosHoje = new Set(todayEscalas.map(e => e.funcionario_id));
-    
-    for (const func of mapFunc.values()) {
-      if (!escaladosHoje.has(func.id)) {
-        offScheduleList.push({ employee: func });
-      }
-    }
-
     return {
-      kpis: {
-        escalados,
-        presentes,
-        ausentes: Math.max(ausentes, 0),
-        atrasos,
-        horasTotaisFmt: minutesToHHhMM(minutosTotais),
-      },
-      workingNow: workingNowList,
-      absentToday: absentTodayList,
-      offSchedule: offScheduleList
+      escalados,
+      presentes,
+      ausentes: Math.max(ausentes, 0),
+      atrasos,
+      horasTotaisFmt: minutesToHHhMM(minutosTotais),
     };
-  }, [apontByKey, escalasByDia, mapFunc]);
+  }, [apontByKey, escalasByDia]);
+
+  /* ========= Render helpers (posicionamento estilo agenda) ========= */
+  const dayHeight = 1200; // px; altura “virtual” da coluna
+  const minVisible = CONFIG_HORARIOS.inicio * 60;
+  const maxVisible = CONFIG_HORARIOS.fim * 60;
+  const minutesSpan = maxVisible - minVisible;
+
+  function blockStyleByMinutes(iniMin, endMin) {
+    if (iniMin == null) return { display: "none" };
+    const start = Math.max(minVisible, iniMin);
+    const end = endMin != null ? Math.min(maxVisible, endMin) : null;
+    const top = ((start - minVisible) / minutesSpan) * dayHeight;
+    const height = end != null ? Math.max(8, ((end - start) / minutesSpan) * dayHeight) : 16;
+    return { position: "absolute", left: 6, right: 6, top, height, borderRadius: 8 };
+  }
+
+  /* ========= Lista renderizada por dia ========= */
+  const DiasAgenda = () => {
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "100px repeat(7, 1fr)",
+          minWidth: 1040,
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          overflow: "hidden",
+          background: "var(--panel)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        }}
+      >
+        {/* Cabeçalho */}
+        <div
+          style={{
+            padding: "16px 12px",
+            borderBottom: "2px solid var(--border)",
+            background: "var(--panel-muted)",
+            fontWeight: 600,
+            fontSize: 14,
+          }}
+        >
+          HORA
+        </div>
+        {dias.map((dia, i) => (
+          <div
+            key={i}
+            style={{
+              padding: "12px",
+              borderBottom: "2px solid var(--border)",
+              textAlign: "center",
+              background: "var(--panel-muted)",
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{DIAS_SEMANA_CURTO[i]}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{formatDateBR(dia)}</div>
+          </div>
+        ))}
+
+        {/* Coluna de horas com linhas */}
+        <div
+          style={{
+            position: "relative",
+            borderRight: "1px solid var(--border)",
+            background:
+              "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
+            height: dayHeight,
+          }}
+        >
+          {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => (
+            <div
+              key={idx}
+              style={{
+                position: "absolute",
+                top: (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio),
+                left: 0,
+                right: 0,
+                height: 0,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: -8,
+                  right: 8,
+                  fontSize: 12,
+                  color: "var(--muted)",
+                }}
+              >
+                {String(CONFIG_HORARIOS.inicio + idx).padStart(2, "0")}:00
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 7 colunas do período */}
+        {dias.map((dia, idxDia) => {
+          const dataISO = toISO(dia);
+          const arrEsc = (escalasByDia.get(dataISO) || []).slice();
+
+          return (
+            <div
+              key={idxDia}
+              style={{
+                position: "relative",
+                height: dayHeight,
+                borderRight: idxDia === 6 ? "none" : "1px solid var(--border)",
+                background:
+                  "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
+              }}
+            >
+              {/* Linha “agora” */}
+              {toISO(new Date()) === dataISO && (() => {
+                const now = new Date();
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                if (nowMin >= minVisible && nowMin <= maxVisible) {
+                  const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
+                  return (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        top,
+                        height: 2,
+                        background: "rgba(59,130,246,0.9)",
+                        boxShadow: "0 0 0 1px rgba(59,130,246,0.4)",
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Blocos de ESCALA (contornos) */}
+              {arrEsc.map((e, idx) => {
+                const func = mapFunc.get(e.funcionario_id);
+                if (!func) return null;
+                const ini = hhmmToMinutes(e.entrada);
+                const end = hhmmToMinutes(e.saida) ?? ini;
+                const style = blockStyleByMinutes(ini, end);
+                return (
+                  <div
+                    key={`esc-${e.id}-${idx}`}
+                    style={{
+                      ...style,
+                      border: `2px solid ${func.cor}`,
+                      background: "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "6px 8px",
+                      gap: 8,
+                    }}
+                    title={`Escala • ${func.nome} (${e.entrada || "--"} - ${e.saida || "--"}) • Turno ${e.turno_ordem}`}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: func.cor,
+                      }}
+                    />
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>
+                      {func.nome}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                      {e.entrada || "--"} – {e.saida || "--"}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Blocos de APONTAMENTO (preenchidos, por mesmo turno) */}
+              {arrEsc.map((e, idx) => {
+                const func = mapFunc.get(e.funcionario_id);
+                if (!func) return null;
+                const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
+                const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
+                if (!cons?.entradaMin) return null;
+                const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
+                const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
+                const dur = (cons.saidaMin ?? cons.entradaMin) - cons.entradaMin;
+                const status =
+                  atrasoMin == null ? "PRESENTE"
+                  : atrasoMin > 5 ? "ATRASO"
+                  : atrasoMin < -5 ? "ADIANTADO"
+                  : "PONTUAL";
+
+                const tone =
+                  status === "ATRASO" ? "yellow"
+                  : status === "ADIANTADO" ? "blue"
+                  : status === "PONTUAL" ? "green"
+                  : "emerald";
+
+                return (
+                  <div
+                    key={`apo-${e.id}-${idx}`}
+                    style={{
+                      ...style,
+                      background: func.cor,
+                      color: "white",
+                      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 8px",
+                      opacity: cons.parcial ? 0.9 : 1,
+                    }}
+                    title={`Apontamento • ${func.nome} (${minutesToHHhMM(dur)}${cons.parcial ? " • em andamento" : ""})`}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: "white",
+                        opacity: 0.9,
+                      }}
+                    />
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{func.nome}</div>
+                    <div style={{ fontSize: 11, opacity: 0.95 }}>
+                      {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
+                      {String(cons.entradaMin % 60).padStart(2, "0")}
+                      {" – "}
+                      {cons.saidaMin != null
+                        ? `${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}`
+                        : "em andamento"}
+                    </div>
+                    <div style={{ marginLeft: "auto" }}>
+                      <StatusBadge tone={tone}>
+                        {status}{atrasoMin != null ? ` (${atrasoMin > 0 ? "+" : ""}${atrasoMin}m)` : ""}
+                      </StatusBadge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  /* ========= Legenda ========= */
+  const Legenda = () => (
+    <div
+      style={{
+        display: "flex",
+        gap: 16,
+        flexWrap: "wrap",
+        padding: 16,
+        background: "var(--panel)",
+        borderRadius: 8,
+        border: "1px solid var(--border)",
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--muted)" }}>Legenda:</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 16, height: 16, border: "2px solid var(--fg)", borderRadius: 4 }} />
+        <span style={{ fontSize: 14 }}>Escala (planejado)</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 16, height: 16, background: "var(--fg)", borderRadius: 4 }} />
+        <span style={{ fontSize: 14 }}>Apontamento (real)</span>
+      </div>
+      {funcionarios.slice(0, 12).map((f) => (
+        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 16, height: 16, background: getCorFuncionario(f.id), borderRadius: 4, border: "1px solid var(--border)" }} />
+          <span style={{ fontSize: 14 }}>{f.pessoa_nome}</span>
+        </div>
+      ))}
+      {funcionarios.length > 12 && (
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>+{funcionarios.length - 12} funcionários…</div>
+      )}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50/30">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard em Tempo Real</h1>
-            <p className="text-gray-600 mt-1">
-              Status atual dos funcionários • {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={carregarTudo}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
-            >
-              {loading ? 'Atualizando...' : 'Atualizar'}
-            </button>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              Auto-refresh
-            </label>
-          </div>
+    <>
+      <header className="main-header">
+        <div className="header-content">
+          <h1>Dashboard Administrativo</h1>
+          <p>Comparativo visual de Escala × Apontamento (semana)</p>
         </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="toggle-btn" onClick={semanaAnterior}>←</button>
+          <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
+          <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
+          <button className="toggle-btn" onClick={carregarTudo} disabled={loading}>
+            {loading ? "Atualizando..." : "Atualizar"}
+          </button>
+          <label className="toggle-btn" style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />
+            Auto-refresh 60s
+          </label>
+        </div>
+      </header>
+
+      {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
+
+      {/* KPIs */}
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <Kpi label="Escalados (semana/dia)" value={kpis.escalados} />
+        <Kpi label="Presentes" value={kpis.presentes} />
+        <Kpi label="Ausentes" value={kpis.ausentes} />
+        <Kpi label="Atrasos (turnos)" value={kpis.atrasos} />
+        <Kpi label="Horas trabalhadas" value={kpis.horasTotaisFmt} sub="Parciais contam até o momento" />
+      </section>
+
+      {/* Grade estilo Google Agenda */}
+      <DiasAgenda />
+
+      {/* Legenda */}
+      <div style={{ marginTop: 20 }}>
+        <Legenda />
       </div>
 
-      {/* Conteúdo principal */}
-      <div className="p-6 max-w-7xl mx-auto">
-        {err && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {err}
-          </div>
-        )}
-
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-          <KpiCard 
-            label="Total de Funcionários" 
-            value={funcionarios.length}
-            icon="👥"
-          />
-          <KpiCard 
-            label="Escalados para Hoje" 
-            value={kpis.escalados}
-            icon="📅"
-          />
-          <KpiCard 
-            label="Presentes no Momento" 
-            value={workingNow.length}
-            icon="✅"
-            sub="Trabalhando agora"
-          />
-          <KpiCard 
-            label="Ausentes" 
-            value={absentToday.length}
-            icon="❌"
-          />
-          <KpiCard 
-            label="Horas Trabalhadas" 
-            value={kpis.horasTotaisFmt}
-            icon="⏱️"
-            sub="Semana atual"
-          />
-        </div>
-
-        {/* Status em Tempo Real */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Trabalhando Agora */}
-          <div className="lg:col-span-1">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Trabalhando Agora ({workingNow.length})</h2>
-              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                AGORA
-              </span>
-            </div>
-            <div className="space-y-3">
-              {workingNow.map((item, index) => (
-                <EmployeeCard
-                  key={index}
-                  employee={item.employee}
-                  status="working"
-                  schedule={item.schedule}
-                  actual={item.actual}
-                  duration={item.duration}
-                  isCurrent={true}
-                />
-              ))}
-              {workingNow.length === 0 && (
-                <div className="text-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200">
-                  Nenhum funcionário trabalhando no momento
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Ausentes da Escala Atual */}
-          <div className="lg:col-span-1">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Ausentes da Escala Atual ({absentToday.length})
-            </h2>
-            <div className="space-y-3">
-              {absentToday.map((item, index) => (
-                <EmployeeCard
-                  key={index}
-                  employee={item.employee}
-                  status="absent"
-                  schedule={item.schedule}
-                />
-              ))}
-              {absentToday.length === 0 && (
-                <div className="text-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200">
-                  Todos os escalados estão presentes
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Fora da Escala */}
-          <div className="lg:col-span-1">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Fora da Escala ({offSchedule.length})
-            </h2>
-            <div className="space-y-3">
-              {offSchedule.map((item, index) => (
-                <EmployeeCard
-                  key={index}
-                  employee={item.employee}
-                  status="off"
-                />
-              ))}
-              {offSchedule.length === 0 && (
-                <div className="text-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200">
-                  Todos os funcionários estão escalados hoje
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Legenda e Informações */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-3">Legenda de Status</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span>Trabalhando agora</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span>Ausente da escala</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-              <span>Fora da escala</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <span>Atrasado</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* Notas */}
+      <section className="text-xs text-gray-500 mt-3">
+        <ul className="list-disc pl-5 space-y-1">
+          <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
+          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>
+          <li>Quando não há saída no apontamento, o bloco aparece como <em>parcial</em> e cresce até a linha do tempo atual.</li>
+          <li>A prioridade de múltiplos apontamentos é AJUSTE &gt; IMPORTADO &gt; APONTADO.</li>
+        </ul>
+      </section>
+    </>
   );
 }
