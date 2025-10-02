@@ -39,6 +39,9 @@ function addDays(d, n) {
 function formatDateBR(d) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
+function formatDateFull(d) {
+  return d.toLocaleDateString("pt-BR", { weekday: 'long', day: "2-digit", month: "2-digit", year: "numeric" });
+}
 function hhmmToMinutes(hhmm) {
   if (!hhmm) return null;
   const [h, m] = hhmm.split(":").map(Number);
@@ -54,6 +57,7 @@ function minutesToHHhMM(min) {
 
 /* ====== Config da timeline ====== */
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const DIAS_SEMANA_LONGO = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const CONFIG_HORARIOS = { inicio: 6, fim: 22 }; // [06:00 .. 22:00]
 
 /* ====== Cores por funcionário ====== */
@@ -149,17 +153,22 @@ function StatusBadge({ children, tone = "gray" }) {
 
 /* ====== KPIs ====== */
 const Kpi = ({ label, value, sub }) => (
-  <div className="bg-white rounded-2xl shadow-sm p-4 ring-1 ring-gray-200">
-    <div className="text-sm text-gray-500">{label}</div>
-    <div className="mt-1 text-2xl font-semibold text-gray-900">{value}</div>
-    {sub ? <div className="mt-1 text-xs text-gray-500">{sub}</div> : null}
+  <div className="stat-card">
+    <div className="stat-value">{value}</div>
+    <div className="stat-title">{label}</div>
+    {sub ? <div className="stat-trend">{sub}</div> : null}
   </div>
 );
 
 /* ====== Componente principal ====== */
 export default function DashboardAdm() {
-  // Semana atual
+  // Estado para controlar se está em mobile
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
+  
+  // Semana atual ou dia atual (dependendo do mobile)
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
+  const [diaAtual, setDiaAtual] = useState(new Date());
+  
   const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(dataRef, i)), [dataRef]);
 
   const api = useApi();
@@ -171,17 +180,38 @@ export default function DashboardAdm() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const refreshRef = useRef(null);
 
+  // Detecta mudança de tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 900);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Navegação
   const semanaAnterior = () => setDataRef(addDays(dataRef, -7));
   const semanaSeguinte = () => setDataRef(addDays(dataRef, 7));
-  const semanaAtual = () => setDataRef(startOfWeek(new Date()));
+  const semanaAtual = () => {
+    const hoje = new Date();
+    setDataRef(startOfWeek(hoje));
+    setDiaAtual(hoje);
+  };
+
+  const diaAnterior = () => setDiaAtual(addDays(diaAtual, -1));
+  const diaSeguinte = () => setDiaAtual(addDays(diaAtual, 1));
+  const irParaHoje = () => setDiaAtual(new Date());
 
   const carregarTudo = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
-      const de = toISO(dias[0]);
-      const ate = toISO(dias[6]);
+      // No mobile carrega apenas +/- 1 dia do dia atual para performance
+      // No desktop carrega a semana inteira
+      const de = isMobile ? toISO(addDays(diaAtual, -1)) : toISO(dias[0]);
+      const ate = isMobile ? toISO(addDays(diaAtual, 1)) : toISO(dias[6]);
+      
       const q = (s) => encodeURIComponent(s);
       const [f, e, a] = await Promise.all([
         api(`/api/funcionarios?ativos=1`),
@@ -190,16 +220,15 @@ export default function DashboardAdm() {
       ]);
       setFuncionarios(f.funcionarios || []);
       setEscalas(e.escalas || []);
-      // aceita tanto {apontamentos:[]} quanto []
       setApontamentos(Array.isArray(a) ? a : (a.apontamentos || []));
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
     } finally {
       setLoading(false);
     }
-  }, [api, dias]);
+  }, [api, dias, diaAtual, isMobile]);
 
-  // carrega na montagem e quando mudar a semana
+  // carrega na montagem e quando mudar a semana/dia
   useEffect(() => { carregarTudo(); }, [carregarTudo]);
 
   // Auto refresh 60s
@@ -213,7 +242,6 @@ export default function DashboardAdm() {
   }, [autoRefresh, carregarTudo]);
 
   /* ========= Índices para render ========= */
-  // Mapa funcionarios (id -> info + cor)
   const mapFunc = useMemo(() => {
     const m = new Map();
     for (const f of funcionarios) {
@@ -229,7 +257,7 @@ export default function DashboardAdm() {
 
   // Group escalas por dia
   const escalasByDia = useMemo(() => {
-    const m = new Map(); // key = dataISO -> array
+    const m = new Map();
     for (const e of escalas) {
       const dkey = normDateStr(e.data);
       if (!dkey || !e.funcionario_id) continue;
@@ -242,7 +270,7 @@ export default function DashboardAdm() {
 
   // Group apontamentos por (data, funcionario, turno)
   const apontByKey = useMemo(() => {
-    const m = new Map(); // key `${data}|${funcId}|${turno}`
+    const m = new Map();
     for (const a of apontamentos) {
       const funcId = a.funcionario_id ?? a.funcionarioId ?? a.funcionario;
       const dkey   = normDateStr(a.data);
@@ -255,15 +283,15 @@ export default function DashboardAdm() {
     return m;
   }, [apontamentos]);
 
-  /* ========= Cálculos de KPIs (por dia-alvo) ========= */
+  /* ========= Cálculos de KPIs ========= */
   const kpis = useMemo(() => {
-    // Dia-alvo: se hoje está na semana exibida, usar hoje; senão, usar o 1º dia da grade
-    const hojeISO = toISO(new Date());
-    const alvoISO = dias.some(d => toISO(d) === hojeISO) ? hojeISO : toISO(dias[0]);
+    // No mobile usa o dia atual, no desktop usa hoje se estiver na semana ou primeiro dia
+    const alvoISO = isMobile ? toISO(diaAtual) : 
+                   (dias.some(d => toISO(d) === toISO(new Date())) ? toISO(new Date()) : toISO(dias[0]));
 
     const arrEsc = escalasByDia.get(alvoISO) || [];
 
-    const escaladosSet = new Set(); // por pessoa/dia
+    const escaladosSet = new Set();
     const presentesSet = new Set();
     let atrasos = 0;
     let minutosTotais = 0;
@@ -280,8 +308,8 @@ export default function DashboardAdm() {
         presentesSet.add(funcId);
 
         if (entradaEsc != null) {
-          const delta = cons.entradaMin - entradaEsc; // + => atraso
-          if (delta > 5) atrasos++; // atraso por turno
+          const delta = cons.entradaMin - entradaEsc;
+          if (delta > 5) atrasos++;
         }
 
         const fim = cons.saidaMin ?? cons.entradaMin;
@@ -301,10 +329,10 @@ export default function DashboardAdm() {
       atrasos,
       horasTotaisFmt: minutesToHHhMM(minutosTotais),
     };
-  }, [apontByKey, escalasByDia, dias]);
+  }, [apontByKey, escalasByDia, dias, diaAtual, isMobile]);
 
-  /* ========= Render helpers (posicionamento estilo agenda) ========= */
-  const dayHeight = 1200; // px; altura “virtual” da coluna
+  /* ========= Render helpers ========= */
+  const dayHeight = isMobile ? 800 : 1200;
   const minVisible = CONFIG_HORARIOS.inicio * 60;
   const maxVisible = CONFIG_HORARIOS.fim * 60;
   const minutesSpan = maxVisible - minVisible;
@@ -318,8 +346,8 @@ export default function DashboardAdm() {
     return { position: "absolute", left: 6, right: 6, top, height, borderRadius: 8 };
   }
 
-  /* ========= Lista renderizada por dia ========= */
-  const DiasAgenda = () => {
+  /* ========= Grade da Semana (Desktop) ========= */
+  const DiasAgendaDesktop = () => {
     return (
       <div
         style={{
@@ -412,7 +440,7 @@ export default function DashboardAdm() {
                   "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
               }}
             >
-              {/* Linha “agora” */}
+              {/* Linha "agora" */}
               {toISO(new Date()) === dataISO && (() => {
                 const now = new Date();
                 const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -435,7 +463,7 @@ export default function DashboardAdm() {
                 return null;
               })()}
 
-              {/* Blocos de ESCALA (contornos) */}
+              {/* Blocos de ESCALA */}
               {arrEsc.map((e, idx) => {
                 const func = mapFunc.get(e.funcionario_id);
                 if (!func) return null;
@@ -474,7 +502,7 @@ export default function DashboardAdm() {
                 );
               })}
 
-              {/* Blocos de APONTAMENTO (preenchidos, por mesmo turno) */}
+              {/* Blocos de APONTAMENTO */}
               {arrEsc.map((e, idx) => {
                 const func = mapFunc.get(e.funcionario_id);
                 if (!func) return null;
@@ -548,36 +576,236 @@ export default function DashboardAdm() {
     );
   };
 
+  /* ========= Dia Único (Mobile) ========= */
+  const DiaAgendaMobile = () => {
+    const dataISO = toISO(diaAtual);
+    const arrEsc = (escalasByDia.get(dataISO) || []).slice();
+    const diaSemana = diaAtual.getDay();
+    const nomeDia = DIAS_SEMANA_LONGO[(diaSemana + 6) % 7]; // Ajuste para Seg=0
+
+    return (
+      <div
+        style={{
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          overflow: "hidden",
+          background: "var(--panel)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        }}
+      >
+        {/* Cabeçalho do dia */}
+        <div
+          style={{
+            padding: "16px",
+            borderBottom: "2px solid var(--border)",
+            background: "var(--panel-muted)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+            {nomeDia}
+          </div>
+          <div style={{ fontSize: 14, color: "var(--muted)" }}>
+            {formatDateFull(diaAtual)}
+          </div>
+        </div>
+
+        {/* Grade do dia */}
+        <div
+          style={{
+            position: "relative",
+            height: dayHeight,
+            background:
+              "repeating-linear-gradient(to bottom, transparent, transparent 39px, var(--border) 40px)",
+          }}
+        >
+          {/* Linhas de hora */}
+          {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => (
+            <div
+              key={idx}
+              style={{
+                position: "absolute",
+                top: (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio),
+                left: 0,
+                right: 0,
+                height: 0,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: -6,
+                  left: 8,
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  background: "var(--panel)",
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                }}
+              >
+                {String(CONFIG_HORARIOS.inicio + idx).padStart(2, "0")}:00
+              </div>
+            </div>
+          ))}
+
+          {/* Linha "agora" */}
+          {toISO(new Date()) === dataISO && (() => {
+            const now = new Date();
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            if (nowMin >= minVisible && nowMin <= maxVisible) {
+              const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
+              return (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top,
+                    height: 2,
+                    background: "rgba(59,130,246,0.9)",
+                    boxShadow: "0 0 0 1px rgba(59,130,246,0.4)",
+                  }}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {/* Blocos de ESCALA */}
+          {arrEsc.map((e, idx) => {
+            const func = mapFunc.get(e.funcionario_id);
+            if (!func) return null;
+            const ini = hhmmToMinutes(e.entrada);
+            const end = hhmmToMinutes(e.saida) ?? ini;
+            const style = blockStyleByMinutes(ini, end);
+            return (
+              <div
+                key={`esc-mobile-${e.id}-${idx}`}
+                style={{
+                  ...style,
+                  border: `2px solid ${func.cor}`,
+                  background: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "4px 6px",
+                  gap: 6,
+                }}
+                title={`Escala • ${func.nome} (${e.entrada || "--"} - ${e.saida || "--"})`}
+              >
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: func.cor,
+                  }}
+                />
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg)" }}>
+                  {func.nome}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--muted)" }}>
+                  {e.entrada || "--"}–{e.saida || "--"}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Blocos de APONTAMENTO */}
+          {arrEsc.map((e, idx) => {
+            const func = mapFunc.get(e.funcionario_id);
+            if (!func) return null;
+
+            const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
+            const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
+            if (!cons?.entradaMin) return null;
+
+            const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
+            const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
+
+            const status =
+              atrasoMin == null ? "PRESENTE"
+              : atrasoMin > 5   ? "ATRASO"
+              : atrasoMin < -5  ? "ADIANTADO"
+              : "PONTUAL";
+
+            return (
+              <div
+                key={`apo-mobile-${e.id}-${idx}`}
+                style={{
+                  ...style,
+                  background: func.cor,
+                  color: "white",
+                  boxShadow: "0 1px 4px rgba(0,0,0,.12)",
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: "4px 6px",
+                  gap: 2,
+                  opacity: cons.parcial ? 0.9 : 1,
+                }}
+                title={`Apontamento • ${func.nome}`}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.2 }}>
+                  {func.nome}
+                </div>
+                <div style={{ fontSize: 9, opacity: 0.95, lineHeight: 1.2 }}>
+                  {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
+                  {String(cons.entradaMin % 60).padStart(2, "0")}
+                  {cons.saidaMin != null ? `–${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}` : " (andamento)"}
+                </div>
+                <div style={{ fontSize: 8, opacity: 0.9 }}>
+                  <StatusBadge tone={status === "ATRASO" ? "yellow" : status === "ADIANTADO" ? "blue" : "green"}>
+                    {status}
+                  </StatusBadge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   /* ========= Legenda ========= */
   const Legenda = () => (
     <div
       style={{
         display: "flex",
-        gap: 16,
+        gap: 12,
         flexWrap: "wrap",
-        padding: 16,
+        padding: 12,
         background: "var(--panel)",
         borderRadius: 8,
         border: "1px solid var(--border)",
+        fontSize: isMobile ? 12 : 14,
       }}
     >
-      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--muted)" }}>Legenda:</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width: 16, height: 16, border: "2px solid var(--fg)", borderRadius: 4 }} />
-        <span style={{ fontSize: 14 }}>Escala (planejado)</span>
+      <div style={{ fontWeight: 600, color: "var(--muted)" }}>Legenda:</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 12, height: 12, border: "2px solid var(--fg)", borderRadius: 3 }} />
+        <span>Escala</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width: 16, height: 16, background: "var(--fg)", borderRadius: 4 }} />
-        <span style={{ fontSize: 14 }}>Apontamento (real)</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 12, height: 12, background: "var(--fg)", borderRadius: 3 }} />
+        <span>Apontamento</span>
       </div>
-      {funcionarios.slice(0, 12).map((f) => (
-        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 16, height: 16, background: getCorFuncionario(f.id), borderRadius: 4, border: "1px solid var(--border)" }} />
-          <span style={{ fontSize: 14 }}>{f.pessoa_nome}</span>
+      {funcionarios.slice(0, isMobile ? 6 : 12).map((f) => (
+        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ 
+            width: 12, 
+            height: 12, 
+            background: getCorFuncionario(f.id), 
+            borderRadius: 3, 
+            border: "1px solid var(--border)" 
+          }} />
+          <span style={{ fontSize: isMobile ? 11 : 13 }}>
+            {f.pessoa_nome?.split(' ')[0]}
+          </span>
         </div>
       ))}
-      {funcionarios.length > 12 && (
-        <div style={{ fontSize: 13, color: "var(--muted)" }}>+{funcionarios.length - 12} funcionários…</div>
+      {funcionarios.length > (isMobile ? 6 : 12) && (
+        <div style={{ fontSize: 11, color: "var(--muted)" }}>
+          +{funcionarios.length - (isMobile ? 6 : 12)}...
+        </div>
       )}
     </div>
   );
@@ -587,12 +815,29 @@ export default function DashboardAdm() {
       <header className="main-header">
         <div className="header-content">
           <h1>Dashboard Administrativo</h1>
-          <p>Comparativo visual de Escala × Apontamento (semana)</p>
+          <p>
+            {isMobile 
+              ? "Visão do dia - Comparativo Escala × Apontamento" 
+              : "Comparativo visual de Escala × Apontamento (semana)"
+            }
+          </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="toggle-btn" onClick={semanaAnterior}>←</button>
-          <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
-          <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
+          {/* Navegação por semana/dia */}
+          {isMobile ? (
+            <>
+              <button className="toggle-btn" onClick={diaAnterior}>←</button>
+              <button className="toggle-btn" onClick={irParaHoje}>Hoje</button>
+              <button className="toggle-btn" onClick={diaSeguinte}>→</button>
+            </>
+          ) : (
+            <>
+              <button className="toggle-btn" onClick={semanaAnterior}>←</button>
+              <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
+              <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
+            </>
+          )}
+          
           <button className="toggle-btn" onClick={carregarTudo} disabled={loading}>
             {loading ? "Atualizando..." : "Atualizar"}
           </button>
@@ -609,40 +854,44 @@ export default function DashboardAdm() {
 
       {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
 
-      {/* KPIs (dia-alvo) */}
-<section className="stats-grid">
-  <div className="stat-card">
-    <div className="stat-value">{kpis.escalados}</div>
-    <div className="stat-title">Escalados (dia)</div>
-  </div>
+      {/* KPIs */}
+      <section className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-value">{kpis.escalados}</div>
+          <div className="stat-title">Escalados (dia)</div>
+        </div>
 
-  <div className="stat-card" data-accent="success">
-    <div className="stat-value">{kpis.presentes}</div>
-    <div className="stat-title">Presentes</div>
-  </div>
+        <div className="stat-card" data-accent="success">
+          <div className="stat-value">{kpis.presentes}</div>
+          <div className="stat-title">Presentes</div>
+        </div>
 
-  <div className="stat-card" data-accent="error">
-    <div className="stat-value">{kpis.ausentes}</div>
-    <div className="stat-title">Ausentes</div>
-  </div>
+        <div className="stat-card" data-accent="error">
+          <div className="stat-value">{kpis.ausentes}</div>
+          <div className="stat-title">Ausentes</div>
+        </div>
 
-  <div className="stat-card" data-accent="warning">
-    <div className="stat-value">{kpis.atrasos}</div>
-    <div className="stat-title">Atrasos (turnos)</div>
-  </div>
-</section>
+        <div className="stat-card" data-accent="warning">
+          <div className="stat-value">{kpis.atrasos}</div>
+          <div className="stat-title">Atrasos (turnos)</div>
+        </div>
+      </section>
 
-      {/* Grade estilo Google Agenda */}
-      <DiasAgenda />
+      {/* Grade agenda */}
+      {isMobile ? <DiaAgendaMobile /> : <DiasAgendaDesktop />}
 
       {/* Legenda */}
-      <div style={{ marginTop: 20 }}>
+      <div style={{ marginTop: 16 }}>
         <Legenda />
       </div>
 
       {/* Notas */}
-      <section className="text-xs text-gray-500 mt-3">
-        <ul className="list-disc pl-5 space-y-1">
+      <section style={{ 
+        fontSize: isMobile ? 11 : 12, 
+        color: "var(--muted)", 
+        marginTop: 12 
+      }}>
+        <ul style={{ listStyle: "disc", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
           <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
           <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>                    
         </ul>
