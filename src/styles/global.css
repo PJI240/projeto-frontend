@@ -130,15 +130,24 @@ body {
   --border: #e5e7eb;
 
   /* ações e foco */
-  --accent: #3b82f6;        /* azul (dashboard) */
-  --accent-strong: #2563eb; /* hover */
+  --accent: #3b82f6;        /* azul (dashboard) - use para ícones/bordas */
+  --accent-strong: #2563eb; /* legado/hover */
   --focus: #ffbf47;         /* amarelo para foco acessível */
 
-  /* status/utilitários */
+  /* status/utilitários (para ícones/bordas/badges suaves) */
   --success: #10b981;
   --warning: #eab308;
   --error: #dc2626;
   --info: #0ea5e9;
+
+  /* ===== Contraste reforçado para fundos com texto branco ===== */
+  /* Use estes quando houver background color + texto branco */
+  --accent-bg: #2563eb;        /* azul forte (contraste ok com branco) */
+  --accent-bg-hover: #1d4ed8;
+  --success-strong: #065f46;   /* verde escuro p/ texto branco */
+  --warning-strong: #92400e;   /* marrom/âmbar p/ texto branco, se necessário */
+  --error-strong: #b91c1c;     /* vermelho escuro p/ texto branco */
+  --info-strong: #075985;      /* azul petróleo p/ texto branco */
 
   /* tipografia/efeitos */
   --radius: 12px;
@@ -192,18 +201,19 @@ body {
   transition: all .2s ease;
 }
 
+/* Estados com alto contraste para texto branco */
 .toggle-btn:hover, 
 .toggle-btn:focus-visible {
-  background: var(--accent);
+  background: var(--accent-bg);
   color: #fff;
-  border-color: var(--accent-strong);
+  border-color: var(--accent-bg-hover);
 }
 
 .toggle-btn:active { transform: scale(0.98); }
 .toggle-btn.is-active {
-  background: var(--accent);
+  background: var(--accent-bg);
   color: #fff;
-  border-color: var(--accent-strong);
+  border-color: var(--accent-bg-hover);
 }
 
 /* ===== Menu responsivo (mobile drawer) - CORRIGIDO ===== */
@@ -231,9 +241,9 @@ body {
 
 .menu-toggle:focus-visible,
 .menu-toggle:hover { 
-  background: var(--accent); 
+  background: var(--accent-bg); 
   color: #fff; 
-  border-color: var(--accent-strong); 
+  border-color: var(--accent-bg-hover); 
 }
 
 .menu-toggle-icon { 
@@ -353,8 +363,8 @@ body {
 }
 
 .form input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  border-color: var(--accent-bg);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-bg) 25%, transparent);
 }
 
 .form button {
@@ -370,7 +380,8 @@ body {
   cursor: pointer;
 }
 
-.form button:hover { 
+.form button:hover, 
+.form button:focus-visible { 
   filter: brightness(.92); 
 }
 
@@ -381,12 +392,12 @@ body {
 }
 
 .links a { 
-  color: var(--accent); 
+  color: var(--accent-bg); 
   text-decoration: none; 
 }
 
 .links a:hover { 
-  color: var(--accent-strong); 
+  color: var(--accent-bg-hover); 
   text-decoration: underline; 
 }
 
@@ -398,13 +409,13 @@ body {
 }
 
 .register-link a { 
-  color: var(--accent); 
+  color: var(--accent-bg); 
   text-decoration: none; 
   font-weight: 600; 
 }
 
 .register-link a:hover { 
-  color: var(--accent-strong); 
+  color: var(--accent-bg-hover); 
   text-decoration: underline; 
 }
 
@@ -499,7 +510,7 @@ body {
   width: 40px; 
   height: 40px; 
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-bg);
   display: flex; 
   align-items: center; 
   justify-content: center;
@@ -532,7 +543,8 @@ body {
   transition: all 0.2s;
 }
 
-.logout-btn:hover { 
+.logout-btn:hover, 
+.logout-btn:focus-visible { 
   background: #f1f5f9; 
   color: #ef4444; 
 }
@@ -555,15 +567,16 @@ body {
   pointer-events: auto;
 }
 
-.nav-item:hover { 
+.nav-item:hover, 
+.nav-item:focus-visible { 
   background: var(--panel-muted); 
-  color: var(--accent); 
+  color: var(--accent-bg); 
 }
 
 .nav-item.active {
-  background: color-mix(in srgb, var(--accent) 12%, #fff);
-  color: var(--accent);
-  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-bg) 12%, #fff);
+  color: var(--accent-bg);
+  border-left-color: var(--accent-bg);
 }
 
 .nav-item span { 
@@ -606,7 +619,7 @@ body {
   align-items: center; 
   gap: .5rem;
   padding: .75rem 1.5rem; 
-  background: var(--accent); 
+  background: var(--accent-bg); 
   color: #fff; 
   border: none;
   border-radius: .5rem; 
@@ -615,8 +628,9 @@ body {
   transition: all .2s;
 }
 
-.refresh-btn:hover:not(:disabled) { 
-  background: var(--accent-strong); 
+.refresh-btn:hover:not(:disabled), 
+.refresh-btn:focus-visible:not(:disabled) { 
+  background: var(--accent-bg-hover); 
 }
 
 .refresh-btn:disabled { 
@@ -649,7 +663,7 @@ body {
   padding: 1.5rem;
   border-radius: 0.75rem;
   box-shadow: 0 1px 3px rgba(0,0,0,.1);
-  border-left: 4px solid var(--accent);
+  border-left: 4px solid var(--accent-bg);
 }
 
 .stat-card[data-accent="success"] { border-left-color: var(--success); }
@@ -716,9 +730,10 @@ body {
   transition: all .2s;
 }
 
-.action-card:hover { 
-  border-color: var(--accent); 
-  color: var(--accent); 
+.action-card:hover, 
+.action-card:focus-visible { 
+  border-color: var(--accent-bg); 
+  color: var(--accent-bg); 
   transform: translateY(-2px); 
 }
 
@@ -806,13 +821,13 @@ body {
 
 .nav-item:hover {
   background: var(--panel-muted);
-  color: var(--accent);
+  color: var(--accent-bg);
 }
 
 .nav-item.active {
-  background: color-mix(in srgb, var(--accent) 12%, #fff);
-  color: var(--accent);
-  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-bg) 12%, #fff);
+  color: var(--accent-bg);
+  border-left-color: var(--accent-bg);
   font-weight: 600;
 }
 
@@ -883,6 +898,7 @@ body {
 .menu-toggle {
   transition: all 0.25s ease;
 }
+
 /* ===== Estilos para Heroicons ===== */
 
 /* Ícones nos cards de estatística */
@@ -944,4 +960,29 @@ body {
 .refresh-btn:hover .icon-sm,
 .action-card:hover .action-icon-svg {
   color: inherit;
+}
+
+/* ===== High Contrast opcional (por preferência do SO ou classe) ===== */
+@media (prefers-contrast: more) {
+  :root {
+    --accent-bg: #1d4ed8;
+    --accent-bg-hover: #1e40af;
+    --success-strong: #065f46;
+    --warning-strong: #78350f;
+    --error-strong: #991b1b;
+    --info-strong: #0c4a6e;
+    --border: #cbd5e1;
+    --muted: #374151;
+  }
+}
+
+.theme-hc {
+  --accent-bg: #1d4ed8;
+  --accent-bg-hover: #1e40af;
+  --success-strong: #065f46;
+  --warning-strong: #78350f;
+  --error-strong: #991b1b;
+  --info-strong: #0c4a6e;
+  --border: #cbd5e1;
+  --muted: #374151;
 }
