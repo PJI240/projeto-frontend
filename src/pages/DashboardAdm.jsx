@@ -160,7 +160,191 @@ const Kpi = ({ label, value, sub }) => (
   </div>
 );
 
+/* ====== Componente de Horas Trabalhadas ====== */
+function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncionario, isMobile }) {
+  const [periodo, setPeriodo] = useState('hoje'); // 'hoje', 'semana', 'mes'
+  
+  // Calcular horas trabalhadas
+  const horasPorFuncionario = useMemo(() => {
+    const resultado = [];
+    const hoje = new Date();
+    const dataInicio = periodo === 'hoje' ? hoje : 
+                      periodo === 'semana' ? startOfWeek(hoje) : 
+                      new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    
+    const dataFim = periodo === 'hoje' ? hoje :
+                    periodo === 'semana' ? addDays(startOfWeek(hoje), 6) :
+                    new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
 
+    // Gerar todas as datas do período
+    const datas = [];
+    let dataAtual = new Date(dataInicio);
+    while (dataAtual <= dataFim) {
+      datas.push(toISO(dataAtual));
+      dataAtual = addDays(dataAtual, 1);
+    }
+
+    for (const func of funcionarios) {
+      if (filtroFuncionario && filtroFuncionario !== 'todos' && func.id.toString() !== filtroFuncionario) {
+        continue;
+      }
+
+      let totalMinutos = 0;
+      let totalAtrasoMinutos = 0;
+      let diasTrabalhados = 0;
+
+      for (const dataISO of datas) {
+        const escalasDia = escalasByDia.get(dataISO) || [];
+        const escalasFunc = escalasDia.filter(e => e.funcionario_id === func.id);
+
+        for (const escala of escalasFunc) {
+          const key = `${dataISO}|${func.id}|${escala.turno_ordem ?? 1}`;
+          const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
+
+          if (cons?.entradaMin != null && cons.saidaMin != null) {
+            const duracao = cons.saidaMin - cons.entradaMin;
+            totalMinutos += Math.max(0, duracao);
+            diasTrabalhados++;
+
+            // Calcular atraso
+            if (escala.entrada) {
+              const entradaEscala = hhmmToMinutes(escala.entrada);
+              const atraso = cons.entradaMin - entradaEscala;
+              if (atraso > 0) {
+                totalAtrasoMinutos += atraso;
+              }
+            }
+          }
+        }
+      }
+
+      resultado.push({
+        id: func.id,
+        nome: func.pessoa_nome || func?.pessoa?.nome || func.nome || `#${func.id}`,
+        horasTrabalhadas: totalMinutos,
+        atrasoTotal: totalAtrasoMinutos,
+        diasTrabalhados,
+        horasFormatadas: minutesToHHhMM(totalMinutos),
+        atrasoFormatado: minutesToHHhMM(totalAtrasoMinutos)
+      });
+    }
+
+    return resultado.sort((a, b) => b.horasTrabalhadas - a.horasTrabalhadas);
+  }, [funcionarios, escalasByDia, apontByKey, filtroFuncionario, periodo]);
+
+  return (
+    <div style={{
+      background: "var(--panel)",
+      borderRadius: 8,
+      border: "1px solid var(--border)",
+      padding: 16,
+      marginBottom: 16
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+        flexWrap: 'wrap',
+        gap: 12
+      }}>
+        <h3 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
+          Horas Trabalhadas × Atraso
+        </h3>
+        
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select 
+            value={periodo}
+            onChange={(e) => setPeriodo(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              background: 'var(--panel)',
+              fontSize: 14
+            }}
+          >
+            <option value="hoje">Hoje</option>
+            <option value="semana">Esta Semana</option>
+            <option value="mes">Este Mês</option>
+          </select>
+        </div>
+      </div>
+
+      {horasPorFuncionario.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>
+          Nenhum dado encontrado para o período selecionado
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gap: 8,
+          maxHeight: isMobile ? 300 : 400,
+          overflowY: 'auto'
+        }}>
+          {horasPorFuncionario.map((func) => (
+            <div
+              key={func.id}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px',
+                background: 'var(--panel-muted)',
+                borderRadius: 6,
+                border: '1px solid var(--border)'
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ 
+                  fontWeight: 600, 
+                  fontSize: isMobile ? 14 : 15,
+                  marginBottom: 4
+                }}>
+                  {func.nome}
+                </div>
+                <div style={{ 
+                  fontSize: isMobile ? 11 : 12, 
+                  color: 'var(--muted)',
+                  display: 'flex',
+                  gap: 12,
+                  flexWrap: 'wrap'
+                }}>
+                  <span>Dias: {func.diasTrabalhados}</span>
+                  <span>Horas: {func.horasFormatadas}</span>
+                  {func.atrasoTotal > 0 && (
+                    <span style={{ color: '#ef4444' }}>
+                      Atraso: {func.atrasoFormatado}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div style={{
+                width: 60,
+                height: 8,
+                background: '#e5e7eb',
+                borderRadius: 4,
+                overflow: 'hidden',
+                marginLeft: 12
+              }}>
+                <div
+                  style={{
+                    width: `${Math.min(100, (func.horasTrabalhadas / (8 * 60)) * 100)}%`,
+                    height: '100%',
+                    background: func.atrasoTotal > 60 ? '#ef4444' : 
+                               func.atrasoTotal > 15 ? '#f59e0b' : '#10b981',
+                    borderRadius: 4
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ====== Componente principal ====== */
 export default function DashboardAdm() {
@@ -928,15 +1112,6 @@ export default function DashboardAdm() {
 
       {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
 
-      {/* Componente de Horas Trabalhadas */}
-      <HorasTrabalhadas 
-        funcionarios={funcionariosFiltrados}
-        escalasByDia={escalasByDiaFiltrado}
-        apontByKey={apontByKeyFiltrado}
-        filtroFuncionario={filtroFuncionario}
-        isMobile={isMobile}
-      />
-
       {/* KPIs */}
       <section className="stats-grid">
         <div className="stat-card">
@@ -979,192 +1154,14 @@ export default function DashboardAdm() {
           <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>                    
         </ul>
       </section>
+      {/* Componente de Horas Trabalhadas */}
+      <HorasTrabalhadas 
+        funcionarios={funcionariosFiltrados}
+        escalasByDia={escalasByDiaFiltrado}
+        apontByKey={apontByKeyFiltrado}
+        filtroFuncionario={filtroFuncionario}
+        isMobile={isMobile}
+      />
     </>
-  );
-}
-
-/* ====== Componente de Horas Trabalhadas ====== */
-function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncionario, isMobile }) {
-  const [periodo, setPeriodo] = useState('hoje'); // 'hoje', 'semana', 'mes'
-  
-  // Calcular horas trabalhadas
-  const horasPorFuncionario = useMemo(() => {
-    const resultado = [];
-    const hoje = new Date();
-    const dataInicio = periodo === 'hoje' ? hoje : 
-                      periodo === 'semana' ? startOfWeek(hoje) : 
-                      new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    
-    const dataFim = periodo === 'hoje' ? hoje :
-                    periodo === 'semana' ? addDays(startOfWeek(hoje), 6) :
-                    new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-
-    // Gerar todas as datas do período
-    const datas = [];
-    let dataAtual = new Date(dataInicio);
-    while (dataAtual <= dataFim) {
-      datas.push(toISO(dataAtual));
-      dataAtual = addDays(dataAtual, 1);
-    }
-
-    for (const func of funcionarios) {
-      if (filtroFuncionario && filtroFuncionario !== 'todos' && func.id.toString() !== filtroFuncionario) {
-        continue;
-      }
-
-      let totalMinutos = 0;
-      let totalAtrasoMinutos = 0;
-      let diasTrabalhados = 0;
-
-      for (const dataISO of datas) {
-        const escalasDia = escalasByDia.get(dataISO) || [];
-        const escalasFunc = escalasDia.filter(e => e.funcionario_id === func.id);
-
-        for (const escala of escalasFunc) {
-          const key = `${dataISO}|${func.id}|${escala.turno_ordem ?? 1}`;
-          const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
-
-          if (cons?.entradaMin != null && cons.saidaMin != null) {
-            const duracao = cons.saidaMin - cons.entradaMin;
-            totalMinutos += Math.max(0, duracao);
-            diasTrabalhados++;
-
-            // Calcular atraso
-            if (escala.entrada) {
-              const entradaEscala = hhmmToMinutes(escala.entrada);
-              const atraso = cons.entradaMin - entradaEscala;
-              if (atraso > 0) {
-                totalAtrasoMinutos += atraso;
-              }
-            }
-          }
-        }
-      }
-
-      resultado.push({
-        id: func.id,
-        nome: func.pessoa_nome || func?.pessoa?.nome || func.nome || `#${func.id}`,
-        horasTrabalhadas: totalMinutos,
-        atrasoTotal: totalAtrasoMinutos,
-        diasTrabalhados,
-        horasFormatadas: minutesToHHhMM(totalMinutos),
-        atrasoFormatado: minutesToHHhMM(totalAtrasoMinutos)
-      });
-    }
-
-    return resultado.sort((a, b) => b.horasTrabalhadas - a.horasTrabalhadas);
-  }, [funcionarios, escalasByDia, apontByKey, filtroFuncionario, periodo]);
-
-  return (
-    <div style={{
-      background: "var(--panel)",
-      borderRadius: 8,
-      border: "1px solid var(--border)",
-      padding: 16,
-      marginBottom: 16
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-        flexWrap: 'wrap',
-        gap: 12
-      }}>
-        <h3 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
-          Horas Trabalhadas × Atraso
-        </h3>
-        
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select 
-            value={periodo}
-            onChange={(e) => setPeriodo(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              background: 'var(--panel)',
-              fontSize: 14
-            }}
-          >
-            <option value="hoje">Hoje</option>
-            <option value="semana">Esta Semana</option>
-            <option value="mes">Este Mês</option>
-          </select>
-        </div>
-      </div>
-
-      {horasPorFuncionario.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>
-          Nenhum dado encontrado para o período selecionado
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gap: 8,
-          maxHeight: isMobile ? 300 : 400,
-          overflowY: 'auto'
-        }}>
-          {horasPorFuncionario.map((func) => (
-            <div
-              key={func.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px',
-                background: 'var(--panel-muted)',
-                borderRadius: 6,
-                border: '1px solid var(--border)'
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ 
-                  fontWeight: 600, 
-                  fontSize: isMobile ? 14 : 15,
-                  marginBottom: 4
-                }}>
-                  {func.nome}
-                </div>
-                <div style={{ 
-                  fontSize: isMobile ? 11 : 12, 
-                  color: 'var(--muted)',
-                  display: 'flex',
-                  gap: 12,
-                  flexWrap: 'wrap'
-                }}>
-                  <span>Dias: {func.diasTrabalhados}</span>
-                  <span>Horas: {func.horasFormatadas}</span>
-                  {func.atrasoTotal > 0 && (
-                    <span style={{ color: '#ef4444' }}>
-                      Atraso: {func.atrasoFormatado}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <div style={{
-                width: 60,
-                height: 8,
-                background: '#e5e7eb',
-                borderRadius: 4,
-                overflow: 'hidden',
-                marginLeft: 12
-              }}>
-                <div
-                  style={{
-                    width: `${Math.min(100, (func.horasTrabalhadas / (8 * 60)) * 100)}%`,
-                    height: '100%',
-                    background: func.atrasoTotal > 60 ? '#ef4444' : 
-                               func.atrasoTotal > 15 ? '#f59e0b' : '#10b981',
-                    borderRadius: 4
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
