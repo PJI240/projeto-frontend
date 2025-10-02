@@ -1,5 +1,5 @@
 // src/pages/Pessoas.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
@@ -19,6 +19,9 @@ export default function Pessoas() {
     email: "",
   });
 
+  const liveRef = useRef(null);
+  const nomeRef = useRef(null);
+
   const listaFiltrada = useMemo(() => {
     const f = filtro.trim().toLowerCase();
     if (!f) return itens;
@@ -37,8 +40,10 @@ export default function Pessoas() {
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao listar pessoas.");
       setItens(data.pessoas || []);
+      if (liveRef.current) liveRef.current.textContent = "Lista atualizada.";
     } catch (e) {
       setErr(e.message || "Erro ao carregar.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar a lista.";
     } finally {
       setLoading(false);
     }
@@ -47,6 +52,12 @@ export default function Pessoas() {
   useEffect(() => {
     carregar();
   }, []);
+
+  useEffect(() => {
+    if (showForm && nomeRef.current) {
+      nomeRef.current.focus();
+    }
+  }, [showForm]);
 
   function abrirNovo() {
     setEditId(null);
@@ -85,9 +96,13 @@ export default function Pessoas() {
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao salvar.");
 
       setShowForm(false);
+      if (liveRef.current) {
+        liveRef.current.textContent = editId ? "Pessoa atualizada." : "Pessoa criada.";
+      }
       await carregar();
     } catch (e) {
       setErr(e.message || "Erro ao salvar.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao salvar.";
     }
   }
 
@@ -101,22 +116,42 @@ export default function Pessoas() {
       });
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao excluir.");
+      if (liveRef.current) liveRef.current.textContent = "Pessoa excluída.";
       await carregar();
     } catch (e) {
       setErr(e.message || "Erro ao excluir.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao excluir.";
     }
   }
 
+  const onOverlayKeyDown = (ev) => {
+    if (ev.key === "Escape") setShowForm(false);
+  };
+
   return (
     <>
-      <header className="main-header">
-        <div className="header-content">
-          <h1>Pessoas</h1>
-          <p>Gerencie as informações pessoais da sua equipe.</p>
+      {/* região viva para leitores de tela */}
+      <div ref={liveRef} aria-live="polite" className="visually-hidden" />
+
+      {/* HEADER NO NOVO PADRÃO */}
+      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
+        <div className="page-header__top">
+          <h1 id="titulo-pagina" className="page-title">Pessoas</h1>
+          <p className="page-subtitle">Gerencie as informações pessoais da sua equipe.</p>
         </div>
-        <div className="header-actions">
-          <button className="toggle-btn" onClick={abrirNovo}>Nova Pessoa</button>
-          <button className="toggle-btn" onClick={carregar} disabled={loading}>
+
+        <div className="page-header__toolbar" aria-label="Ações da página">
+          <button className="toggle-btn" onClick={abrirNovo} aria-label="Criar nova pessoa">
+            Nova Pessoa
+          </button>
+          <button
+            className="toggle-btn"
+            onClick={carregar}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+            aria-label="Atualizar lista de pessoas"
+            title="Atualizar"
+          >
             {loading ? "Atualizando..." : "Atualizar"}
           </button>
         </div>
@@ -129,32 +164,33 @@ export default function Pessoas() {
       )}
 
       <div className="search-container">
+        <label htmlFor="busca" className="visually-hidden">Buscar por nome, CPF ou e-mail</label>
         <input
+          id="busca"
           placeholder="Buscar por nome, CPF ou e-mail…"
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
           className="search-input"
+          autoComplete="off"
         />
       </div>
 
       <div className="table-container">
         <div className="stat-card">
           {loading ? (
-            <div className="loading-message">Carregando…</div>
+            <div className="loading-message" role="status">Carregando…</div>
           ) : listaFiltrada.length === 0 ? (
-            <div className="empty-message">
-              Nenhuma pessoa encontrada para sua empresa.
-            </div>
+            <div className="empty-message">Nenhuma pessoa encontrada para sua empresa.</div>
           ) : (
-            <div className="table-wrapper">
+            <div className="table-wrapper" role="region" aria-label="Tabela de pessoas">
               <table className="pessoas-table">
                 <thead>
                   <tr>
-                    <th>Nome</th>
-                    <th className="hide-on-mobile">CPF</th>
-                    <th className="hide-on-mobile">E-mail</th>
-                    <th className="hide-on-small">Telefone</th>
-                    <th className="actions-column">Ações</th>
+                    <th scope="col">Nome</th>
+                    <th scope="col" className="hide-on-mobile">CPF</th>
+                    <th scope="col" className="hide-on-mobile">E-mail</th>
+                    <th scope="col" className="hide-on-small">Telefone</th>
+                    <th scope="col" className="actions-column">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -175,8 +211,20 @@ export default function Pessoas() {
                       <td className="hide-on-small">{p.telefone || "—"}</td>
                       <td>
                         <div className="actions-buttons">
-                          <button className="toggle-btn small-btn" onClick={() => abrirEdicao(p)}>Editar</button>
-                          <button className="toggle-btn small-btn" onClick={() => excluir(p.id)}>Excluir</button>
+                          <button
+                            className="toggle-btn small-btn"
+                            onClick={() => abrirEdicao(p)}
+                            aria-label={`Editar ${p.nome}`}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="toggle-btn small-btn danger"
+                            onClick={() => excluir(p.id)}
+                            aria-label={`Excluir ${p.nome}`}
+                          >
+                            Excluir
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -190,27 +238,35 @@ export default function Pessoas() {
 
       {/* Drawer/ formulário simples */}
       {showForm && (
-        <div className="form-overlay">
+        <div
+          className="form-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-form"
+          onKeyDown={onOverlayKeyDown}
+        >
           <div className="form-container">
             <div className="form-header">
-              <h2>{editId ? "Editar Pessoa" : "Nova Pessoa"}</h2>
-              <button 
-                className="close-btn" 
+              <h2 id="titulo-form">{editId ? "Editar Pessoa" : "Nova Pessoa"}</h2>
+              <button
+                className="close-btn"
                 onClick={() => setShowForm(false)}
-                aria-label="Fechar"
+                aria-label="Fechar formulário"
               >
                 ×
               </button>
             </div>
-            
+
             <form className="form" onSubmit={salvar}>
               <div className="form-group">
                 <label htmlFor="nome">Nome</label>
                 <input
                   id="nome"
+                  ref={nomeRef}
                   value={form.nome}
                   onChange={(e) => setForm({ ...form, nome: e.target.value })}
                   required
+                  autoComplete="name"
                 />
               </div>
 
@@ -222,6 +278,7 @@ export default function Pessoas() {
                   onChange={(e) => setForm({ ...form, cpf: e.target.value })}
                   inputMode="numeric"
                   placeholder="Somente números"
+                  autoComplete="off"
                 />
               </div>
 
@@ -232,6 +289,7 @@ export default function Pessoas() {
                   type="date"
                   value={form.data_nascimento}
                   onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
+                  autoComplete="bday"
                 />
               </div>
 
@@ -241,6 +299,7 @@ export default function Pessoas() {
                   id="tel"
                   value={form.telefone}
                   onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+                  autoComplete="tel"
                 />
               </div>
 
@@ -251,11 +310,16 @@ export default function Pessoas() {
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  autoComplete="email"
                 />
               </div>
 
               <div className="form-actions">
-                <button type="button" className="toggle-btn secondary" onClick={() => setShowForm(false)}>
+                <button
+                  type="button"
+                  className="toggle-btn secondary"
+                  onClick={() => setShowForm(false)}
+                >
                   Cancelar
                 </button>
                 <button type="submit" className="toggle-btn primary">
@@ -264,7 +328,7 @@ export default function Pessoas() {
               </div>
 
               {!editId && (
-                <div className="form-tip">
+                <div className="form-tip" id="form-tip">
                   <small>
                     * Dica: para a pessoa aparecer nesta lista, vincule-a depois como funcionário (módulo Funcionários).
                   </small>
@@ -276,37 +340,51 @@ export default function Pessoas() {
       )}
 
       <style jsx>{`
-        /* Header responsivo */
-        .main-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 24px;
-          gap: 16px;
+        .visually-hidden {
+          position: absolute !important;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
         }
 
-        .header-content h1 {
+        /* Header no novo padrão (mesmo respiro das outras páginas) */
+        .page-header {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 16px;
+          margin-bottom: 16px;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        .page-title {
           margin: 0 0 4px 0;
-          font-size: 1.5rem;
+          color: var(--fg);
+          font-size: clamp(1.5rem, 4vw, 2rem);
         }
-
-        .header-content p {
+        .page-subtitle {
           margin: 0;
           color: var(--muted);
-          font-size: 0.9rem;
+          font-size: clamp(var(--fs-14), 3vw, var(--fs-16));
         }
-
-        .header-actions {
+        .page-header__toolbar {
           display: flex;
+          flex-wrap: wrap;
           gap: 8px;
-          flex-shrink: 0;
+          align-items: center;
         }
 
         /* Alertas */
         .error-alert {
-          background: #fee;
-          border: 1px solid #fcc;
-          color: #c33;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          color: var(--error-strong, #b91c1c);
           padding: 12px 16px;
           border-radius: 8px;
           margin-bottom: 16px;
@@ -316,13 +394,18 @@ export default function Pessoas() {
         .search-container {
           margin-bottom: 16px;
         }
-
         .search-input {
           width: 100%;
           padding: 12px;
           border: 1px solid var(--border);
           border-radius: 8px;
-          font-size: 1rem;
+          font-size: var(--fs-16, 1rem);
+          background: var(--panel);
+          color: var(--fg);
+        }
+        .search-input:focus-visible {
+          outline: 3px solid var(--focus);
+          outline-offset: 2px;
         }
 
         /* Container da tabela */
@@ -330,12 +413,12 @@ export default function Pessoas() {
           width: 100%;
           overflow: hidden;
         }
-
         .stat-card {
-          background: white;
+          background: var(--panel);
+          border: 1px solid var(--border);
           border-radius: 12px;
           padding: 0;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          box-shadow: var(--shadow);
           overflow: hidden;
         }
 
@@ -350,22 +433,24 @@ export default function Pessoas() {
         .table-wrapper {
           overflow-x: auto;
         }
-
         .pessoas-table {
           width: 100%;
           border-collapse: collapse;
-          min-width: 600px;
+          min-width: 640px;
+          background: var(--panel);
+          color: var(--fg);
         }
-
         .pessoas-table th {
           padding: 16px 12px;
           text-align: left;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--muted);
           border-bottom: 1px solid var(--border);
-          background: #f8f9fa;
+          background: var(--panel-muted);
+          position: sticky;
+          top: 0;
+          z-index: 1;
         }
-
         .pessoas-table td {
           padding: 16px 12px;
           border-bottom: 1px solid var(--border);
@@ -374,13 +459,13 @@ export default function Pessoas() {
 
         /* Informações mobile */
         .mobile-info .main-info {
-          font-weight: 500;
+          font-weight: 600;
           margin-bottom: 4px;
+          color: var(--fg);
         }
-
         .mobile-details {
           display: none;
-          font-size: 0.8rem;
+          font-size: var(--fs-12, 0.8rem);
           color: var(--muted);
           flex-direction: column;
           gap: 2px;
@@ -391,51 +476,50 @@ export default function Pessoas() {
           display: flex;
           gap: 6px;
           justify-content: flex-start;
+          flex-wrap: wrap;
         }
 
         .small-btn {
           padding: 6px 10px !important;
           font-size: 0.8rem !important;
         }
+        .danger {
+          border-color: color-mix(in srgb, var(--error-strong, #991b1b) 40%, var(--border));
+        }
 
-        /* Formulário overlay */
+        /* Formulário overlay (dialog) */
         .form-overlay {
           position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.5);
+          inset: 0;
+          background: rgba(0,0,0,.5);
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 20px;
           z-index: 1000;
         }
-
         .form-container {
-          background: white;
+          background: var(--panel);
+          border: 1px solid var(--border);
           border-radius: 12px;
           padding: 24px;
           width: 100%;
-          max-width: 500px;
+          max-width: 520px;
           max-height: 90vh;
           overflow-y: auto;
           box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
-
         .form-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 20px;
         }
-
         .form-header h2 {
           margin: 0;
-          font-size: 1.3rem;
+          font-size: clamp(var(--fs-18), 3vw, 1.3rem);
+          color: var(--fg);
         }
-
         .close-btn {
           background: none;
           border: none;
@@ -443,170 +527,121 @@ export default function Pessoas() {
           cursor: pointer;
           color: var(--muted);
           padding: 0;
-          width: 30px;
-          height: 30px;
-          display: flex;
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
+          border-radius: 6px;
         }
-
-        .close-btn:hover {
-          color: #333;
+        .close-btn:hover, .close-btn:focus-visible {
+          background: var(--panel-muted);
+          color: var(--fg);
+          outline: 2px solid var(--focus);
+          outline-offset: 2px;
         }
 
         .form-group {
           margin-bottom: 16px;
         }
-
         .form-group label {
           display: block;
           margin-bottom: 6px;
-          font-weight: 500;
-          color: #333;
+          font-weight: 600;
+          color: var(--fg);
         }
-
         .form-group input {
           width: 100%;
           padding: 10px 12px;
           border: 1px solid var(--border);
-          border-radius: 6px;
-          font-size: 1rem;
+          border-radius: 8px;
+          font-size: var(--fs-16, 1rem);
+          background: #fff;
+          color: #111;
+        }
+        .form-group input:focus-visible {
+          outline: 3px solid var(--focus);
+          outline-offset: 2px;
         }
 
         .form-actions {
           display: flex;
           gap: 10px;
           margin-top: 24px;
+          flex-wrap: wrap;
         }
-
         .form-actions .toggle-btn {
-          flex: 1;
+          flex: 1 1 200px;
         }
-
         .form-tip {
           margin-top: 16px;
           padding-top: 16px;
           border-top: 1px solid var(--border);
         }
+        .form-tip small { color: var(--muted); }
 
-        .form-tip small {
-          color: var(--muted);
-        }
-
-        /* Botões */
+        /* Botões padronizados (usam tokens do tema) */
         .toggle-btn {
           padding: 10px 16px;
           border: 1px solid var(--border);
-          background: white;
-          border-radius: 6px;
+          background: var(--panel);
+          color: var(--fg);
+          border-radius: var(--radius);
           cursor: pointer;
-          font-size: 0.9rem;
-          transition: all 0.2s;
+          font-size: var(--fs-14, 0.9rem);
+          font-weight: 600;
+          transition: all 0.2s ease;
+          box-shadow: var(--shadow);
         }
-
-        .toggle-btn:hover {
-          background: #f5f5f5;
+        .toggle-btn:hover,
+        .toggle-btn:focus-visible {
+          background: var(--accent);
+          color: #fff;
+          border-color: var(--accent-strong);
+          outline: none;
         }
-
         .toggle-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
         }
-
         .toggle-btn.primary {
-          background: #007bff;
-          color: white;
-          border-color: #007bff;
+          background: var(--accent-bg, #1d4ed8);
+          color: #fff;
+          border-color: var(--accent-bg-hover, #1e40af);
         }
-
-        .toggle-btn.primary:hover {
-          background: #0056b3;
+        .toggle-btn.primary:hover,
+        .toggle-btn.primary:focus-visible {
+          background: var(--accent-bg-hover, #1e40af);
         }
-
         .toggle-btn.secondary {
-          background: #6c757d;
-          color: white;
-          border-color: #6c757d;
-        }
-
-        .toggle-btn.secondary:hover {
-          background: #545b62;
+          background: var(--panel);
+          color: var(--fg);
         }
 
         /* Media Queries */
         @media (max-width: 768px) {
-          .main-header {
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .header-actions {
-            margin-top: 12px;
-            justify-content: stretch;
-          }
-
-          .header-actions .toggle-btn {
-            flex: 1;
-          }
-
-          .hide-on-mobile {
-            display: none !important;
-          }
-
-          .mobile-details {
-            display: flex;
-          }
-
-          .pessoas-table td {
-            padding: 12px 8px;
-          }
-
           .actions-buttons {
             flex-direction: column;
             gap: 4px;
           }
-
           .small-btn {
             padding: 8px !important;
             font-size: 0.75rem !important;
           }
-
-          .form-container {
-            padding: 20px;
-            margin: 10px;
-          }
-
-          .form-actions {
-            flex-direction: column;
-          }
+          .mobile-details { display: flex; }
+          .hide-on-mobile { display: none !important; }
+          .form-container { padding: 20px; margin: 10px; }
+          .form-actions { flex-direction: column; }
         }
-
         @media (max-width: 480px) {
-          .hide-on-small {
-            display: none !important;
-          }
-
-          .header-content h1 {
-            font-size: 1.3rem;
-          }
-
-          .form-overlay {
-            padding: 10px;
-          }
-
-          .form-container {
-            padding: 16px;
-          }
-
-          .form-header h2 {
-            font-size: 1.1rem;
-          }
+          .hide-on-small { display: none !important; }
+          .page-title { font-size: clamp(1.35rem, 6vw, 1.5rem); }
+          .form-overlay { padding: 10px; }
+          .form-container { padding: 16px; }
+          .form-header h2 { font-size: 1.1rem; }
         }
-
         @media (min-width: 769px) {
-          .actions-column {
-            width: 160px;
-          }
+          .actions-column { width: 180px; }
         }
       `}</style>
     </>
