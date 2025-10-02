@@ -1,9 +1,9 @@
 // src/pages/DashboardAdm.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
+const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 
-/* ====== Utils de data/hora BR (mesmas ideias do Escalas.jsx) ====== */
+/* ====== Utils de data/hora ====== */
 function toISO(d) {
   const yy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -14,10 +14,19 @@ function fromISO(s) {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
+function normDateStr(x) {
+  if (!x) return "";
+  if (x instanceof Date) return toISO(x);
+  const s = String(x);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;  // "YYYY-MM-DD"
+  if (s.includes("T")) return s.split("T")[0];  // "YYYY-MM-DDTHH:mm:ss..."
+  const d = new Date(s);
+  return isNaN(d) ? "" : toISO(d);
+}
 function startOfWeek(d) {
   const dt = new Date(d);
   const day = dt.getDay();
-  const diff = (day + 6) % 7;
+  const diff = (day + 6) % 7; // 0 = Seg
   dt.setDate(dt.getDate() - diff);
   dt.setHours(0, 0, 0, 0);
   return dt;
@@ -29,9 +38,6 @@ function addDays(d, n) {
 }
 function formatDateBR(d) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-}
-function formatMonthYear(d) {
-  return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 function hhmmToMinutes(hhmm) {
   if (!hhmm) return null;
@@ -46,7 +52,7 @@ function minutesToHHhMM(min) {
   return `${sign}${String(h).padStart(2, "0")}h${String(m).padStart(2, "0")}`;
 }
 
-/* ====== Config da timeline (reutilizável) ====== */
+/* ====== Config da timeline ====== */
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const CONFIG_HORARIOS = { inicio: 6, fim: 22 }; // [06:00 .. 22:00]
 
@@ -57,7 +63,10 @@ const CORES_FUNCIONARIOS = [
   "#f97316", "#6366f1", "#14b8a6", "#84cc16",
   "#eab308", "#a855f7", "#f43f5e", "#0ea5e9",
 ];
-const getCorFuncionario = (id) => CORES_FUNCIONARIOS[id % CORES_FUNCIONARIOS.length];
+const getCorFuncionario = (id) => {
+  const n = Math.abs(Number(id) || 0);
+  return CORES_FUNCIONARIOS[n % CORES_FUNCIONARIOS.length];
+};
 
 /* ====== API helper ====== */
 const useApi = () => {
@@ -74,9 +83,7 @@ const useApi = () => {
 /* ====== Consolidação de apontamentos por prioridade ====== */
 function consolidateApontamentos(items, dataISO) {
   if (!items?.length) return null;
-
   const pri = { AJUSTE: 3, IMPORTADO: 2, APONTADO: 1 };
-  // menor entrada + maior saída (quebrando empate por prioridade)
   let bestEntrada = null, bestEntradaOrigem = null;
   let bestSaida = null, bestSaidaOrigem = null;
 
@@ -115,7 +122,10 @@ function consolidateApontamentos(items, dataISO) {
     entradaMin: bestEntrada ?? null,
     saidaMin: fim ?? null,
     parcial,
-    origem: (pri[bestEntradaOrigem] || 0) >= (pri[bestSaidaOrigem] || 0) ? bestEntradaOrigem : bestSaidaOrigem,
+    origem:
+      (pri[bestEntradaOrigem] || 0) >= (pri[bestSaidaOrigem] || 0)
+        ? bestEntradaOrigem
+        : bestSaidaOrigem,
   };
 }
 
@@ -172,14 +182,16 @@ export default function DashboardAdm() {
     try {
       const de = toISO(dias[0]);
       const ate = toISO(dias[6]);
+      const q = (s) => encodeURIComponent(s);
       const [f, e, a] = await Promise.all([
         api(`/api/funcionarios?ativos=1`),
-        api(`/api/escalas?from=${de}&to=${ate}`),
-        api(`/api/apontamentos?from=${de}&to=${ate}`),
+        api(`/api/escalas?from=${q(de)}&to=${q(ate)}&ativos=1`),
+        api(`/api/apontamentos?from=${q(de)}&to=${q(ate)}&ativos=1`),
       ]);
       setFuncionarios(f.funcionarios || []);
       setEscalas(e.escalas || []);
-      setApontamentos(a.apontamentos || a || []); // aceita tanto {apontamentos:[]} quanto []
+      // aceita tanto {apontamentos:[]} quanto []
+      setApontamentos(Array.isArray(a) ? a : (a.apontamentos || []));
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
     } finally {
@@ -187,15 +199,8 @@ export default function DashboardAdm() {
     }
   }, [api, dias]);
 
-  useEffect(() => {
-    carregarTudo();
-  }, [carregarTudo]);
-
-  // Recarrega ao trocar semana
-  useEffect(() => {
-    if (escalas.length || apontamentos.length) carregarTudo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataRef]);
+  // carrega na montagem e quando mudar a semana
+  useEffect(() => { carregarTudo(); }, [carregarTudo]);
 
   // Auto refresh 60s
   useEffect(() => {
@@ -226,10 +231,11 @@ export default function DashboardAdm() {
   const escalasByDia = useMemo(() => {
     const m = new Map(); // key = dataISO -> array
     for (const e of escalas) {
-      if (!e.data || !e.funcionario_id) continue;
-      const arr = m.get(e.data) || [];
+      const dkey = normDateStr(e.data);
+      if (!dkey || !e.funcionario_id) continue;
+      const arr = m.get(dkey) || [];
       arr.push(e);
-      m.set(e.data, arr);
+      m.set(dkey, arr);
     }
     return m;
   }, [escalas]);
@@ -239,8 +245,9 @@ export default function DashboardAdm() {
     const m = new Map(); // key `${data}|${funcId}|${turno}`
     for (const a of apontamentos) {
       const funcId = a.funcionario_id ?? a.funcionarioId ?? a.funcionario;
-      if (!a.data || !funcId) continue;
-      const k = `${a.data}|${funcId}|${a.turno_ordem ?? 1}`;
+      const dkey   = normDateStr(a.data);
+      if (!dkey || !funcId) continue;
+      const k = `${dkey}|${funcId}|${a.turno_ordem ?? 1}`;
       const arr = m.get(k) || [];
       arr.push(a);
       m.set(k, arr);
@@ -248,49 +255,53 @@ export default function DashboardAdm() {
     return m;
   }, [apontamentos]);
 
-  /* ========= Cálculos de KPIs ========= */
+  /* ========= Cálculos de KPIs (por dia-alvo) ========= */
   const kpis = useMemo(() => {
-    let escalados = 0, presentes = 0, ausentes = 0, atrasos = 0, minutosTotais = 0;
+    // Dia-alvo: se hoje está na semana exibida, usar hoje; senão, usar o 1º dia da grade
+    const hojeISO = toISO(new Date());
+    const alvoISO = dias.some(d => toISO(d) === hojeISO) ? hojeISO : toISO(dias[0]);
 
-    // percorre por funcionario/dia/turno
-    for (const [dataISO, arrEsc] of escalasByDia) {
-      const vistos = new Set(); // funcionários contados no dia
-      for (const e of arrEsc) {
-        const funcId = e.funcionario_id;
-        const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
-        const key = `${dataISO}|${funcId}|${e.turno_ordem ?? 1}`;
-        const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
+    const arrEsc = escalasByDia.get(alvoISO) || [];
 
-        // Escalado
-        if (!vistos.has(funcId)) {
-          escalados++;
-          vistos.add(funcId);
+    const escaladosSet = new Set(); // por pessoa/dia
+    const presentesSet = new Set();
+    let atrasos = 0;
+    let minutosTotais = 0;
+
+    for (const e of arrEsc) {
+      const funcId = e.funcionario_id;
+      escaladosSet.add(funcId);
+
+      const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
+      const key = `${alvoISO}|${funcId}|${e.turno_ordem ?? 1}`;
+      const cons = consolidateApontamentos(apontByKey.get(key) || [], alvoISO);
+
+      if (cons?.entradaMin != null) {
+        presentesSet.add(funcId);
+
+        if (entradaEsc != null) {
+          const delta = cons.entradaMin - entradaEsc; // + => atraso
+          if (delta > 5) atrasos++; // atraso por turno
         }
 
-        // Presença/atraso
-        if (cons?.entradaMin != null) {
-          presentes++;
-          if (entradaEsc != null) {
-            const delta = cons.entradaMin - entradaEsc; // + => atrasou
-            if (delta > 5) atrasos++;
-          }
-          // horas trabalhadas (parcial se sem saída)
-          const fim = cons.saidaMin ?? cons.entradaMin;
-          const dur = Math.max(0, (fim ?? 0) - cons.entradaMin);
-          minutosTotais += dur;
-        } else {
-          ausentes++;
-        }
+        const fim = cons.saidaMin ?? cons.entradaMin;
+        const dur = Math.max(0, fim - cons.entradaMin);
+        minutosTotais += dur;
       }
     }
+
+    const escalados = escaladosSet.size;
+    const presentes = presentesSet.size;
+    const ausentes  = Math.max(0, escalados - presentes);
+
     return {
       escalados,
       presentes,
-      ausentes: Math.max(ausentes, 0),
+      ausentes,
       atrasos,
       horasTotaisFmt: minutesToHHhMM(minutosTotais),
     };
-  }, [apontByKey, escalasByDia]);
+  }, [apontByKey, escalasByDia, dias]);
 
   /* ========= Render helpers (posicionamento estilo agenda) ========= */
   const dayHeight = 1200; // px; altura “virtual” da coluna
@@ -467,23 +478,26 @@ export default function DashboardAdm() {
               {arrEsc.map((e, idx) => {
                 const func = mapFunc.get(e.funcionario_id);
                 if (!func) return null;
+
                 const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
                 const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
                 if (!cons?.entradaMin) return null;
+
                 const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
                 const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
                 const dur = (cons.saidaMin ?? cons.entradaMin) - cons.entradaMin;
+
                 const status =
                   atrasoMin == null ? "PRESENTE"
-                  : atrasoMin > 5 ? "ATRASO"
-                  : atrasoMin < -5 ? "ADIANTADO"
+                  : atrasoMin > 5   ? "ATRASO"
+                  : atrasoMin < -5  ? "ADIANTADO"
                   : "PONTUAL";
 
                 const tone =
-                  status === "ATRASO" ? "yellow"
-                  : status === "ADIANTADO" ? "blue"
-                  : status === "PONTUAL" ? "green"
-                  : "emerald";
+                  status === "ATRASO"   ? "yellow"
+                : status === "ADIANTADO" ? "blue"
+                : status === "PONTUAL"   ? "green"
+                : "emerald";
 
                 return (
                   <div
@@ -595,9 +609,9 @@ export default function DashboardAdm() {
 
       {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
 
-      {/* KPIs */}
+      {/* KPIs (dia-alvo) */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <Kpi label="Escalados (semana/dia)" value={kpis.escalados} />
+        <Kpi label="Escalados (dia)" value={kpis.escalados} />
         <Kpi label="Presentes" value={kpis.presentes} />
         <Kpi label="Ausentes" value={kpis.ausentes} />
         <Kpi label="Atrasos (turnos)" value={kpis.atrasos} />
