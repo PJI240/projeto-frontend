@@ -1153,7 +1153,7 @@ export default function DashboardAdm() {
       }}>
         <ul style={{ listStyle: "disc", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
           <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
-          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>                    
+          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada prevista na escala (tolerância de 5 minutos).</li>                    
         </ul>
       </section>
       {/* Componente de Horas Trabalhadas */}
