@@ -3,12 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-/* ====== Utils de data/hora BR ====== */
+/* ====== Utils de data/hora BR (mesmas ideias do Escalas.jsx) ====== */
 function toISO(d) {
   const yy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
+}
+function fromISO(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 function startOfWeek(d) {
   const dt = new Date(d);
@@ -42,7 +46,7 @@ function minutesToHHhMM(min) {
   return `${sign}${String(h).padStart(2, "0")}h${String(m).padStart(2, "0")}`;
 }
 
-/* ====== Config da timeline ====== */
+/* ====== Config da timeline (reutilizável) ====== */
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const CONFIG_HORARIOS = { inicio: 6, fim: 22 }; // [06:00 .. 22:00]
 
@@ -77,7 +81,6 @@ function consolidateApontamentos(items, dataISO) {
   let bestSaida = null, bestSaidaOrigem = null;
 
   for (const it of items) {
-    const origem = String(it.origem || "").toUpperCase().trim();
     const ent = it.entrada ? hhmmToMinutes(it.entrada) : null;
     const sai = it.saida ? hhmmToMinutes(it.saida) : null;
 
@@ -85,18 +88,18 @@ function consolidateApontamentos(items, dataISO) {
       if (
         bestEntrada == null ||
         ent < bestEntrada ||
-        (ent === bestEntrada && (pri[origem] || 0) > (pri[bestEntradaOrigem] || 0))
+        (ent === bestEntrada && (pri[it.origem] || 0) > (pri[bestEntradaOrigem] || 0))
       ) {
-        bestEntrada = ent; bestEntradaOrigem = origem;
+        bestEntrada = ent; bestEntradaOrigem = it.origem;
       }
     }
     if (sai != null) {
       if (
         bestSaida == null ||
         sai > bestSaida ||
-        (sai === bestSaida && (pri[origem] || 0) > (pri[bestSaidaOrigem] || 0))
+        (sai === bestSaida && (pri[it.origem] || 0) > (pri[bestSaidaOrigem] || 0))
       ) {
-        bestSaida = sai; bestSaidaOrigem = origem;
+        bestSaida = sai; bestSaidaOrigem = it.origem;
       }
     }
   }
@@ -134,7 +137,7 @@ function StatusBadge({ children, tone = "gray" }) {
   );
 }
 
-/* ====== KPIs card ====== */
+/* ====== KPIs ====== */
 const Kpi = ({ label, value, sub }) => (
   <div className="bg-white rounded-2xl shadow-sm p-4 ring-1 ring-gray-200">
     <div className="text-sm text-gray-500">{label}</div>
@@ -143,7 +146,7 @@ const Kpi = ({ label, value, sub }) => (
   </div>
 );
 
-/* ====== Página ====== */
+/* ====== Componente principal ====== */
 export default function DashboardAdm() {
   // Semana atual
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
@@ -169,24 +172,14 @@ export default function DashboardAdm() {
     try {
       const de = toISO(dias[0]);
       const ate = toISO(dias[6]);
-
-      // 1) Tenta endpoint consolidado
-      const consolidated = await api(`/api/dashboard/adm?from=${de}&to=${ate}&ativos=1`);
-      if (consolidated?.funcionarios || consolidated?.escalas || consolidated?.apontamentos) {
-        setFuncionarios(consolidated.funcionarios || []);
-        setEscalas(consolidated.escalas || []);
-        setApontamentos(consolidated.apontamentos || []);
-      } else {
-        // 2) Fallback para rotas separadas
-        const [f, e, a] = await Promise.all([
-          api(`/api/funcionarios?ativos=1`),
-          api(`/api/escalas?from=${de}&to=${ate}`),
-          api(`/api/apontamentos?from=${de}&to=${ate}`),
-        ]);
-        setFuncionarios(f.funcionarios || f || []);
-        setEscalas(e.escalas || e || []);
-        setApontamentos(a.apontamentos || a || []);
-      }
+      const [f, e, a] = await Promise.all([
+        api(`/api/funcionarios?ativos=1`),
+        api(`/api/escalas?from=${de}&to=${ate}`),
+        api(`/api/apontamentos?from=${de}&to=${ate}`),
+      ]);
+      setFuncionarios(f.funcionarios || []);
+      setEscalas(e.escalas || []);
+      setApontamentos(a.apontamentos || a || []); // aceita tanto {apontamentos:[]} quanto []
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
     } finally {
@@ -194,9 +187,11 @@ export default function DashboardAdm() {
     }
   }, [api, dias]);
 
-  useEffect(() => { carregarTudo(); }, [carregarTudo]);
+  useEffect(() => {
+    carregarTudo();
+  }, [carregarTudo]);
 
-  // Recarrega ao trocar semana (se já havia dados)
+  // Recarrega ao trocar semana
   useEffect(() => {
     if (escalas.length || apontamentos.length) carregarTudo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,8 +207,8 @@ export default function DashboardAdm() {
     return () => refreshRef.current && clearInterval(refreshRef.current);
   }, [autoRefresh, carregarTudo]);
 
-  /* ========= Índices ========= */
-  // Funcionários (id -> info + cor)
+  /* ========= Índices para render ========= */
+  // Mapa funcionarios (id -> info + cor)
   const mapFunc = useMemo(() => {
     const m = new Map();
     for (const f of funcionarios) {
@@ -227,7 +222,7 @@ export default function DashboardAdm() {
     return m;
   }, [funcionarios]);
 
-  // Escalas por dia
+  // Group escalas por dia
   const escalasByDia = useMemo(() => {
     const m = new Map(); // key = dataISO -> array
     for (const e of escalas) {
@@ -239,80 +234,66 @@ export default function DashboardAdm() {
     return m;
   }, [escalas]);
 
-  // Apontamentos por (data, func, turno) — origem normalizada
+  // Group apontamentos por (data, funcionario, turno)
   const apontByKey = useMemo(() => {
-    const m = new Map();
+    const m = new Map(); // key `${data}|${funcId}|${turno}`
     for (const a of apontamentos) {
       const funcId = a.funcionario_id ?? a.funcionarioId ?? a.funcionario;
       if (!a.data || !funcId) continue;
-      const turno = a.turno_ordem ?? 1;
-      const origem = String(a.origem || "").toUpperCase().trim();
-      const k = `${a.data}|${funcId}|${turno}`;
+      const k = `${a.data}|${funcId}|${a.turno_ordem ?? 1}`;
       const arr = m.get(k) || [];
-      arr.push({ ...a, origem });
+      arr.push(a);
       m.set(k, arr);
     }
     return m;
   }, [apontamentos]);
 
-  // Apontamentos por (data, func) — fallback quando turno não bate
-  const apontByFuncDia = useMemo(() => {
-    const m = new Map();
-    for (const a of apontamentos) {
-      const funcId = a.funcionario_id ?? a.funcionarioId ?? a.funcionario;
-      if (!a.data || !funcId) continue;
-      const origem = String(a.origem || "").toUpperCase().trim();
-      const k = `${a.data}|${funcId}`;
-      const arr = m.get(k) || [];
-      arr.push({ ...a, origem });
-      m.set(k, arr);
-    }
-    return m;
-  }, [apontamentos]);
-
-  /* ========= KPIs (somente dia atual) ========= */
-  const kpiDate = toISO(new Date());
+  /* ========= Cálculos de KPIs ========= */
   const kpis = useMemo(() => {
     let escalados = 0, presentes = 0, ausentes = 0, atrasos = 0, minutosTotais = 0;
 
-    const arrEsc = escalasByDia.get(kpiDate) || [];
-    const vistos = new Set();
+    // percorre por funcionario/dia/turno
+    for (const [dataISO, arrEsc] of escalasByDia) {
+      const vistos = new Set(); // funcionários contados no dia
+      for (const e of arrEsc) {
+        const funcId = e.funcionario_id;
+        const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
+        const key = `${dataISO}|${funcId}|${e.turno_ordem ?? 1}`;
+        const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
 
-    for (const e of arrEsc) {
-      const funcId = e.funcionario_id;
-      if (!vistos.has(funcId)) { escalados++; vistos.add(funcId); }
-
-      const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
-
-      // busca por turno; se não achar, cai no fallback por dia
-      const key = `${kpiDate}|${funcId}|${e.turno_ordem ?? 1}`;
-      let cons = consolidateApontamentos(apontByKey.get(key) || [], kpiDate);
-      if (!cons?.entradaMin) cons = consolidateApontamentos(apontByFuncDia.get(`${kpiDate}|${funcId}`) || [], kpiDate);
-
-      if (cons?.entradaMin != null) {
-        presentes++;
-        if (entradaEsc != null) {
-          const delta = cons.entradaMin - entradaEsc;
-          if (delta > 5) atrasos++;
+        // Escalado
+        if (!vistos.has(funcId)) {
+          escalados++;
+          vistos.add(funcId);
         }
-        const fim = cons.saidaMin ?? cons.entradaMin;
-        minutosTotais += Math.max(0, (fim ?? 0) - cons.entradaMin);
-      } else {
-        ausentes++;
+
+        // Presença/atraso
+        if (cons?.entradaMin != null) {
+          presentes++;
+          if (entradaEsc != null) {
+            const delta = cons.entradaMin - entradaEsc; // + => atrasou
+            if (delta > 5) atrasos++;
+          }
+          // horas trabalhadas (parcial se sem saída)
+          const fim = cons.saidaMin ?? cons.entradaMin;
+          const dur = Math.max(0, (fim ?? 0) - cons.entradaMin);
+          minutosTotais += dur;
+        } else {
+          ausentes++;
+        }
       }
     }
-
     return {
       escalados,
       presentes,
-      ausentes,
+      ausentes: Math.max(ausentes, 0),
       atrasos,
       horasTotaisFmt: minutesToHHhMM(minutosTotais),
     };
-  }, [apontByFuncDia, apontByKey, escalasByDia, kpiDate]);
+  }, [apontByKey, escalasByDia]);
 
-  /* ========= Render helpers (agenda) ========= */
-  const dayHeight = 1200; // px
+  /* ========= Render helpers (posicionamento estilo agenda) ========= */
+  const dayHeight = 1200; // px; altura “virtual” da coluna
   const minVisible = CONFIG_HORARIOS.inicio * 60;
   const maxVisible = CONFIG_HORARIOS.fim * 60;
   const minutesSpan = maxVisible - minVisible;
@@ -326,7 +307,7 @@ export default function DashboardAdm() {
     return { position: "absolute", left: 6, right: 6, top, height, borderRadius: 8 };
   }
 
-  /* ========= Grade semanal estilo Google Agenda ========= */
+  /* ========= Lista renderizada por dia ========= */
   const DiasAgenda = () => {
     return (
       <div
@@ -443,7 +424,7 @@ export default function DashboardAdm() {
                 return null;
               })()}
 
-              {/* ESCALA (contorno) */}
+              {/* Blocos de ESCALA (contornos) */}
               {arrEsc.map((e, idx) => {
                 const func = mapFunc.get(e.funcionario_id);
                 if (!func) return null;
@@ -482,17 +463,13 @@ export default function DashboardAdm() {
                 );
               })}
 
-              {/* APONTAMENTO sobre a escala (mesmo turno, com fallback por dia) */}
+              {/* Blocos de APONTAMENTO (preenchidos, por mesmo turno) */}
               {arrEsc.map((e, idx) => {
                 const func = mapFunc.get(e.funcionario_id);
                 if (!func) return null;
                 const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
-                let cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
-                if (!cons?.entradaMin) {
-                  cons = consolidateApontamentos(apontByFuncDia.get(`${dataISO}|${e.funcionario_id}`) || [], dataISO);
-                }
+                const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
                 if (!cons?.entradaMin) return null;
-
                 const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
                 const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
                 const dur = (cons.saidaMin ?? cons.entradaMin) - cons.entradaMin;
@@ -524,7 +501,15 @@ export default function DashboardAdm() {
                     }}
                     title={`Apontamento • ${func.nome} (${minutesToHHhMM(dur)}${cons.parcial ? " • em andamento" : ""})`}
                   >
-                    <div style={{ width: 8, height: 8, borderRadius: 999, background: "white", opacity: 0.9 }} />
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: "white",
+                        opacity: 0.9,
+                      }}
+                    />
                     <div style={{ fontSize: 12, fontWeight: 700 }}>{func.nome}</div>
                     <div style={{ fontSize: 11, opacity: 0.95 }}>
                       {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
@@ -542,63 +527,6 @@ export default function DashboardAdm() {
                   </div>
                 );
               })}
-
-              {/* Apontamentos SEM escala para este dia */}
-              {(() => {
-                // chaves já cobertas por escala
-                const keysComEscala = new Set(
-                  arrEsc.map(e => `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`)
-                );
-
-                const blocks = [];
-                for (const [k, itens] of apontByKey.entries()) {
-                  const [dataK, funcK, turnoK] = k.split("|");
-                  if (dataK !== dataISO) continue;
-                  if (keysComEscala.has(k)) continue;
-
-                  const cons = consolidateApontamentos(itens, dataISO);
-                  if (!cons?.entradaMin) continue;
-
-                  const func = mapFunc.get(Number(funcK));
-                  if (!func) continue;
-
-                  const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
-                  const dur = (cons.saidaMin ?? cons.entradaMin) - cons.entradaMin;
-
-                  blocks.push(
-                    <div
-                      key={`apo-sem-escala-${k}`}
-                      style={{
-                        ...style,
-                        background: func.cor,
-                        color: "white",
-                        boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 8px",
-                        opacity: cons.parcial ? 0.9 : 1,
-                      }}
-                      title={`Apontamento (sem escala) • ${func.nome} • ${minutesToHHhMM(dur)}${cons.parcial ? " • em andamento" : ""}`}
-                    >
-                      <div style={{ width: 8, height: 8, borderRadius: 999, background: "white", opacity: 0.9 }} />
-                      <div style={{ fontSize: 12, fontWeight: 700 }}>{func.nome}</div>
-                      <div style={{ fontSize: 11, opacity: 0.95 }}>
-                        {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
-                        {String(cons.entradaMin % 60).padStart(2, "0")}
-                        {" – "}
-                        {cons.saidaMin != null
-                          ? `${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}`
-                          : "em andamento"}
-                      </div>
-                      <div style={{ marginLeft: "auto" }}>
-                        <StatusBadge tone="emerald">PRESENTE</StatusBadge>
-                      </div>
-                    </div>
-                  );
-                }
-                return blocks;
-              })()}
             </div>
           );
         })}
@@ -667,9 +595,9 @@ export default function DashboardAdm() {
 
       {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
 
-      {/* KPIs (hoje) */}
+      {/* KPIs */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <Kpi label={`Escalados (${formatDateBR(new Date())})`} value={kpis.escalados} />
+        <Kpi label="Escalados (semana/dia)" value={kpis.escalados} />
         <Kpi label="Presentes" value={kpis.presentes} />
         <Kpi label="Ausentes" value={kpis.ausentes} />
         <Kpi label="Atrasos (turnos)" value={kpis.atrasos} />
@@ -687,10 +615,10 @@ export default function DashboardAdm() {
       {/* Notas */}
       <section className="text-xs text-gray-500 mt-3">
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Escala</strong> (contorno) = planejado; <strong>Apontamento</strong> (preenchido) = realizado.</li>
-          <li><strong>Atraso</strong> = entrada apontada − entrada da escala (&gt; 5 min).</li>
-          <li>Sem saída no apontamento ⇒ bloco <em>parcial</em> cresce até “agora”.</li>
-          <li>Prioridade: AJUSTE &gt; IMPORTADO &gt; APONTADO.</li>
+          <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
+          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>
+          <li>Quando não há saída no apontamento, o bloco aparece como <em>parcial</em> e cresce até a linha do tempo atual.</li>
+          <li>A prioridade de múltiplos apontamentos é AJUSTE &gt; IMPORTADO &gt; APONTADO.</li>
         </ul>
       </section>
     </>
