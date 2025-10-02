@@ -55,11 +55,21 @@ function calcularDuracao(entrada, saida) {
 const DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
-// Horários do dia (6h às 22h)
-const HORARIOS_DIA = Array.from({ length: 17 }, (_, i) => {
-  const hora = i + 6;
-  return `${hora.toString().padStart(2, '0')}:00`;
-});
+// Configuração de horários flexível
+const CONFIG_HORARIOS = {
+  inicio: 6,
+  fim: 22,
+  incremento: 1 // horas entre cada linha
+};
+
+// Função para gerar horários baseado na configuração
+function gerarHorarios() {
+  const horarios = [];
+  for (let hora = CONFIG_HORARIOS.inicio; hora <= CONFIG_HORARIOS.fim; hora += CONFIG_HORARIOS.incremento) {
+    horarios.push(`${hora.toString().padStart(2, '0')}:00`);
+  }
+  return horarios;
+}
 
 // Cores para os funcionários
 const CORES_FUNCIONARIOS = [
@@ -74,8 +84,16 @@ function getCorFuncionario(id) {
 }
 
 /* ========== Modal ========== */
-function Modal({ open, onClose, title, children, footer }) {
+function Modal({ open, onClose, title, children, footer, size = "medium" }) {
   if (!open) return null;
+  
+  const sizes = {
+    small: "min(400px, 100%)",
+    medium: "min(500px, 100%)",
+    large: "min(800px, 100%)",
+    xlarge: "min(95vw, 1200px)"
+  };
+  
   return (
     <div
       role="dialog"
@@ -96,11 +114,13 @@ function Modal({ open, onClose, title, children, footer }) {
     >
       <div
         style={{
-          width: "min(500px, 100%)",
+          width: sizes[size],
           background: "var(--panel)",
           borderRadius: "12px",
           border: "1px solid var(--border)",
           padding: 20,
+          maxHeight: "90vh",
+          overflow: "auto"
         }}
       >
         <div style={{ 
@@ -133,6 +153,107 @@ function Modal({ open, onClose, title, children, footer }) {
   );
 }
 
+/* ========== Componente Calendário Multi Seleção ========== */
+function CalendarioMultiSelecao({ datasSelecionadas, onDatasChange, mesInicial }) {
+  const [mesAtual, setMesAtual] = useState(mesInicial || new Date());
+  
+  const primeiroDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
+  const ultimoDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0);
+  const primeiroDiaGrid = new Date(primeiroDiaMes);
+  primeiroDiaGrid.setDate(primeiroDiaGrid.getDate() - (primeiroDiaMes.getDay() + 6) % 7);
+  
+  const dias = [];
+  const dataAtual = new Date(primeiroDiaGrid);
+  
+  // 6 semanas para cobrir todos os cenários
+  for (let i = 0; i < 42; i++) {
+    dias.push(new Date(dataAtual));
+    dataAtual.setDate(dataAtual.getDate() + 1);
+  }
+  
+  const toggleData = (data) => {
+    const dataISO = toISO(data);
+    const novasDatas = new Set(datasSelecionadas);
+    
+    if (novasDatas.has(dataISO)) {
+      novasDatas.delete(dataISO);
+    } else {
+      novasDatas.add(dataISO);
+    }
+    
+    onDatasChange(Array.from(novasDatas));
+  };
+  
+  const mesAnterior = () => {
+    setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1));
+  };
+  
+  const mesSeguinte = () => {
+    setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1));
+  };
+  
+  const hoje = toISO(new Date());
+  
+  return (
+    <div style={{ background: "var(--panel)", borderRadius: "8px", padding: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <button className="toggle-btn" onClick={mesAnterior}>←</button>
+        <h3 style={{ margin: 0, fontSize: "16px" }}>
+          {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+        </h3>
+        <button className="toggle-btn" onClick={mesSeguinte}>→</button>
+      </div>
+      
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", marginBottom: "8px" }}>
+        {DIAS_SEMANA_CURTO.map(dia => (
+          <div key={dia} style={{ textAlign: "center", fontSize: "12px", fontWeight: "600", padding: "8px 0" }}>
+            {dia}
+          </div>
+        ))}
+      </div>
+      
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px" }}>
+        {dias.map((dia, index) => {
+          const dataISO = toISO(dia);
+          const isMesAtual = dia.getMonth() === mesAtual.getMonth();
+          const isSelecionado = datasSelecionadas.includes(dataISO);
+          const isHoje = dataISO === hoje;
+          
+          return (
+            <button
+              key={index}
+              onClick={() => toggleData(dia)}
+              style={{
+                padding: "8px",
+                border: "none",
+                background: isSelecionado 
+                  ? "var(--primary)" 
+                  : isHoje 
+                    ? "rgba(59, 130, 246, 0.2)" 
+                    : isMesAtual 
+                      ? "var(--panel-muted)" 
+                      : "var(--panel)",
+                color: isSelecionado ? "white" : isMesAtual ? "var(--fg)" : "var(--muted)",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: isHoje ? "600" : "normal"
+              }}
+              title={dia.toLocaleDateString('pt-BR')}
+            >
+              {dia.getDate()}
+            </button>
+          );
+        })}
+      </div>
+      
+      <div style={{ marginTop: "16px", fontSize: "12px", color: "var(--muted)" }}>
+        {datasSelecionadas.length} datas selecionadas
+      </div>
+    </div>
+  );
+}
+
 /* ========== Página Escalas ========== */
 export default function Escalas() {
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
@@ -145,12 +266,24 @@ export default function Escalas() {
   const [err, setErr] = useState("");
   const [sucesso, setSucesso] = useState("");
 
-  // Estados para modal
+  // Estados para modais
   const [modalAberto, setModalAberto] = useState(false);
+  const [modalMultiploAberto, setModalMultiploAberto] = useState(false);
+  const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [editando, setEditando] = useState(null);
+  
   const [form, setForm] = useState({
     funcionario_id: "",
     data: toISO(new Date()),
+    turno_ordem: 1,
+    entrada: "",
+    saida: "",
+    origem: "FIXA",
+  });
+  
+  const [formMultiplo, setFormMultiplo] = useState({
+    funcionario_id: "",
+    datas: [],
     turno_ordem: 1,
     entrada: "",
     saida: "",
@@ -237,7 +370,7 @@ export default function Escalas() {
 
   // Recarregar quando mudar a semana
   useEffect(() => {
-    if (escalas.length > 0) { // Só recarrega se já tiver dados carregados
+    if (escalas.length > 0) {
       carregarEscalas();
     }
   }, [dataRef]);
@@ -249,51 +382,48 @@ export default function Escalas() {
 
   // Agrupar escalas por hora e dia para visualização
   const escalasAgrupadas = useMemo(() => {
-  const mapa = new Map();
+    const mapa = new Map();
 
-  escalas.forEach((escala) => {
-    // tolera diferentes formatos vindos do backend
-    const funcId =
-      escala.funcionario_id ??
-      escala.funcionarioId ??
-      escala.funcionario ??
-      null;
+    escalas.forEach((escala) => {
+      const funcId =
+        escala.funcionario_id ??
+        escala.funcionarioId ??
+        escala.funcionario ??
+        null;
 
-    const entradaStr = escala.entrada || escala.hora_entrada || null;
-    const saidaStr   = escala.saida   || escala.hora_saida   || null;
+      const entradaStr = escala.entrada || escala.hora_entrada || null;
+      const saidaStr   = escala.saida   || escala.hora_saida   || null;
 
-    if (!funcId || !entradaStr || !saidaStr) return;
+      if (!funcId || !entradaStr || !saidaStr) return;
 
-    const funcionario = funcionarios.find((f) => f.id === funcId);
-    if (!funcionario) return;
+      const funcionario = funcionarios.find((f) => f.id === funcId);
+      if (!funcionario) return;
 
-    // inclui também a “hora cheia” final se a saída tiver minutos > 0
-    const [h1, m1] = entradaStr.split(":").map(Number);
-    const [h2, m2] = saidaStr.split(":").map(Number);
+      const [h1, m1] = entradaStr.split(":").map(Number);
+      const [h2, m2] = saidaStr.split(":").map(Number);
 
-    const startHour = Number.isFinite(h1) ? h1 : 0;
-    // se saiu 18:00, último bloco é 17; se saiu 12:50, último bloco é 12
-    const endHour = Number.isFinite(h2)
-      ? (m2 === 0 ? h2 - 1 : h2)
-      : startHour;
+      const startHour = Number.isFinite(h1) ? h1 : 0;
+      const endHour = Number.isFinite(h2)
+        ? (m2 === 0 ? h2 - 1 : h2)
+        : startHour;
 
-    for (let hora = startHour; hora <= endHour; hora++) {
-      const chave = `${escala.data}|${String(hora).padStart(2, "0")}`;
-      if (!mapa.has(chave)) mapa.set(chave, []);
-      if (!mapa.get(chave).some((e) => e.id === escala.id)) {
-        mapa.get(chave).push({
-          ...escala,
-          funcionario_id: funcId,
-          funcionario_nome: funcionario.pessoa_nome,
-          cargo: funcionario.cargo_nome,
-          cor: getCorFuncionario(funcId),
-        });
+      for (let hora = startHour; hora <= endHour; hora++) {
+        const chave = `${escala.data}|${String(hora).padStart(2, "0")}`;
+        if (!mapa.has(chave)) mapa.set(chave, []);
+        if (!mapa.get(chave).some((e) => e.id === escala.id)) {
+          mapa.get(chave).push({
+            ...escala,
+            funcionario_id: funcId,
+            funcionario_nome: funcionario.pessoa_nome,
+            cargo: funcionario.cargo_nome,
+            cor: getCorFuncionario(funcId),
+          });
+        }
       }
-    }
-  });
+    });
 
-  return mapa;
-}, [escalas, funcionarios]);
+    return mapa;
+  }, [escalas, funcionarios]);
 
   // Encontrar escala em uma célula específica
   const encontrarEscalaNaCelula = (dataISO, hora) => {
@@ -314,6 +444,22 @@ export default function Escalas() {
       origem: "FIXA",
     });
     setModalAberto(true);
+  };
+
+  const abrirMultiplo = () => {
+    setFormMultiplo({
+      funcionario_id: "",
+      datas: [],
+      turno_ordem: 1,
+      entrada: "08:00",
+      saida: "17:00",
+      origem: "FIXA",
+    });
+    setModalMultiploAberto(true);
+  };
+
+  const abrirConfig = () => {
+    setModalConfigAberto(true);
   };
 
   const abrirEdicao = (escala) => {
@@ -374,11 +520,44 @@ export default function Escalas() {
       }
 
       setModalAberto(false);
-      // Recarregar os dados após salvar
       await carregarEscalas();
     } catch (e) {
       console.error('❌ Erro ao salvar escala:', e);
       setErr(e.message || "Falha ao salvar escala.");
+    }
+  };
+
+  const salvarEscalasMultiplas = async () => {
+    setErr("");
+    setSucesso("");
+    
+    try {
+      if (!formMultiplo.funcionario_id || formMultiplo.datas.length === 0) {
+        throw new Error("Selecione funcionário e pelo menos uma data.");
+      }
+
+      const promises = formMultiplo.datas.map(data => 
+        api(`/api/escalas`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            funcionario_id: Number(formMultiplo.funcionario_id),
+            data: data,
+            turno_ordem: Number(formMultiplo.turno_ordem) || 1,
+            entrada: formMultiplo.entrada || null,
+            saida: formMultiplo.saida || null,
+            origem: formMultiplo.origem || "FIXA",
+          }),
+        })
+      );
+
+      await Promise.all(promises);
+      setSucesso(`${formMultiplo.datas.length} escalas adicionadas com sucesso!`);
+      setModalMultiploAberto(false);
+      await carregarEscalas();
+    } catch (e) {
+      console.error('❌ Erro ao salvar escalas múltiplas:', e);
+      setErr(e.message || "Falha ao salvar escalas.");
     }
   };
 
@@ -399,6 +578,15 @@ export default function Escalas() {
     }
   };
 
+  const atualizarConfigHorarios = (novaConfig) => {
+    CONFIG_HORARIOS.inicio = novaConfig.inicio;
+    CONFIG_HORARIOS.fim = novaConfig.fim;
+    CONFIG_HORARIOS.incremento = novaConfig.incremento;
+    setModalConfigAberto(false);
+    // Forçar re-render
+    setDataRef(new Date(dataRef));
+  };
+
   // Handler para clique na célula
   const handleCliqueCelula = (dataISO, hora) => {
     const escalasNaCelula = encontrarEscalaNaCelula(dataISO, hora);
@@ -411,6 +599,8 @@ export default function Escalas() {
     }
   };
 
+  const HORARIOS_DIA = gerarHorarios();
+
   return (
     <>
       <header className="main-header">
@@ -418,7 +608,7 @@ export default function Escalas() {
           <h1>Escalas</h1>
           <p>Clique em qualquer horário para adicionar ou editar escalas</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="toggle-btn" onClick={semanaAnterior}>
             ← Anterior
           </button>
@@ -427,6 +617,12 @@ export default function Escalas() {
           </button>
           <button className="toggle-btn" onClick={semanaSeguinte}>
             Seguinte →
+          </button>
+          <button className="toggle-btn" onClick={abrirMultiplo}>
+            + Múltiplas Datas
+          </button>
+          <button className="toggle-btn" onClick={abrirConfig}>
+            ⚙️ Configurar
           </button>
           <button className="toggle-btn" onClick={recarregar} disabled={loading}>
             {loading ? "Atualizando..." : "Atualizar"}
@@ -477,7 +673,7 @@ export default function Escalas() {
           fontSize: "12px",
           color: "var(--muted)"
         }}>
-          📊 {funcionarios.length} funcionários • {escalas.length} escalas carregadas
+          📊 {funcionarios.length} funcionários • {escalas.length} escalas carregadas • Horários: {CONFIG_HORARIOS.inicio}h às {CONFIG_HORARIOS.fim}h
         </div>
       </div>
 
@@ -648,7 +844,7 @@ export default function Escalas() {
         </div>
       )}
 
-      {/* Modal Escala */}
+      {/* Modal Escala Simples */}
       <Modal
         open={modalAberto}
         onClose={() => setModalAberto(false)}
@@ -785,6 +981,234 @@ export default function Escalas() {
                 fontSize: "14px"
               }}
             />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Escalas Múltiplas */}
+      <Modal
+        open={modalMultiploAberto}
+        onClose={() => setModalMultiploAberto(false)}
+        title="Adicionar Escalas em Múltiplas Datas"
+        size="large"
+        footer={
+          <>
+            <button className="toggle-btn" onClick={() => setModalMultiploAberto(false)}>
+              Cancelar
+            </button>
+            <button className="toggle-btn" onClick={salvarEscalasMultiplas}>
+              Adicionar {formMultiplo.datas.length} Escalas
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+              Funcionário *
+            </label>
+            <select
+              value={formMultiplo.funcionario_id}
+              onChange={(e) => setFormMultiplo({ ...formMultiplo, funcionario_id: e.target.value })}
+              style={{ 
+                width: "100%", 
+                padding: "10px 12px", 
+                borderRadius: "6px", 
+                border: "1px solid var(--border)",
+                fontSize: "14px"
+              }}
+              required
+            >
+              <option value="">Selecione um funcionário...</option>
+              {funcionarios.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.pessoa_nome} - {f.cargo_nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+                Entrada
+              </label>
+              <input
+                type="time"
+                value={formMultiplo.entrada}
+                onChange={(e) => setFormMultiplo({ ...formMultiplo, entrada: e.target.value })}
+                style={{ 
+                  width: "100%", 
+                  padding: "10px 12px", 
+                  borderRadius: "6px", 
+                  border: "1px solid var(--border)",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+                Saída
+              </label>
+              <input
+                type="time"
+                value={formMultiplo.saida}
+                onChange={(e) => setFormMultiplo({ ...formMultiplo, saida: e.target.value })}
+                style={{ 
+                  width: "100%", 
+                  padding: "10px 12px", 
+                  borderRadius: "6px", 
+                  border: "1px solid var(--border)",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
+          </div>
+
+          {formMultiplo.entrada && formMultiplo.saida && (
+            <div style={{ 
+              padding: "12px", 
+              background: "var(--panel-muted)", 
+              borderRadius: "6px",
+              fontSize: "14px",
+              textAlign: "center",
+              border: "1px solid var(--border)"
+            }}>
+              Duração total: <strong>{calcularDuracao(formMultiplo.entrada, formMultiplo.saida)} horas</strong>
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+              Turno (ordem)
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={formMultiplo.turno_ordem}
+              onChange={(e) => setFormMultiplo({ ...formMultiplo, turno_ordem: parseInt(e.target.value) || 1 })}
+              style={{ 
+                width: "100%", 
+                padding: "10px 12px", 
+                borderRadius: "6px", 
+                border: "1px solid var(--border)",
+                fontSize: "14px"
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+              Selecionar Datas *
+            </label>
+            <CalendarioMultiSelecao
+              datasSelecionadas={formMultiplo.datas}
+              onDatasChange={(datas) => setFormMultiplo({ ...formMultiplo, datas })}
+              mesInicial={new Date()}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Configuração */}
+      <Modal
+        open={modalConfigAberto}
+        onClose={() => setModalConfigAberto(false)}
+        title="Configurar Horários de Exibição"
+        footer={
+          <>
+            <button className="toggle-btn" onClick={() => setModalConfigAberto(false)}>
+              Cancelar
+            </button>
+            <button className="toggle-btn" onClick={() => atualizarConfigHorarios({
+              inicio: 6,
+              fim: 22,
+              incremento: 1
+            })}>
+              Padrão
+            </button>
+            <button className="toggle-btn" onClick={() => atualizarConfigHorarios({
+              inicio: CONFIG_HORARIOS.inicio,
+              fim: CONFIG_HORARIOS.fim,
+              incremento: CONFIG_HORARIOS.incremento
+            })}>
+              Aplicar
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+                Hora Inicial
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="23"
+                value={CONFIG_HORARIOS.inicio}
+                onChange={(e) => CONFIG_HORARIOS.inicio = parseInt(e.target.value) || 0}
+                style={{ 
+                  width: "100%", 
+                  padding: "10px 12px", 
+                  borderRadius: "6px", 
+                  border: "1px solid var(--border)",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+                Hora Final
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                value={CONFIG_HORARIOS.fim}
+                onChange={(e) => CONFIG_HORARIOS.fim = parseInt(e.target.value) || 24}
+                style={{ 
+                  width: "100%", 
+                  padding: "10px 12px", 
+                  borderRadius: "6px", 
+                  border: "1px solid var(--border)",
+                  fontSize: "14px"
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
+              Incremento (horas entre cada linha)
+            </label>
+            <select
+              value={CONFIG_HORARIOS.incremento}
+              onChange={(e) => CONFIG_HORARIOS.incremento = parseInt(e.target.value) || 1}
+              style={{ 
+                width: "100%", 
+                padding: "10px 12px", 
+                borderRadius: "6px", 
+                border: "1px solid var(--border)",
+                fontSize: "14px"
+              }}
+            >
+              <option value="1">1 hora</option>
+              <option value="2">2 horas</option>
+              <option value="4">4 horas</option>
+            </select>
+          </div>
+
+          <div style={{ 
+            padding: "12px", 
+            background: "var(--panel-muted)", 
+            borderRadius: "6px",
+            fontSize: "14px",
+            border: "1px solid var(--border)"
+          }}>
+            <strong>Pré-visualização:</strong> Horários de {CONFIG_HORARIOS.inicio}h às {CONFIG_HORARIOS.fim}h, 
+            com intervalos de {CONFIG_HORARIOS.incremento} hora{CONFIG_HORARIOS.incremento > 1 ? 's' : ''}
           </div>
         </div>
       </Modal>
