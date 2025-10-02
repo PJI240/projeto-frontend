@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-/* ====== Utils de data/hora BR (mesmas ideias do Escalas.jsx) ====== */
+/* ====== Utils de data/hora BR ====== */
 function toISO(d) {
   const yy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -46,9 +46,9 @@ function minutesToHHhMM(min) {
   return `${sign}${String(h).padStart(2, "0")}h${String(m).padStart(2, "0")}`;
 }
 
-/* ====== Config da timeline (reutilizável) ====== */
+/* ====== Config da timeline ====== */
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-const CONFIG_HORARIOS = { inicio: 6, fim: 22 }; // [06:00 .. 22:00]
+const CONFIG_HORARIOS = { inicio: 6, fim: 22 };
 
 /* ====== Cores por funcionário ====== */
 const CORES_FUNCIONARIOS = [
@@ -71,12 +71,11 @@ const useApi = () => {
   }, []);
 };
 
-/* ====== Consolidação de apontamentos por prioridade ====== */
+/* ====== Consolidação de apontamentos ====== */
 function consolidateApontamentos(items, dataISO) {
   if (!items?.length) return null;
 
   const pri = { AJUSTE: 3, IMPORTADO: 2, APONTADO: 1 };
-  // menor entrada + maior saída (quebrando empate por prioridade)
   let bestEntrada = null, bestEntradaOrigem = null;
   let bestSaida = null, bestSaidaOrigem = null;
 
@@ -119,7 +118,7 @@ function consolidateApontamentos(items, dataISO) {
   };
 }
 
-/* ====== Badge ====== */
+/* ====== Componentes Visuais Melhorados ====== */
 function StatusBadge({ children, tone = "gray" }) {
   const map = {
     gray: "bg-gray-100 text-gray-800 ring-gray-200",
@@ -137,18 +136,40 @@ function StatusBadge({ children, tone = "gray" }) {
   );
 }
 
-/* ====== KPIs ====== */
-const Kpi = ({ label, value, sub }) => (
-  <div className="bg-white rounded-2xl shadow-sm p-4 ring-1 ring-gray-200">
-    <div className="text-sm text-gray-500">{label}</div>
-    <div className="mt-1 text-2xl font-semibold text-gray-900">{value}</div>
-    {sub ? <div className="mt-1 text-xs text-gray-500">{sub}</div> : null}
+const KpiCard = ({ label, value, sub, trend }) => (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-200 group">
+    <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <div className="text-sm font-medium text-gray-500 mb-1">{label}</div>
+        <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
+        {sub && (
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-gray-500">{sub}</div>
+            {trend && (
+              <span className={`text-xs font-medium ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {trend > 0 ? '↗' : '↘'} {Math.abs(trend)}%
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+const TimeIndicator = ({ time, isCurrent = false }) => (
+  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+    isCurrent 
+      ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+      : 'bg-gray-100 text-gray-600 border border-gray-200'
+  }`}>
+    <div className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`} />
+    {time}
   </div>
 );
 
 /* ====== Componente principal ====== */
 export default function DashboardAdm() {
-  // Semana atual
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
   const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(dataRef, i)), [dataRef]);
 
@@ -179,7 +200,7 @@ export default function DashboardAdm() {
       ]);
       setFuncionarios(f.funcionarios || []);
       setEscalas(e.escalas || []);
-      setApontamentos(a.apontamentos || a || []); // aceita tanto {apontamentos:[]} quanto []
+      setApontamentos(a.apontamentos || a || []);
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
     } finally {
@@ -191,13 +212,10 @@ export default function DashboardAdm() {
     carregarTudo();
   }, [carregarTudo]);
 
-  // Recarrega ao trocar semana
   useEffect(() => {
     if (escalas.length || apontamentos.length) carregarTudo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataRef]);
 
-  // Auto refresh 60s
   useEffect(() => {
     if (autoRefresh) {
       refreshRef.current = setInterval(() => carregarTudo(), 60000);
@@ -207,8 +225,7 @@ export default function DashboardAdm() {
     return () => refreshRef.current && clearInterval(refreshRef.current);
   }, [autoRefresh, carregarTudo]);
 
-  /* ========= Índices para render ========= */
-  // Mapa funcionarios (id -> info + cor)
+  /* ========= Processamento de dados ========= */
   const mapFunc = useMemo(() => {
     const m = new Map();
     for (const f of funcionarios) {
@@ -222,9 +239,8 @@ export default function DashboardAdm() {
     return m;
   }, [funcionarios]);
 
-  // Group escalas por dia
   const escalasByDia = useMemo(() => {
-    const m = new Map(); // key = dataISO -> array
+    const m = new Map();
     for (const e of escalas) {
       if (!e.data || !e.funcionario_id) continue;
       const arr = m.get(e.data) || [];
@@ -234,9 +250,8 @@ export default function DashboardAdm() {
     return m;
   }, [escalas]);
 
-  // Group apontamentos por (data, funcionario, turno)
   const apontByKey = useMemo(() => {
-    const m = new Map(); // key `${data}|${funcId}|${turno}`
+    const m = new Map();
     for (const a of apontamentos) {
       const funcId = a.funcionario_id ?? a.funcionarioId ?? a.funcionario;
       if (!a.data || !funcId) continue;
@@ -248,33 +263,29 @@ export default function DashboardAdm() {
     return m;
   }, [apontamentos]);
 
-  /* ========= Cálculos de KPIs ========= */
+  /* ========= KPIs ========= */
   const kpis = useMemo(() => {
     let escalados = 0, presentes = 0, ausentes = 0, atrasos = 0, minutosTotais = 0;
 
-    // percorre por funcionario/dia/turno
     for (const [dataISO, arrEsc] of escalasByDia) {
-      const vistos = new Set(); // funcionários contados no dia
+      const vistos = new Set();
       for (const e of arrEsc) {
         const funcId = e.funcionario_id;
         const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
         const key = `${dataISO}|${funcId}|${e.turno_ordem ?? 1}`;
         const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
 
-        // Escalado
         if (!vistos.has(funcId)) {
           escalados++;
           vistos.add(funcId);
         }
 
-        // Presença/atraso
         if (cons?.entradaMin != null) {
           presentes++;
           if (entradaEsc != null) {
-            const delta = cons.entradaMin - entradaEsc; // + => atrasou
+            const delta = cons.entradaMin - entradaEsc;
             if (delta > 5) atrasos++;
           }
-          // horas trabalhadas (parcial se sem saída)
           const fim = cons.saidaMin ?? cons.entradaMin;
           const dur = Math.max(0, (fim ?? 0) - cons.entradaMin);
           minutosTotais += dur;
@@ -283,6 +294,7 @@ export default function DashboardAdm() {
         }
       }
     }
+
     return {
       escalados,
       presentes,
@@ -292,8 +304,8 @@ export default function DashboardAdm() {
     };
   }, [apontByKey, escalasByDia]);
 
-  /* ========= Render helpers (posicionamento estilo agenda) ========= */
-  const dayHeight = 1200; // px; altura “virtual” da coluna
+  /* ========= Timeline Visual Melhorada ========= */
+  const dayHeight = 1200;
   const minVisible = CONFIG_HORARIOS.inicio * 60;
   const maxVisible = CONFIG_HORARIOS.fim * 60;
   const minutesSpan = maxVisible - minVisible;
@@ -304,323 +316,391 @@ export default function DashboardAdm() {
     const end = endMin != null ? Math.min(maxVisible, endMin) : null;
     const top = ((start - minVisible) / minutesSpan) * dayHeight;
     const height = end != null ? Math.max(8, ((end - start) / minutesSpan) * dayHeight) : 16;
-    return { position: "absolute", left: 6, right: 6, top, height, borderRadius: 8 };
+    return { 
+      position: "absolute", 
+      left: 8, 
+      right: 8, 
+      top, 
+      height, 
+      borderRadius: 8,
+      transition: 'all 0.2s ease-in-out'
+    };
   }
 
-  /* ========= Lista renderizada por dia ========= */
   const DiasAgenda = () => {
     return (
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "100px repeat(7, 1fr)",
-          minWidth: 1040,
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          overflow: "hidden",
-          background: "var(--panel)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
-      >
-        {/* Cabeçalho */}
-        <div
-          style={{
-            padding: "16px 12px",
-            borderBottom: "2px solid var(--border)",
-            background: "var(--panel-muted)",
-            fontWeight: 600,
-            fontSize: 14,
-          }}
-        >
-          HORA
-        </div>
-        {dias.map((dia, i) => (
-          <div
-            key={i}
-            style={{
-              padding: "12px",
-              borderBottom: "2px solid var(--border)",
-              textAlign: "center",
-              background: "var(--panel-muted)",
-            }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 14 }}>{DIAS_SEMANA_CURTO[i]}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{formatDateBR(dia)}</div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Cabeçalho da Timeline */}
+        <div className="grid grid-cols-[120px,repeat(7,1fr)] bg-gray-50 border-b border-gray-200">
+          <div className="p-4 font-semibold text-gray-700 text-sm border-r border-gray-200">
+            HORÁRIO
           </div>
-        ))}
-
-        {/* Coluna de horas com linhas */}
-        <div
-          style={{
-            position: "relative",
-            borderRight: "1px solid var(--border)",
-            background:
-              "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
-            height: dayHeight,
-          }}
-        >
-          {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => (
-            <div
-              key={idx}
-              style={{
-                position: "absolute",
-                top: (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio),
-                left: 0,
-                right: 0,
-                height: 0,
-              }}
-            >
+          {dias.map((dia, i) => {
+            const isToday = toISO(new Date()) === toISO(dia);
+            return (
               <div
-                style={{
-                  position: "absolute",
-                  top: -8,
-                  right: 8,
-                  fontSize: 12,
-                  color: "var(--muted)",
-                }}
+                key={i}
+                className={`p-4 text-center border-r border-gray-200 last:border-r-0 ${
+                  isToday ? 'bg-blue-50 border-b-2 border-b-blue-500' : ''
+                }`}
               >
-                {String(CONFIG_HORARIOS.inicio + idx).padStart(2, "0")}:00
+                <div className={`font-bold text-sm ${isToday ? 'text-blue-700' : 'text-gray-900'}`}>
+                  {DIAS_SEMANA_CURTO[i]}
+                </div>
+                <div className={`text-xs mt-1 ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>
+                  {formatDateBR(dia)}
+                </div>
+                {isToday && (
+                  <div className="mt-1">
+                    <TimeIndicator time="HOJE" isCurrent={true} />
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* 7 colunas do período */}
-        {dias.map((dia, idxDia) => {
-          const dataISO = toISO(dia);
-          const arrEsc = (escalasByDia.get(dataISO) || []).slice();
-
-          return (
-            <div
-              key={idxDia}
+        {/* Corpo da Timeline */}
+        <div className="grid grid-cols-[120px,repeat(7,1fr)] relative">
+          {/* Coluna de horas */}
+          <div className="border-r border-gray-200 relative" style={{ height: dayHeight }}>
+            {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => {
+              const hora = CONFIG_HORARIOS.inicio + idx;
+              const top = (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio);
+              
+              return (
+                <div
+                  key={idx}
+                  className="absolute right-3 text-xs text-gray-400 font-medium"
+                  style={{ top: top - 8 }}
+                >
+                  {String(hora).padStart(2, "0")}:00
+                </div>
+              );
+            })}
+            {/* Linhas de grade */}
+            <div 
+              className="absolute inset-0 pointer-events-none"
               style={{
-                position: "relative",
-                height: dayHeight,
-                borderRight: idxDia === 6 ? "none" : "1px solid var(--border)",
-                background:
-                  "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
+                background: 'repeating-linear-gradient(to bottom, transparent, transparent 59px, #f3f4f6 60px)'
               }}
-            >
-              {/* Linha “agora” */}
-              {toISO(new Date()) === dataISO && (() => {
-                const now = new Date();
-                const nowMin = now.getHours() * 60 + now.getMinutes();
-                if (nowMin >= minVisible && nowMin <= maxVisible) {
-                  const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
+            />
+          </div>
+
+          {/* Colunas dos dias */}
+          {dias.map((dia, idxDia) => {
+            const dataISO = toISO(dia);
+            const arrEsc = (escalasByDia.get(dataISO) || []).slice();
+            const isToday = toISO(new Date()) === dataISO;
+
+            return (
+              <div
+                key={idxDia}
+                className={`relative border-r border-gray-200 last:border-r-0 ${
+                  isToday ? 'bg-blue-50/30' : ''
+                }`}
+                style={{ height: dayHeight }}
+              >
+                {/* Linha do tempo atual */}
+                {isToday && (() => {
+                  const now = new Date();
+                  const nowMin = now.getHours() * 60 + now.getMinutes();
+                  if (nowMin >= minVisible && nowMin <= maxVisible) {
+                    const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
+                    return (
+                      <div
+                        className="absolute left-0 right-0 z-20"
+                        style={{ top, height: 2 }}
+                      >
+                        <div className="absolute left-0 w-2 h-2 bg-red-500 rounded-full -translate-y-1 -translate-x-1 animate-pulse" />
+                        <div className="w-full h-0.5 bg-red-500 shadow-sm" />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Linhas de grade */}
+                <div 
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: 'repeating-linear-gradient(to bottom, transparent, transparent 59px, #f3f4f6 60px)'
+                  }}
+                />
+
+                {/* Blocos de ESCALA (contornos) */}
+                {arrEsc.map((e, idx) => {
+                  const func = mapFunc.get(e.funcionario_id);
+                  if (!func) return null;
+                  const ini = hhmmToMinutes(e.entrada);
+                  const end = hhmmToMinutes(e.saida) ?? ini;
+                  const style = blockStyleByMinutes(ini, end);
+                  
                   return (
                     <div
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        top,
-                        height: 2,
-                        background: "rgba(59,130,246,0.9)",
-                        boxShadow: "0 0 0 1px rgba(59,130,246,0.4)",
-                      }}
-                    />
+                      key={`esc-${e.id}-${idx}`}
+                      style={style}
+                      className="border-2 bg-white/80 backdrop-blur-sm hover:bg-white hover:shadow-md group"
+                    >
+                      <div className="flex items-center gap-2 p-2 h-full">
+                        <div
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: func.cor }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-gray-900 truncate">
+                            {func.nome}
+                          </div>
+                          <div className="text-[10px] text-gray-500">
+                            {e.entrada || "--"} – {e.saida || "--"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   );
-                }
-                return null;
-              })()}
+                })}
 
-              {/* Blocos de ESCALA (contornos) */}
-              {arrEsc.map((e, idx) => {
-                const func = mapFunc.get(e.funcionario_id);
-                if (!func) return null;
-                const ini = hhmmToMinutes(e.entrada);
-                const end = hhmmToMinutes(e.saida) ?? ini;
-                const style = blockStyleByMinutes(ini, end);
-                return (
-                  <div
-                    key={`esc-${e.id}-${idx}`}
-                    style={{
-                      ...style,
-                      border: `2px solid ${func.cor}`,
-                      background: "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "6px 8px",
-                      gap: 8,
-                    }}
-                    title={`Escala • ${func.nome} (${e.entrada || "--"} - ${e.saida || "--"}) • Turno ${e.turno_ordem}`}
-                  >
+                {/* Blocos de APONTAMENTO (preenchidos) */}
+                {arrEsc.map((e, idx) => {
+                  const func = mapFunc.get(e.funcionario_id);
+                  if (!func) return null;
+                  const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
+                  const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
+                  if (!cons?.entradaMin) return null;
+                  
+                  const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
+                  const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
+                  const dur = (cons.saidaMin ?? cons.entradaMin) - cons.entradaMin;
+                  const status =
+                    atrasoMin == null ? "PRESENTE"
+                    : atrasoMin > 5 ? "ATRASO"
+                    : atrasoMin < -5 ? "ADIANTADO"
+                    : "PONTUAL";
+
+                  const tone =
+                    status === "ATRASO" ? "yellow"
+                    : status === "ADIANTADO" ? "blue"
+                    : status === "PONTUAL" ? "green"
+                    : "emerald";
+
+                  return (
                     <div
+                      key={`apo-${e.id}-${idx}`}
                       style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 999,
-                        background: func.cor,
+                        ...style,
+                        background: `linear-gradient(135deg, ${func.cor}, ${func.cor}dd)`,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        zIndex: 10
                       }}
-                    />
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>
-                      {func.nome}
+                      className="text-white hover:shadow-lg hover:scale-[1.02] transition-all"
+                    >
+                      <div className="flex items-center gap-2 p-2 h-full">
+                        <div className="w-2 h-2 bg-white/90 rounded-full flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold truncate">{func.nome}</div>
+                          <div className="text-[10px] opacity-90">
+                            {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
+                            {String(cons.entradaMin % 60).padStart(2, "0")}
+                            {" – "}
+                            {cons.saidaMin != null
+                              ? `${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}`
+                              : "em andamento"}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <StatusBadge tone={tone}>
+                            {status}{atrasoMin != null ? ` (${atrasoMin > 0 ? "+" : ""}${atrasoMin}m)` : ""}
+                          </StatusBadge>
+                        </div>
+                      </div>
+                      {/* Barra de progresso para turnos em andamento */}
+                      {cons.parcial && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/30 rounded-b">
+                          <div 
+                            className="h-full bg-white/50 rounded-b transition-all duration-1000"
+                            style={{ width: '75%' }} // Isso seria calculado dinamicamente
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                      {e.entrada || "--"} – {e.saida || "--"}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Blocos de APONTAMENTO (preenchidos, por mesmo turno) */}
-              {arrEsc.map((e, idx) => {
-                const func = mapFunc.get(e.funcionario_id);
-                if (!func) return null;
-                const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
-                const cons = consolidateApontamentos(apontByKey.get(key) || [], dataISO);
-                if (!cons?.entradaMin) return null;
-                const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
-                const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
-                const dur = (cons.saidaMin ?? cons.entradaMin) - cons.entradaMin;
-                const status =
-                  atrasoMin == null ? "PRESENTE"
-                  : atrasoMin > 5 ? "ATRASO"
-                  : atrasoMin < -5 ? "ADIANTADO"
-                  : "PONTUAL";
-
-                const tone =
-                  status === "ATRASO" ? "yellow"
-                  : status === "ADIANTADO" ? "blue"
-                  : status === "PONTUAL" ? "green"
-                  : "emerald";
-
-                return (
-                  <div
-                    key={`apo-${e.id}-${idx}`}
-                    style={{
-                      ...style,
-                      background: func.cor,
-                      color: "white",
-                      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 8px",
-                      opacity: cons.parcial ? 0.9 : 1,
-                    }}
-                    title={`Apontamento • ${func.nome} (${minutesToHHhMM(dur)}${cons.parcial ? " • em andamento" : ""})`}
-                  >
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 999,
-                        background: "white",
-                        opacity: 0.9,
-                      }}
-                    />
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>{func.nome}</div>
-                    <div style={{ fontSize: 11, opacity: 0.95 }}>
-                      {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
-                      {String(cons.entradaMin % 60).padStart(2, "0")}
-                      {" – "}
-                      {cons.saidaMin != null
-                        ? `${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}`
-                        : "em andamento"}
-                    </div>
-                    <div style={{ marginLeft: "auto" }}>
-                      <StatusBadge tone={tone}>
-                        {status}{atrasoMin != null ? ` (${atrasoMin > 0 ? "+" : ""}${atrasoMin}m)` : ""}
-                      </StatusBadge>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
 
-  /* ========= Legenda ========= */
   const Legenda = () => (
-    <div
-      style={{
-        display: "flex",
-        gap: 16,
-        flexWrap: "wrap",
-        padding: 16,
-        background: "var(--panel)",
-        borderRadius: 8,
-        border: "1px solid var(--border)",
-      }}
-    >
-      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--muted)" }}>Legenda:</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width: 16, height: 16, border: "2px solid var(--fg)", borderRadius: 4 }} />
-        <span style={{ fontSize: 14 }}>Escala (planejado)</span>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width: 16, height: 16, background: "var(--fg)", borderRadius: 4 }} />
-        <span style={{ fontSize: 14 }}>Apontamento (real)</span>
-      </div>
-      {funcionarios.slice(0, 12).map((f) => (
-        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 16, height: 16, background: getCorFuncionario(f.id), borderRadius: 4, border: "1px solid var(--border)" }} />
-          <span style={{ fontSize: 14 }}>{f.pessoa_nome}</span>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <h3 className="font-semibold text-gray-900 mb-4">Legenda do Sistema</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-4 h-4 border-2 border-gray-400 rounded bg-transparent" />
+          <div>
+            <div className="font-medium text-gray-900">Escala</div>
+            <div className="text-gray-500 text-xs">Planejado</div>
+          </div>
         </div>
-      ))}
-      {funcionarios.length > 12 && (
-        <div style={{ fontSize: 13, color: "var(--muted)" }}>+{funcionarios.length - 12} funcionários…</div>
-      )}
+        <div className="flex items-center gap-3">
+          <div className="w-4 h-4 rounded bg-gray-600" />
+          <div>
+            <div className="font-medium text-gray-900">Apontamento</div>
+            <div className="text-gray-500 text-xs">Realizado</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-4 h-4 border-2 border-red-500 rounded-full">
+            <div className="w-full h-full bg-red-500 rounded-full animate-pulse" />
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">Tempo Atual</div>
+            <div className="text-gray-500 text-xs">Agora</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-4 h-4 bg-blue-500 rounded" />
+          <div>
+            <div className="font-medium text-gray-900">Dia Atual</div>
+            <div className="text-gray-500 text-xs">Hoje</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Cores dos funcionários */}
+      <div className="mt-6">
+        <h4 className="font-medium text-gray-900 mb-3">Funcionários</h4>
+        <div className="flex flex-wrap gap-3">
+          {funcionarios.slice(0, 8).map((f) => (
+            <div key={f.id} className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded border border-gray-300"
+                style={{ backgroundColor: getCorFuncionario(f.id) }}
+              />
+              <span className="text-sm text-gray-700">{f.pessoa_nome}</span>
+            </div>
+          ))}
+          {funcionarios.length > 8 && (
+            <div className="text-sm text-gray-500">
+              +{funcionarios.length - 8} outros
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 
   return (
-    <>
-      <header className="main-header">
-        <div className="header-content">
-          <h1>Dashboard Administrativo</h1>
-          <p>Comparativo visual de Escala × Apontamento (semana)</p>
+    <div className="min-h-screen bg-gray-50/50 p-6">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard Administrativo</h1>
+            <p className="text-gray-600 mt-1">Comparativo visual de Escala × Apontamento</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+              <button 
+                onClick={semanaAnterior}
+                className="px-3 py-1 rounded-md hover:bg-gray-100 text-gray-600 font-medium"
+              >
+                ←
+              </button>
+              <button 
+                onClick={semanaAtual}
+                className="px-4 py-1 rounded-md bg-blue-600 text-white font-medium mx-1"
+              >
+                Hoje
+              </button>
+              <button 
+                onClick={semanaSeguinte}
+                className="px-3 py-1 rounded-md hover:bg-gray-100 text-gray-600 font-medium"
+              >
+                →
+              </button>
+            </div>
+            <button 
+              onClick={carregarTudo}
+              disabled={loading}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-gray-700 font-medium shadow-sm"
+            >
+              {loading ? '🔄 Atualizando...' : '↻ Atualizar'}
+            </button>
+            <label className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg border border-gray-300 shadow-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Auto-refresh
+            </label>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="toggle-btn" onClick={semanaAnterior}>←</button>
-          <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
-          <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
-          <button className="toggle-btn" onClick={carregarTudo} disabled={loading}>
-            {loading ? "Atualizando..." : "Atualizar"}
-          </button>
-          <label className="toggle-btn" style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-            />
-            Auto-refresh 60s
-          </label>
-        </div>
-      </header>
 
-      {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
+        {err && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {err}
+          </div>
+        )}
+      </div>
 
       {/* KPIs */}
-      <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-        <Kpi label="Escalados (semana/dia)" value={kpis.escalados} />
-        <Kpi label="Presentes" value={kpis.presentes} />
-        <Kpi label="Ausentes" value={kpis.ausentes} />
-        <Kpi label="Atrasos (turnos)" value={kpis.atrasos} />
-        <Kpi label="Horas trabalhadas" value={kpis.horasTotaisFmt} sub="Parciais contam até o momento" />
-      </section>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <KpiCard label="Escalados (semana)" value={kpis.escalados} />
+        <KpiCard label="Presentes" value={kpis.presentes} />
+        <KpiCard label="Ausentes" value={kpis.ausentes} />
+        <KpiCard label="Atrasos" value={kpis.atrasos} />
+        <KpiCard 
+          label="Horas Trabalhadas" 
+          value={kpis.horasTotaisFmt} 
+          sub="Parciais incluídas" 
+        />
+      </div>
 
-      {/* Grade estilo Google Agenda */}
-      <DiasAgenda />
+      {/* Timeline */}
+      <div className="mb-6">
+        <DiasAgenda />
+      </div>
 
       {/* Legenda */}
-      <div style={{ marginTop: 20 }}>
+      <div className="mb-6">
         <Legenda />
       </div>
 
       {/* Notas */}
-      <section className="text-xs text-gray-500 mt-3">
-        <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
-          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada da escala (&gt; 5 min).</li>
-          <li>Quando não há saída no apontamento, o bloco aparece como <em>parcial</em> e cresce até a linha do tempo atual.</li>
-          <li>A prioridade de múltiplos apontamentos é AJUSTE &gt; IMPORTADO &gt; APONTADO.</li>
-        </ul>
-      </section>
-    </>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="font-semibold text-gray-900 mb-3">Como interpretar</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+          <div>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full mt-2 flex-shrink-0" />
+                <span><strong>Escala</strong> (contorno) mostra o turno planejado</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full mt-2 flex-shrink-0" />
+                <span><strong>Apontamento</strong> (preenchido) mostra o realizado</span>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <ul className="space-y-2">
+              <li className="flex items-start gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full mt-2 flex-shrink-0" />
+                <span><strong>Linha vermelha</strong> indica o horário atual</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-1 h-1 bg-gray-400 rounded-full mt-2 flex-shrink-0" />
+                <span><strong>Cores</strong> identificam cada funcionário</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
