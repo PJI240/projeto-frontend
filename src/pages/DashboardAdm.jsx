@@ -153,7 +153,7 @@ function StatusBadge({ children, tone = "gray" }) {
 
 /* ====== KPIs ====== */
 const Kpi = ({ label, value, sub }) => (
-  <div className="stat-card" role="group" aria-label={label}>
+  <div className="stat-card">
     <div className="stat-value">{value}</div>
     <div className="stat-title">{label}</div>
     {sub ? <div className="stat-trend">{sub}</div> : null}
@@ -233,34 +233,27 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncio
   }, [funcionarios, escalasByDia, apontByKey, filtroFuncionario, periodo]);
 
   return (
-    <section
-      style={{
-        background: "var(--panel)",
-        borderRadius: "var(--radius)",
-        border: "1px solid var(--border)",
-        padding: 16,
-        marginBottom: 16
-      }}
-      aria-labelledby="titulo-horas"
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 16,
-          flexWrap: 'wrap',
-          gap: 12
-        }}
-      >
-        <h3 id="titulo-horas" style={{ margin: 0, fontSize: "clamp(var(--fs-16), 2.5vw, var(--fs-18))", color: "var(--fg)" }}>
+    <div style={{
+      background: "var(--panel)",
+      borderRadius: 8,
+      border: "1px solid var(--border)",
+      padding: 16,
+      marginBottom: 16
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+        flexWrap: 'wrap',
+        gap: 12
+      }}>
+        <h3 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
           Horas Trabalhadas
         </h3>
         
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label htmlFor="periodo" className="visually-hidden">Período</label>
           <select 
-            id="periodo"
             value={periodo}
             onChange={(e) => setPeriodo(e.target.value)}
             style={{
@@ -268,20 +261,19 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncio
               border: '1px solid var(--border)',
               borderRadius: 6,
               background: 'var(--panel)',
-              fontSize: 'var(--fs-14)',
-              color: 'var(--fg)'
+              fontSize: 14
             }}
           >
             <option value="hoje">Hoje</option>
-            <option value="semana">Esta semana</option>
-            <option value="mes">Este mês</option>
+            <option value="semana">Esta Semana</option>
+            <option value="mes">Este Mês</option>
           </select>
         </div>
       </div>
 
       {horasPorFuncionario.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>
-          Nenhum dado encontrado para o período selecionado.
+          Nenhum dado encontrado para o período selecionado
         </div>
       ) : (
         <div style={{
@@ -302,19 +294,17 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncio
                 borderRadius: 6,
                 border: '1px solid var(--border)'
               }}
-              aria-label={`Funcionário ${func.nome}`}
             >
               <div style={{ flex: 1 }}>
                 <div style={{ 
                   fontWeight: 600, 
-                  fontSize: isMobile ? 'var(--fs-14)' : '15px',
-                  marginBottom: 4,
-                  color: 'var(--fg)'
+                  fontSize: isMobile ? 14 : 15,
+                  marginBottom: 4
                 }}>
                   {func.nome}
                 </div>
                 <div style={{ 
-                  fontSize: isMobile ? '11px' : '12px', 
+                  fontSize: isMobile ? 11 : 12, 
                   color: 'var(--muted)',
                   display: 'flex',
                   gap: 12,
@@ -352,14 +342,14 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncio
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
 /* ====== Componente principal ====== */
 export default function DashboardAdm() {
   // Estado para controlar se está em mobile
-  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 900 : true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
   
   // Semana atual ou dia atual (dependendo do mobile)
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
@@ -376,16 +366,15 @@ export default function DashboardAdm() {
   const [apontamentos, setApontamentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [msg, setMsg] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const refreshRef = useRef(null);
-  const liveRef = useRef(null);
 
   // Detecta mudança de tamanho da tela
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 900);
     };
+    
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -406,28 +395,23 @@ export default function DashboardAdm() {
   const carregarTudo = useCallback(async () => {
     setLoading(true);
     setErr("");
-    setMsg("");
     try {
+      // No mobile carrega apenas +/- 1 dia do dia atual para performance
+      // No desktop carrega a semana inteira
       const de = isMobile ? toISO(addDays(diaAtual, -1)) : toISO(dias[0]);
       const ate = isMobile ? toISO(addDays(diaAtual, 1)) : toISO(dias[6]);
+      
       const q = (s) => encodeURIComponent(s);
-
       const [f, e, a] = await Promise.all([
         api(`/api/funcionarios?ativos=1`),
         api(`/api/escalas?from=${q(de)}&to=${q(ate)}&ativos=1`),
         api(`/api/apontamentos?from=${q(de)}&to=${q(ate)}&ativos=1`),
       ]);
-
       setFuncionarios(f.funcionarios || []);
       setEscalas(e.escalas || []);
       setApontamentos(Array.isArray(a) ? a : (a.apontamentos || []));
-
-      const feedback = "Dados atualizados.";
-      setMsg(feedback);
-      if (liveRef.current) liveRef.current.textContent = feedback;
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar dados.";
     } finally {
       setLoading(false);
     }
@@ -538,9 +522,9 @@ export default function DashboardAdm() {
 
   /* ========= Cálculos de KPIs ========= */
   const kpis = useMemo(() => {
-    const hojeISO = toISO(new Date());
+    // No mobile usa o dia atual, no desktop usa hoje se estiver na semana ou primeiro dia
     const alvoISO = isMobile ? toISO(diaAtual) : 
-                   (dias.some(d => toISO(d) === hojeISO) ? hojeISO : toISO(dias[0]));
+                   (dias.some(d => toISO(d) === toISO(new Date())) ? toISO(new Date()) : toISO(dias[0]));
 
     const arrEsc = escalasByDiaFiltrado.get(alvoISO) || [];
 
@@ -599,255 +583,587 @@ export default function DashboardAdm() {
     return { position: "absolute", left: 6, right: 6, top, height, borderRadius: 8 };
   }
 
-  /* ========= Timeline simplificada ========= */
-  const LinhaTempoDia = ({ data }) => {
-    const dataISO = toISO(data);
-    const escalasDia = escalasByDiaFiltrado.get(dataISO) || [];
+  /* ========= Grade da Semana (Desktop) ========= */
+  const DiasAgendaDesktop = () => {
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "100px repeat(7, 1fr)",
+          minWidth: 1040,
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          overflow: "hidden",
+          background: "var(--panel)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        }}
+      >
+        {/* Cabeçalho */}
+        <div
+          style={{
+            padding: "16px 12px",
+            borderBottom: "2px solid var(--border)",
+            background: "var(--panel-muted)",
+            fontWeight: 600,
+            fontSize: 14,
+          }}
+        >
+          HORA
+        </div>
+        {dias.map((dia, i) => (
+          <div
+            key={i}
+            style={{
+              padding: "12px",
+              borderBottom: "2px solid var(--border)",
+              textAlign: "center",
+              background: "var(--panel-muted)",
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{DIAS_SEMANA_CURTO[i]}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{formatDateBR(dia)}</div>
+          </div>
+        ))}
+
+        {/* Coluna de horas com linhas */}
+        <div
+          style={{
+            position: "relative",
+            borderRight: "1px solid var(--border)",
+            background:
+              "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
+            height: dayHeight,
+          }}
+        >
+          {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => (
+            <div
+              key={idx}
+              style={{
+                position: "absolute",
+                top: (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio),
+                left: 0,
+                right: 0,
+                height: 0,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: -8,
+                  right: 8,
+                  fontSize: 12,
+                  color: "var(--muted)",
+                }}
+              >
+                {String(CONFIG_HORARIOS.inicio + idx).padStart(2, "0")}:00
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 7 colunas do período */}
+        {dias.map((dia, idxDia) => {
+          const dataISO = toISO(dia);
+          const arrEsc = (escalasByDiaFiltrado.get(dataISO) || []).slice();
+
+          return (
+            <div
+              key={idxDia}
+              style={{
+                position: "relative",
+                height: dayHeight,
+                borderRight: idxDia === 6 ? "none" : "1px solid var(--border)",
+                background:
+                  "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
+              }}
+            >
+              {/* Linha "agora" */}
+              {toISO(new Date()) === dataISO && (() => {
+                const now = new Date();
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                if (nowMin >= minVisible && nowMin <= maxVisible) {
+                  const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
+                  return (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        top,
+                        height: 2,
+                        background: "rgba(59,130,246,0.9)",
+                        boxShadow: "0 0 0 1px rgba(59,130,246,0.4)",
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Blocos de ESCALA */}
+              {arrEsc.map((e, idx) => {
+                const func = mapFunc.get(e.funcionario_id);
+                if (!func) return null;
+                const ini = hhmmToMinutes(e.entrada);
+                const end = hhmmToMinutes(e.saida) ?? ini;
+                const style = blockStyleByMinutes(ini, end);
+                return (
+                  <div
+                    key={`esc-${e.id}-${idx}`}
+                    style={{
+                      ...style,
+                      border: `2px solid ${func.cor}`,
+                      background: "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "6px 8px",
+                      gap: 8,
+                    }}
+                    title={`Escala • ${func.nome} (${e.entrada || "--"} - ${e.saida || "--"}) • Turno ${e.turno_ordem}`}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: func.cor,
+                      }}
+                    />
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>
+                      {func.nome}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                      {e.entrada || "--"} – {e.saida || "--"}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Blocos de APONTAMENTO */}
+              {arrEsc.map((e, idx) => {
+                const func = mapFunc.get(e.funcionario_id);
+                if (!func) return null;
+
+                const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
+                const cons = consolidateApontamentos(apontByKeyFiltrado.get(key) || [], dataISO);
+                if (!cons?.entradaMin) return null;
+
+                const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
+                const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
+                const dur = (cons.saidaMin ?? cons.entradaMin) - cons.entradaMin;
+
+                const status =
+                  atrasoMin == null ? "PRESENTE"
+                  : atrasoMin > 5   ? "ATRASO"
+                  : atrasoMin < -5  ? "ADIANTADO"
+                  : "PONTUAL";
+
+                const tone =
+                  status === "ATRASO"   ? "yellow"
+                : status === "ADIANTADO" ? "blue"
+                : status === "PONTUAL"   ? "green"
+                : "emerald";
+
+                return (
+                  <div
+                    key={`apo-${e.id}-${idx}`}
+                    style={{
+                      ...style,
+                      background: func.cor,
+                      color: "white",
+                      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 8px",
+                      opacity: cons.parcial ? 0.9 : 1,
+                    }}
+                    title={`Apontamento • ${func.nome} (${minutesToHHhMM(dur)}${cons.parcial ? " • em andamento" : ""})`}
+                  >
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: "white",
+                        opacity: 0.9,
+                      }}
+                    />
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{func.nome}</div>
+                    <div style={{ fontSize: 11, opacity: 0.95 }}>
+                      {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
+                      {String(cons.entradaMin % 60).padStart(2, "0")}
+                      {" – "}
+                      {cons.saidaMin != null
+                        ? `${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}`
+                        : "em andamento"}
+                    </div>
+                    <div style={{ marginLeft: "auto" }}>
+                      <StatusBadge tone={tone}>
+                        {status}{atrasoMin != null ? ` (${atrasoMin > 0 ? "+" : ""}${atrasoMin}m)` : ""}
+                      </StatusBadge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  /* ========= Dia Único (Mobile) ========= */
+  const DiaAgendaMobile = () => {
+    const dataISO = toISO(diaAtual);
+    const arrEsc = (escalasByDiaFiltrado.get(dataISO) || []).slice();
+    const diaSemana = diaAtual.getDay();
+    const nomeDia = DIAS_SEMANA_LONGO[(diaSemana + 6) % 7]; // Ajuste para Seg=0
 
     return (
       <div
         style={{
           border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
+          borderRadius: 8,
+          overflow: "hidden",
           background: "var(--panel)",
-          padding: 12
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         }}
-        aria-label={`Agenda de ${formatDateFull(data)}`}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
-          <strong style={{ color: "var(--fg)" }}>
-            {DIAS_SEMANA_LONGO[data.getDay() === 0 ? 6 : data.getDay() - 1]} • {formatDateBR(data)}
-          </strong>
-          <span style={{ color: "var(--muted)", fontSize: "var(--fs-12)" }}>
-            {escalasDia.length} turno(s) escalado(s)
-          </span>
+        {/* Cabeçalho do dia */}
+        <div
+          style={{
+            padding: "16px",
+            borderBottom: "2px solid var(--border)",
+            background: "var(--panel-muted)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+            {nomeDia}
+          </div>
+          <div style={{ fontSize: 14, color: "var(--muted)" }}>
+            {formatDateFull(diaAtual)}
+          </div>
         </div>
 
-        {escalasDia.length === 0 ? (
-          <div style={{ color: "var(--muted)", fontSize: "var(--fs-14)" }}>Sem escalas para este dia.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {escalasDia.map((e) => {
-              const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
-              const cons = consolidateApontamentos(apontByKeyFiltrado.get(key) || [], dataISO);
-              const f = mapFunc.get(e.funcionario_id);
-              const cor = f?.cor || "var(--accent-bg)";
+        {/* Grade do dia */}
+        <div
+          style={{
+            position: "relative",
+            height: dayHeight,
+            background:
+              "repeating-linear-gradient(to bottom, transparent, transparent 39px, var(--border) 40px)",
+          }}
+        >
+          {/* Linhas de hora */}
+          {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => (
+            <div
+              key={idx}
+              style={{
+                position: "absolute",
+                top: (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio),
+                left: 0,
+                right: 0,
+                height: 0,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: -6,
+                  left: 8,
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  background: "var(--panel)",
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                }}
+              >
+                {String(CONFIG_HORARIOS.inicio + idx).padStart(2, "0")}:00
+              </div>
+            </div>
+          ))}
 
-              const entrada = e.entrada || (cons?.entradaMin != null ? `${String(Math.floor(cons.entradaMin / 60)).padStart(2,"0")}:${String(cons.entradaMin % 60).padStart(2,"0")}` : "—");
-              const saida  = e.saida  || (cons?.saidaMin   != null ? `${String(Math.floor(cons.saidaMin / 60)).padStart(2,"0")}:${String(cons.saidaMin % 60).padStart(2,"0")}`   : "—");
-
+          {/* Linha "agora" */}
+          {toISO(new Date()) === dataISO && (() => {
+            const now = new Date();
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            if (nowMin >= minVisible && nowMin <= maxVisible) {
+              const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
               return (
                 <div
-                  key={key}
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 8,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    background: "var(--panel-muted)",
-                    padding: 12
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top,
+                    height: 2,
+                    background: "rgba(59,130,246,0.9)",
+                    boxShadow: "0 0 0 1px rgba(59,130,246,0.4)",
                   }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, color: "var(--fg)" }}>
-                      {f?.nome || `#${e.funcionario_id}`} {f?.cargo ? <span style={{ color: "var(--muted)", fontWeight: 400 }}>• {f.cargo}</span> : null}
-                    </div>
-                    <div style={{ fontSize: "var(--fs-12)", color: "var(--muted)" }}>
-                      Turno {e.turno_ordem ?? 1} — {entrada} — {saida}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span
-                      aria-hidden="true"
-                      style={{ width: 12, height: 12, borderRadius: 999, background: cor, display: "inline-block" }}
-                    />
-                    {cons?.parcial ? <StatusBadge tone="yellow">Em andamento</StatusBadge> : <StatusBadge tone="green">Consolidado</StatusBadge>}
-                  </div>
-                </div>
+                />
               );
-            })}
-          </div>
-        )}
+            }
+            return null;
+          })()}
+
+          {/* Blocos de ESCALA */}
+          {arrEsc.map((e, idx) => {
+            const func = mapFunc.get(e.funcionario_id);
+            if (!func) return null;
+            const ini = hhmmToMinutes(e.entrada);
+            const end = hhmmToMinutes(e.saida) ?? ini;
+            const style = blockStyleByMinutes(ini, end);
+            return (
+              <div
+                key={`esc-mobile-${e.id}-${idx}`}
+                style={{
+                  ...style,
+                  border: `2px solid ${func.cor}`,
+                  background: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "4px 6px",
+                  gap: 6,
+                }}
+                title={`Escala • ${func.nome} (${e.entrada || "--"} - ${e.saida || "--"})`}
+              >
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: func.cor,
+                  }}
+                />
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg)" }}>
+                  {func.nome}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--muted)" }}>
+                  {e.entrada || "--"}–{e.saida || "--"}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Blocos de APONTAMENTO */}
+          {arrEsc.map((e, idx) => {
+            const func = mapFunc.get(e.funcionario_id);
+            if (!func) return null;
+
+            const key = `${dataISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
+            const cons = consolidateApontamentos(apontByKeyFiltrado.get(key) || [], dataISO);
+            if (!cons?.entradaMin) return null;
+
+            const style = blockStyleByMinutes(cons.entradaMin, cons.saidaMin);
+            const atrasoMin = e.entrada ? (cons.entradaMin - hhmmToMinutes(e.entrada)) : null;
+
+            const status =
+              atrasoMin == null ? "PRESENTE"
+              : atrasoMin > 5   ? "ATRASO"
+              : atrasoMin < -5  ? "ADIANTADO"
+              : "PONTUAL";
+
+            return (
+              <div
+                key={`apo-mobile-${e.id}-${idx}`}
+                style={{
+                  ...style,
+                  background: func.cor,
+                  color: "white",
+                  boxShadow: "0 1px 4px rgba(0,0,0,.12)",
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: "4px 6px",
+                  gap: 2,
+                  opacity: cons.parcial ? 0.9 : 1,
+                }}
+                title={`Apontamento • ${func.nome}`}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.2 }}>
+                  {func.nome}
+                </div>
+                <div style={{ fontSize: 9, opacity: 0.95, lineHeight: 1.2 }}>
+                  {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
+                  {String(cons.entradaMin % 60).padStart(2, "0")}
+                  {cons.saidaMin != null ? `–${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}` : " (andamento)"}
+                </div>
+                <div style={{ fontSize: 8, opacity: 0.9 }}>
+                  <StatusBadge tone={status === "ATRASO" ? "yellow" : status === "ADIANTADO" ? "blue" : "green"}>
+                    {status}
+                  </StatusBadge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
 
-  /* ========= Render ========= */
-  const tituloPeriodo = isMobile
-    ? `Dia ${formatDateFull(diaAtual)}`
-    : `Semana ${formatDateBR(dias[0])} — ${formatDateBR(dias[6])}`;
+  /* ========= Legenda ========= */
+  const Legenda = () => (
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        flexWrap: "wrap",
+        padding: 12,
+        background: "var(--panel)",
+        borderRadius: 8,
+        border: "1px solid var(--border)",
+        fontSize: isMobile ? 12 : 14,
+      }}
+    >
+      <div style={{ fontWeight: 600, color: "var(--muted)" }}>Legenda:</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 12, height: 12, border: "2px solid var(--fg)", borderRadius: 3 }} />
+        <span>Escala</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 12, height: 12, background: "var(--fg)", borderRadius: 3 }} />
+        <span>Apontamento</span>
+      </div>
+      {funcionariosFiltrados.slice(0, isMobile ? 6 : 12).map((f) => (
+        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ 
+            width: 12, 
+            height: 12, 
+            background: getCorFuncionario(f.id), 
+            borderRadius: 3, 
+            border: "1px solid var(--border)" 
+          }} />
+          <span style={{ fontSize: isMobile ? 11 : 13 }}>
+            {f.pessoa_nome?.split(' ')[0]}
+          </span>
+        </div>
+      ))}
+      {funcionariosFiltrados.length > (isMobile ? 6 : 12) && (
+        <div style={{ fontSize: 11, color: "var(--muted)" }}>
+          +{funcionariosFiltrados.length - (isMobile ? 6 : 12)}...
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <div className="container" role="main" aria-labelledby="titulo-pagina" style={{ paddingBlock: 16 }}>
-      {/* Live region para mensagens globais */}
-      <div ref={liveRef} id="announce" aria-live="polite" className="visually-hidden" />
-
-      {/* HEADER PADRONIZADO */}
-      <header
-        style={{
-          background: "var(--panel)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
-          padding: 16,
-          marginBottom: 16,
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: 12
-        }}
-      >
-        {/* Título e período */}
-        <div>
-          <h1 id="titulo-pagina" style={{ margin: "0 0 4px 0", fontSize: "clamp(1.5rem, 4vw, 2rem)", color: "var(--fg)" }}>
-            Administração
-          </h1>
-          <p style={{ margin: 0, color: "var(--muted)", fontSize: "clamp(var(--fs-14), 3vw, var(--fs-16))" }}>
-            {tituloPeriodo}
+    <>
+      <header className="main-header">
+        <div className="header-content">
+          <h1>Painel do Administrador</h1>
+          <p>
+            {isMobile 
+              ? "Escala × Apontamento" 
+              : "Escala × Apontamento"
+            }
           </p>
         </div>
-
-        {/* Barra de ações responsiva */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            alignItems: "center",
-            justifyContent: "flex-start"
-          }}
-          aria-label="Ações do painel"
-        >
-          {/* Filtro funcionário */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <label htmlFor="filtro-func" className="visually-hidden">Filtrar por funcionário</label>
-            <select
-              id="filtro-func"
-              value={filtroFuncionario}
-              onChange={(e) => setFiltroFuncionario(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                background: "var(--panel)",
-                color: "var(--fg)",
-                fontSize: "var(--fs-14)"
-              }}
-              aria-label="Filtrar por funcionário"
-            >
-              <option value="todos">Todos</option>
-              {funcionarios.map((f) => (
-                <option key={f.id} value={String(f.id)}>
-                  {f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Navegação por período */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+ {/* Navegação por semana/dia */}
           {isMobile ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }} aria-label="Navegação por dia">
-              <button type="button" className="toggle-btn" onClick={diaAnterior} aria-label="Dia anterior">◀</button>
-              <button type="button" className="toggle-btn" onClick={irParaHoje} aria-label="Ir para hoje">Hoje</button>
-              <button type="button" className="toggle-btn" onClick={diaSeguinte} aria-label="Dia seguinte">▶</button>
-            </div>
+            <>
+              <button className="toggle-btn" onClick={diaAnterior}>←</button>
+              <button className="toggle-btn" onClick={irParaHoje}>Hoje</button>
+              <button className="toggle-btn" onClick={diaSeguinte}>→</button>
+            </>
           ) : (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }} aria-label="Navegação por semana">
-              <button type="button" className="toggle-btn" onClick={semanaAnterior} aria-label="Semana anterior">◀</button>
-              <button type="button" className="toggle-btn" onClick={semanaAtual} aria-label="Semana atual">Essa semana</button>
-              <button type="button" className="toggle-btn" onClick={semanaSeguinte} aria-label="Próxima semana">▶</button>
-            </div>
+            <>
+              <button className="toggle-btn" onClick={semanaAnterior}>←</button>
+              <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
+              <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
+            </>
           )}
-
-          {/* Atualizar e Auto-refresh */}
-          <button
-            type="button"
-            className="toggle-btn"
-            onClick={carregarTudo}
-            disabled={loading}
-            aria-busy={loading ? "true" : "false"}
-            aria-label="Atualizar dados"
-            title="Atualizar"
-            style={{ opacity: loading ? 0.7 : 1 }}
+          
+          {/* Filtro de funcionário */}
+          <select 
+            value={filtroFuncionario}
+            onChange={(e) => setFiltroFuncionario(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              background: 'var(--panel)',
+              fontSize: 14,
+              minWidth: 150
+            }}
           >
-            {loading ? "Atualizando…" : "Atualizar"}
-          </button>
+            <option value="todos">Todos os funcionários</option>
+            {funcionarios.map(f => (
+              <option key={f.id} value={f.id}>
+                {f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}
+              </option>
+            ))}
+          </select>
 
-          <button
-            type="button"
-            onClick={() => setAutoRefresh(v => !v)}
-            className={`toggle-btn ${autoRefresh ? "is-active" : ""}`}
-            aria-pressed={autoRefresh ? "true" : "false"}
-            aria-label="Alternar atualização automática"
-            title="Auto atualização a cada 60s"
-          >
-            Auto 60s
+         
+          
+          <button className="toggle-btn" onClick={carregarTudo} disabled={loading}>
+            {loading ? "Atualizando..." : "Atualizar"}
           </button>
+          <label className="toggle-btn" style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />
+            Atualizar Automático
+          </label>
         </div>
       </header>
 
-      {/* Alertas */}
-      {err && (
-        <div
-          role="alert"
-          style={{
-            background: "#fef2f2",
-            color: "var(--error-strong)",
-            border: "1px solid #fecaca",
-            borderRadius: 8,
-            padding: "12px 16px",
-            marginBottom: 16,
-            fontSize: "var(--fs-14)",
-          }}
-        >
-          {err}
-        </div>
-      )}
-      {msg && (
-        <div
-          role="status"
-          style={{
-            background: "rgba(16,185,129,.08)",
-            color: "var(--success-strong)",
-            border: "1px solid rgba(16,185,129,.35)",
-            borderRadius: 8,
-            padding: "12px 16px",
-            marginBottom: 16,
-            fontSize: "var(--fs-14)",
-          }}
-        >
-          {msg}
-        </div>
-      )}
+      {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
 
       {/* KPIs */}
-      <section className="stats-grid" aria-label="Indicadores principais">
-        <Kpi label="Escalados (hoje)" value={kpis.escalados} />
-        <Kpi label="Presentes (hoje)" value={kpis.presentes} />
-        <Kpi label="Ausentes (hoje)" value={kpis.ausentes} />
-        <Kpi label="Atrasos (hoje)" value={kpis.atrasos} sub={`Tempo total: ${kpis.horasTotaisFmt}`} />
+      <section className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-value">{kpis.escalados}</div>
+          <div className="stat-title">Escalados (dia)</div>
+        </div>
+
+        <div className="stat-card" data-accent="success">
+          <div className="stat-value">{kpis.presentes}</div>
+          <div className="stat-title">Presentes</div>
+        </div>
+
+        <div className="stat-card" data-accent="error">
+          <div className="stat-value">{kpis.ausentes}</div>
+          <div className="stat-title">Ausentes</div>
+        </div>
+
+        <div className="stat-card" data-accent="warning">
+          <div className="stat-value">{kpis.atrasos}</div>
+          <div className="stat-title">Atrasos (turnos)</div>
+        </div>
       </section>
 
-      {/* Horas trabalhadas */}
-      <HorasTrabalhadas
+      {/* Grade agenda */}
+      {isMobile ? <DiaAgendaMobile /> : <DiasAgendaDesktop />}
+
+      {/* Legenda */}
+      <div style={{ marginTop: 16 }}>
+        <Legenda />
+      </div>
+
+      {/* Notas */}
+      <section style={{ 
+        fontSize: isMobile ? 11 : 12, 
+        color: "var(--muted)", 
+        marginTop: 12 
+      }}>
+        <ul style={{ listStyle: "disc", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+          <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
+          <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada prevista na escala (tolerância de 5 minutos).</li>                    
+        </ul>
+      </section>
+      {/* Componente de Horas Trabalhadas */}
+      <HorasTrabalhadas 
         funcionarios={funcionariosFiltrados}
         escalasByDia={escalasByDiaFiltrado}
         apontByKey={apontByKeyFiltrado}
         filtroFuncionario={filtroFuncionario}
         isMobile={isMobile}
       />
-
-      {/* Agenda / Timeline */}
-      <section aria-label="Agenda" style={{ display: "grid", gap: 12 }}>
-        {isMobile ? (
-          <LinhaTempoDia data={diaAtual} />
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 12, minWidth: 960 }}>
-            {dias.map((d) => (
-              <LinhaTempoDia key={toISO(d)} data={d} />
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
+    </>
   );
 }
