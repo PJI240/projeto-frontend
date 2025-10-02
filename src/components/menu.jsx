@@ -204,10 +204,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
             <Section
               title="Geral"
               items={[
-                { perm: PERM.DASHBOARD,       to: "/dashboard",        label: "Visão Geral",        icon: <ChartBarIcon /> },
-                { perm: PERM.DASHBOARD_FUNC,  to: "/dashboard_func",   label: "Meu Painel",         icon: <UserIcon /> },
-                // Se você quiser que o painel do admin apareça só pra admin mesmo,
-                // mantenha a perm apenas para admins no BD; aqui seguimos a permissão.
+               { perm: PERM.DASHBOARD_FUNC,  to: "/dashboard_func",   label: "Meu Painel",         icon: <UserIcon /> },
                 { perm: PERM.DASHBOARD_ADM,   to: "/dashboard_adm",    label: "Painel do Admin",    icon: <ShieldCheckIcon /> },
                 { perm: PERM.EMPRESAS,        to: "/empresas",         label: "Minha Empresa",      icon: <BuildingOfficeIcon /> },
               ]}
