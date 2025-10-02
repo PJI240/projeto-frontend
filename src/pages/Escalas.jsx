@@ -568,16 +568,6 @@ const salvarEscalasMultiplas = async () => {
   }
 };
 
-      await Promise.all(promises);
-      setSucesso(`${formMultiplo.datas.length} escalas adicionadas com sucesso!`);
-      setModalMultiploAberto(false);
-      await carregarEscalas();
-    } catch (e) {
-      console.error('❌ Erro ao salvar escalas múltiplas:', e);
-      setErr(e.message || "Falha ao salvar escalas.");
-    }
-  };
-
   const excluirEscala = async (escala) => {
     if (!confirm(`Remover escala de ${escala.funcionario_nome} no dia ${escala.data}?`)) return;
     
