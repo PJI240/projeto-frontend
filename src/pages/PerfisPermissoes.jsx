@@ -440,18 +440,18 @@ export default function PerfisPermissoes() {
                                       {itens.map((perm) => {
                                         const checked = permissoesPerfil.has(perm.id);
                                         return (
-                                          <label key={perm.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
-                                            <input
-                                              type="checkbox"
-                                              checked={checked}
-                                              onChange={() => togglePermissao(p.id, perm.id)}
-                                              style={{ marginTop: 2 }}
-                                            />
-                                            <div>
-                                              <div style={{ fontWeight: 600, color: "var(--fg)" }}>{perm.codigo}</div>
-                                              <div style={{ color: "var(--muted)", fontSize: "var(--fs-14)" }}>{perm.descricao || ""}</div>
-                                            </div>
-                                          </label>
+<div className="checkbox-field checkbox-field--compact" key={perm.id}>
+  <input
+    type="checkbox"
+    checked={checked}
+    onChange={() => togglePermissao(p.id, perm.id)}
+    id={`perm-${p.id}-${perm.id}`}
+  />
+  <label htmlFor={`perm-${p.id}-${perm.id}`}>
+    <div style={{ fontWeight: 600, color: "var(--fg)" }}>{perm.codigo}</div>
+    <div style={{ color: "var(--muted)", fontSize: "var(--fs-14)" }}>{perm.descricao || ""}</div>
+  </label>
+</div>
                                         );
                                       })}
                                     </div>
