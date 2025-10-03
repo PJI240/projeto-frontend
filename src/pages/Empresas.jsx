@@ -1,4 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+// src/pages/Empresas.jsx
+import { useEffect, useMemo, useState, useRef } from "react";
+import {
+  PlusIcon,
+  ArrowPathIcon,
+  PencilSquareIcon,
+  XMarkIcon,
+  BuildingOffice2Icon,
+  CheckIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
@@ -35,6 +45,8 @@ export default function Empresas() {
   const [editMode, setEditMode] = useState(false); // true: editando empresa existente
   const [creating, setCreating] = useState(false); // true: criando nova (dev only)
 
+  const liveRef = useRef(null);
+
   const listaFiltrada = useMemo(() => {
     const q = filtro.trim().toLowerCase();
     if (!q) return empresas;
@@ -68,12 +80,11 @@ export default function Empresas() {
       const list = li.empresas || [];
       setEmpresas(list);
 
-      // 3) decide seleção inicial (não-dev com 1 empresa já abre; dev só seleciona quando clicar)
+      // 3) decide seleção inicial
       if (!isDev(me.roles)) {
         if (list.length === 1) {
           selecionarEmpresa(list[0].id);
         } else {
-          // múltiplas: mostra seletor
           setSelectedId(null);
           setEditMode(false);
         }
@@ -81,8 +92,10 @@ export default function Empresas() {
         setSelectedId(null);
         setEditMode(false);
       }
+      if (liveRef.current) liveRef.current.textContent = "Lista de empresas atualizada.";
     } catch (e) {
       setErr(e.message || "Falha ao carregar empresas.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar empresas.";
     } finally {
       setLoading(false);
     }
@@ -116,14 +129,17 @@ export default function Empresas() {
         natureza_juridica: emp.natureza_juridica || "",
         situacao_cadastral: emp.situacao_cadastral || "",
         data_situacao: emp.data_situacao || "",
-        socios_receita: typeof emp.socios_receita === "string"
-          ? emp.socios_receita
-          : JSON.stringify(emp.socios_receita ?? []),
+        socios_receita:
+          typeof emp.socios_receita === "string"
+            ? emp.socios_receita
+            : JSON.stringify(emp.socios_receita ?? []),
         ativa: emp.ativa ? 1 : 0,
       });
       setEditMode(true);
+      if (liveRef.current) liveRef.current.textContent = "Empresa carregada para edição.";
     } catch (e) {
       setErr(e.message || "Falha ao obter empresa.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar empresa.";
     } finally {
       setLoading(false);
     }
@@ -149,6 +165,7 @@ export default function Empresas() {
       socios_receita: "[]",
       ativa: 1,
     });
+    if (liveRef.current) liveRef.current.textContent = "Criando nova empresa.";
   }
 
   async function salvar(e) {
@@ -167,7 +184,6 @@ export default function Empresas() {
 
       const payload = {
         ...form,
-        // normalizações simples
         cnpj: String(form.cnpj).replace(/\D+/g, ""),
         socios_receita: form.socios_receita, // string JSON
       };
@@ -179,44 +195,81 @@ export default function Empresas() {
       });
 
       if (creating) {
-        // após criar, recarrega lista e foca na nova
         await carregar();
         if (d?.id) selecionarEmpresa(d.id);
+        if (liveRef.current) liveRef.current.textContent = "Empresa criada.";
       } else {
-        // só recarrega dados da atual
         await selecionarEmpresa(selectedId);
+        if (liveRef.current) liveRef.current.textContent = "Empresa salva.";
       }
     } catch (e) {
       setErr(e.message || "Falha ao salvar empresa.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao salvar empresa.";
     }
   }
 
   return (
     <>
-      <header className="main-header">
-        <div className="header-content">
-          <h1>Empresas</h1>
-          <p>
+      {/* região viva para leitores de tela */}
+      <div ref={liveRef} aria-live="polite" className="visually-hidden" />
+
+      {/* HEADER NO NOVO PADRÃO */}
+      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
+        <div>
+          <h1 id="titulo-pagina" className="page-title">Empresas</h1>
+          <p className="page-subtitle">
             {isDev(roles)
               ? "Visualize e gerencie todas as empresas (desenvolvedor)."
-              : "Dados da empresa vinculada à sua sessão."}
+              : "Dados da(s) empresa(s) vinculada(s) à sua sessão."}
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="page-header__toolbar" aria-label="Ações da página">
           {isDev(roles) && (
             <>
-              <input
-                placeholder="Buscar por razão social, fantasia ou CNPJ…"
-                value={filtro}
-                onChange={(e) => setFiltro(e.target.value)}
-                style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)" }}
-              />
-              <button className="toggle-btn" onClick={novoEmpresaForm}>Nova Empresa</button>
+              {/* Barra de busca padronizada */}
+              <div className="search-bar" role="search" aria-label="Buscar empresas">
+                <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+                <label htmlFor="busca-emp" className="visually-hidden">
+                  Buscar por razão social, fantasia ou CNPJ
+                </label>
+                <input
+                  id="busca-emp"
+                  type="search"
+                  className="input input--lg"
+                  placeholder="Buscar por razão social, fantasia ou CNPJ…"
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  autoComplete="off"
+                />
+                {Boolean(filtro) && (
+                  <button
+                    type="button"
+                    className="btn btn--neutral btn--icon-only"
+                    onClick={() => setFiltro("")}
+                    aria-label="Limpar busca"
+                    title="Limpar"
+                  >
+                    <XMarkIcon className="icon" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              <button className="btn btn--success" onClick={novoEmpresaForm} aria-label="Nova empresa">
+                <PlusIcon className="icon" aria-hidden="true" />
+                <span>Nova Empresa</span>
+              </button>
             </>
           )}
-          <button className="toggle-btn" onClick={carregar} disabled={loading}>
-            {loading ? "Atualizando…" : "Atualizar"}
+          <button
+            className="btn btn--neutral"
+            onClick={carregar}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+            aria-label="Atualizar lista"
+            title="Atualizar"
+          >
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
         </div>
       </header>
@@ -227,52 +280,110 @@ export default function Empresas() {
         </div>
       )}
 
-      {/* Desenvolvedor: lista todas + clique para editar */}
+      {/* DESENVOLVEDOR: listagem completa */}
       {isDev(roles) && !creating && !editMode && (
-        <div className="stats-grid" style={{ gridTemplateColumns: "1fr" }}>
-          <div className="stat-card" style={{ padding: 0 }}>
+        <div className="listagem-container">
+          {/* Desktop/tablet: Tabela */}
+          <div className="table-wrapper table-only" role="region" aria-label="Tabela de empresas">
             {loading ? (
-              <div style={{ padding: 16, color: "var(--muted)" }}>Carregando…</div>
+              <div className="loading-message" role="status">Carregando…</div>
             ) : listaFiltrada.length === 0 ? (
-              <div style={{ padding: 16, color: "var(--muted)" }}>Nenhuma empresa encontrada.</div>
+              <div className="empty-message">Nenhuma empresa encontrada.</div>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-                    <th style={{ padding: 12 }}>Razão Social</th>
-                    <th style={{ padding: 12 }}>Nome Fantasia</th>
-                    <th style={{ padding: 12 }}>CNPJ</th>
-                    <th style={{ padding: 12, width: 150 }}>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {listaFiltrada.map((e) => (
-                    <tr key={e.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                      <td style={{ padding: 12 }}>{e.razao_social}</td>
-                      <td style={{ padding: 12 }}>{e.nome_fantasia || "—"}</td>
-                      <td style={{ padding: 12 }}>{e.cnpj}</td>
-                      <td style={{ padding: 12 }}>
-                        <button className="toggle-btn" onClick={() => selecionarEmpresa(e.id)}>
-                          Editar
-                        </button>
-                      </td>
+              <div className="stat-card" style={{ overflow: "hidden" }}>
+                <table className="pessoas-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Razão Social</th>
+                      <th scope="col">Nome Fantasia</th>
+                      <th scope="col">CNPJ</th>
+                      <th scope="col" className="actions-column">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {listaFiltrada.map((e) => (
+                      <tr key={e.id}>
+                        <td>{e.razao_social}</td>
+                        <td>{e.nome_fantasia || "—"}</td>
+                        <td>{e.cnpj}</td>
+                        <td>
+                          <div className="actions-buttons">
+                            <button
+                              className="btn btn--neutral btn--sm"
+                              onClick={() => selecionarEmpresa(e.id)}
+                              aria-label={`Editar ${e.razao_social}`}
+                            >
+                              <PencilSquareIcon className="icon" aria-hidden="true" />
+                              <span>Editar</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile: Cards */}
+          <div className="cards-wrapper cards-only" role="region" aria-label="Lista de empresas (cartões)">
+            {loading ? (
+              <div className="loading-message" role="status">Carregando…</div>
+            ) : listaFiltrada.length === 0 ? (
+              <div className="empty-message">Nenhuma empresa encontrada.</div>
+            ) : (
+              <ul className="cards-grid" aria-label="Cartões de empresas">
+                {listaFiltrada.map((e) => (
+                  <li key={e.id} className="empresa-card" aria-label={`Empresa: ${e.razao_social}`}>
+                    <div className="empresa-card__head">
+                      <div className="empresa-card__title-wrap">
+                        <BuildingOffice2Icon className="icon" aria-hidden="true" />
+                        <h3 className="empresa-card__title">{e.razao_social}</h3>
+                      </div>
+                      <div className="empresa-card__actions">
+                        <button
+                          className="btn btn--neutral btn--sm"
+                          onClick={() => selecionarEmpresa(e.id)}
+                          aria-label={`Editar ${e.razao_social}`}
+                          title="Editar"
+                        >
+                          <PencilSquareIcon className="icon" aria-hidden="true" />
+                          <span>Editar</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="empresa-card__body">
+                      <dl className="empresa-dl">
+                        <div className="empresa-dl__row">
+                          <dt>Fantasia</dt>
+                          <dd>{e.nome_fantasia || "—"}</dd>
+                        </div>
+                        <div className="empresa-dl__row">
+                          <dt>CNPJ</dt>
+                          <dd>{e.cnpj}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>
       )}
 
-      {/* Não-dev: se múltiplas empresas, permite escolher qual editar */}
+      {/* NÃO-DEV: seletor quando houver múltiplas empresas */}
       {!isDev(roles) && empresas.length > 1 && !editMode && !creating && (
-        <div className="stat-card">
+        <div className="stat-card" style={{ marginTop: 16 }}>
           <h2 className="title" style={{ margin: 0, marginBottom: 12 }}>Selecione a empresa</h2>
+          <label htmlFor="sel-emp" className="visually-hidden">Selecionar empresa</label>
           <select
+            id="sel-emp"
             value={selectedId || ""}
             onChange={(e) => selecionarEmpresa(Number(e.target.value))}
-            style={{ padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)" }}
+            className="input input--lg"
           >
             <option value="">— Selecione —</option>
             {empresas.map((e) => (
@@ -286,7 +397,8 @@ export default function Empresas() {
 
       {/* Formulário (criando ou editando) */}
       {(creating || editMode) && (
-        <div className="stat-card" style={{ marginTop: 16 }}>
+        <div className="stat-card" style={{ marginTop: 16, position: "relative" }}>
+          <div className="card-left-accent" aria-hidden="true" />
           <h2 className="title" style={{ margin: 0, marginBottom: 12 }}>
             {creating ? "Nova Empresa" : "Dados da Empresa"}
           </h2>
@@ -295,6 +407,7 @@ export default function Empresas() {
             <label htmlFor="razao_social">Razão Social</label>
             <input
               id="razao_social"
+              className="input"
               value={form.razao_social}
               onChange={(e) => setForm({ ...form, razao_social: e.target.value })}
               required
@@ -303,6 +416,7 @@ export default function Empresas() {
             <label htmlFor="nome_fantasia">Nome Fantasia</label>
             <input
               id="nome_fantasia"
+              className="input"
               value={form.nome_fantasia}
               onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })}
             />
@@ -310,14 +424,16 @@ export default function Empresas() {
             <label htmlFor="cnpj">CNPJ</label>
             <input
               id="cnpj"
+              className="input"
               value={form.cnpj}
               onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
-              disabled={!creating} // no edit, mantemos CNPJ travado
+              disabled={!creating} // no edit, CNPJ travado
             />
 
             <label htmlFor="insc_est">Inscrição Estadual</label>
             <input
               id="insc_est"
+              className="input"
               value={form.inscricao_estadual}
               onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })}
             />
@@ -326,6 +442,7 @@ export default function Empresas() {
             <input
               id="data_abertura"
               type="date"
+              className="input"
               value={form.data_abertura || ""}
               onChange={(e) => setForm({ ...form, data_abertura: e.target.value })}
             />
@@ -333,6 +450,7 @@ export default function Empresas() {
             <label htmlFor="telefone">Telefone</label>
             <input
               id="telefone"
+              className="input"
               value={form.telefone}
               onChange={(e) => setForm({ ...form, telefone: e.target.value })}
             />
@@ -341,6 +459,7 @@ export default function Empresas() {
             <input
               id="email"
               type="email"
+              className="input"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
@@ -349,6 +468,7 @@ export default function Empresas() {
             <input
               id="capital_social"
               inputMode="decimal"
+              className="input"
               value={form.capital_social}
               onChange={(e) => setForm({ ...form, capital_social: e.target.value })}
             />
@@ -356,6 +476,7 @@ export default function Empresas() {
             <label htmlFor="natureza_juridica">Natureza Jurídica</label>
             <input
               id="natureza_juridica"
+              className="input"
               value={form.natureza_juridica}
               onChange={(e) => setForm({ ...form, natureza_juridica: e.target.value })}
             />
@@ -363,6 +484,7 @@ export default function Empresas() {
             <label htmlFor="situacao_cadastral">Situação Cadastral</label>
             <input
               id="situacao_cadastral"
+              className="input"
               value={form.situacao_cadastral}
               onChange={(e) => setForm({ ...form, situacao_cadastral: e.target.value })}
             />
@@ -371,18 +493,19 @@ export default function Empresas() {
             <input
               id="data_situacao"
               type="date"
+              className="input"
               value={form.data_situacao || ""}
               onChange={(e) => setForm({ ...form, data_situacao: e.target.value })}
             />
 
-            {/* JSON de sócios (texto bruto para manter simples) */}
+            {/* JSON de sócios (texto bruto) */}
             <label htmlFor="socios_receita">Sócios (JSON Receita)</label>
             <textarea
               id="socios_receita"
+              className="input"
               rows={3}
               value={form.socios_receita}
               onChange={(e) => setForm({ ...form, socios_receita: e.target.value })}
-              style={{ padding: "12px", borderRadius: "12px", border: "1px solid var(--border)" }}
             />
 
             <label htmlFor="ativa" style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -395,25 +518,95 @@ export default function Empresas() {
               Empresa ativa
             </label>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
               <button
                 type="button"
-                className="toggle-btn"
+                className="btn btn--neutral"
                 onClick={() => {
                   setCreating(false);
                   setEditMode(false);
                   setSelectedId(null);
                 }}
               >
-                Cancelar
+                <XMarkIcon className="icon" aria-hidden="true" />
+                <span>Cancelar</span>
               </button>
-              <button type="submit" className="toggle-btn">
-                {creating ? "Criar Empresa" : "Salvar Alterações"}
+              <button type="submit" className="btn btn--primary">
+                <CheckIcon className="icon" aria-hidden="true" />
+                <span>{creating ? "Criar Empresa" : "Salvar Alterações"}</span>
               </button>
             </div>
           </form>
         </div>
       )}
+
+      {/* estilos locais específicos da página */}
+      <style jsx>{`
+        .visually-hidden {
+          position: absolute !important;
+          width: 1px; height: 1px; padding: 0; margin: -1px;
+          overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+
+        /* Alterna tabela (desktop) e cards (mobile) */
+        .table-only { display: block; }
+        .cards-only { display: none; }
+
+        @media (max-width: 768px) {
+          .table-only { display: none; }
+          .cards-only { display: block; }
+        }
+
+        /* Cards grid (mobile) */
+        .cards-grid {
+          list-style: none; padding: 0; margin: 0;
+          display: grid; grid-template-columns: 1fr; gap: 12px;
+        }
+        .empresa-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          box-shadow: var(--shadow);
+          position: relative; overflow: hidden;
+        }
+        .empresa-card::before {
+          content: "";
+          position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+          background: var(--accent-bg);
+        }
+        .empresa-card__head {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 8px; padding: 14px 14px 0 14px;
+        }
+        .empresa-card__title-wrap {
+          display: flex; align-items: center; gap: 8px;
+          color: var(--fg);
+        }
+        .empresa-card__title { margin: 0; font-size: 1rem; font-weight: 700; }
+        .empresa-card__actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .empresa-card__body { padding: 12px 14px 14px 14px; }
+        .empresa-dl { margin: 0; display: grid; gap: 8px; }
+        .empresa-dl__row {
+          display: grid; grid-template-columns: 120px 1fr; gap: 8px; align-items: baseline;
+        }
+        .empresa-dl__row dt {
+          color: var(--muted); font-weight: 600; font-size: var(--fs-12);
+        }
+        .empresa-dl__row dd { margin: 0; color: var(--fg); font-weight: 500; }
+
+        /* Borda lateral no card de formulário (coerente com o padrão) */
+        .card-left-accent {
+          position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+          background: var(--accent-bg);
+          border-top-left-radius: 12px; border-bottom-left-radius: 12px;
+        }
+
+        /* Espaços padrão (coerente: busca separada do conteúdo) */
+        .page-header { margin-bottom: 16px; }
+        .search-bar { margin-bottom: 24px; } /* gap após a busca */
+
+        /* Tabela usa estilos globais (pessoas-table) para consistência */
+      `}</style>
     </>
   );
 }
