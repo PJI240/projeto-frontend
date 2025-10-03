@@ -753,3 +753,68 @@ html[data-theme="hc"] {
 .search-bar .input:focus-visible {
   outline: none;       /* o foco visual sobe para o container */
 }
+
+/* ====== Grid e consistência visual do diálogo ====== */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;     /* mobile: 1 coluna */
+  gap: 12px;
+}
+
+/* >= 640px: duas colunas */
+@media (min-width: 640px) {
+  .form-grid { grid-template-columns: 1fr 1fr; }
+  .form-field.span-2 { grid-column: span 2; }
+}
+
+/* Field padrão */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* Inputs consistentes */
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  min-height: 44px;               /* alvo de toque acessível */
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;            /* igual ao resto do app */
+  font-size: var(--fs-16);
+  background: #fff;
+  color: #111;
+}
+
+.form-field textarea { min-height: 120px; }
+
+/* Foco acessível */
+.form-field input:focus-visible,
+.form-field select:focus-visible,
+.form-field textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Botões com respiro do conteúdo */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* No mobile, botões empilhados e larguras iguais */
+@media (max-width: 480px) {
+  .form-actions { flex-direction: column; }
+  .form-actions .btn { width: 100%; }
+}
