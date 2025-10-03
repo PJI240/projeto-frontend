@@ -373,6 +373,56 @@ body {
 }
 .form button:hover, .form button:focus-visible { filter: brightness(.92); }
 
+/* === Overrides de botões dentro de formulários (ganham do ".form button") === */
+.form .btn {
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+.form .btn--success {
+  background: var(--btn-success-bg);
+  color: #fff;
+  border-color: var(--btn-success-border);
+}
+.form .btn--success:hover,
+.form .btn--success:focus-visible {
+  background: var(--btn-success-bg-hover);
+  border-color: var(--btn-success-bg-hover);
+}
+
+.form .btn--neutral {
+  background: var(--panel);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.form .btn--neutral:hover,
+.form .btn--neutral:focus-visible {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent-strong);
+}
+
+.form .btn--danger {
+  background: var(--error-strong);
+  color: #fff;
+  border-color: var(--error-strong);
+}
+.form .btn--danger:hover,
+.form .btn--danger:focus-visible {
+  background: #7f1d1d;
+}
+
+.form .btn--primary {
+  background: var(--accent-bg);
+  color: #fff;
+  border-color: var(--accent-bg-hover);
+}
+.form .btn--primary:hover,
+.form .btn--primary:focus-visible {
+  background: var(--accent-bg-hover);
+}
+
 .links { display: flex; justify-content: space-between; font-size: var(--fs-14); }
 .links a { color: var(--accent-bg); text-decoration: none; }
 .links a:hover { color: var(--accent-bg-hover); text-decoration: underline; }
