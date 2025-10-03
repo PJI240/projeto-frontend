@@ -1,15 +1,15 @@
 // src/pages/Usuarios.jsx
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  PlusIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  ArrowPathIcon,
+  CheckIcon,
+} from "@heroicons/react/24/outline";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
-
-/* Ícones minimalistas (substituíveis por Heroicons) */
-function PlusIcon(props){ return (<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" {...props}><path d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/></svg>); }
-function TrashIcon(props){ return (<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}><path d="M6 7h12v13H6zM8 4h8l1 2H7l1-2z"/></svg>); }
-function EditIcon(props){ return (<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0L15.13 5.12l3.75 3.75 1.83-1.83z"/></svg>); }
-function RefreshIcon(props){ return (<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}><path d="M17.65 6.35A7.95 7.95 0 0012 4 8 8 0 104 12h2a6 6 0 1110.24 3.66L14 13v7h7l-2.35-2.35A7.96 7.96 0 0020 12c0-2.21-.9-4.2-2.35-5.65z"/></svg>); }
-function CheckIcon(props){ return (<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...props}><path d="M9 16.2l-3.5-3.5-1.4 1.4L9 19 20.3 7.7l-1.4-1.4z"/></svg>); }
 
 const EMPTY_FORM = {
   id: null,
@@ -23,6 +23,7 @@ const EMPTY_FORM = {
 
 export default function Usuarios() {
   const [me, setMe] = useState({ roles: [] });
+
   const [lista, setLista] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -41,14 +42,12 @@ export default function Usuarios() {
   const isDev   = me.roles?.some((r) => String(r).toLowerCase() === "desenvolvedor");
   const isAdmin = me.roles?.some((r) => String(r).toLowerCase() === "administrador");
 
-  function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   async function fetchJSON(url, init = {}) {
     const r = await fetch(url, { credentials: "include", ...init });
     const data = await r.json().catch(() => null);
-    if (!r.ok || data?.ok === false) {
-      throw new Error(data?.error || `HTTP ${r.status}`);
-    }
+    if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
     return data;
   }
 
@@ -96,11 +95,13 @@ export default function Usuarios() {
     })();
   }, []);
 
+  // Pessoas sem usuário
   const pessoasSemUsuario = useMemo(() => {
     const usedPessoaIds = new Set((lista || []).map((u) => u.pessoa_id).filter(Boolean));
     return (pessoas || []).filter((p) => !usedPessoaIds.has(p.id));
   }, [pessoas, lista]);
 
+  // Pessoas disponíveis no select (criação: sem usuário; edição: sem usuário + atual)
   const pessoasDisponiveis = useMemo(() => {
     if (!form.id) return pessoasSemUsuario;
     const atual = (pessoas || []).find((p) => p.id === Number(form.pessoa_id));
@@ -109,6 +110,7 @@ export default function Usuarios() {
     return base.sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
   }, [form.id, form.pessoa_id, pessoas, pessoasSemUsuario]);
 
+  // Filtro
   const filtrados = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return lista;
@@ -163,6 +165,7 @@ export default function Usuarios() {
       if (!String(form.nome || "").trim()) throw new Error("Informe o nome do usuário.");
       if (!String(form.email || "").trim()) throw new Error("Informe o e-mail.");
       if (!String(form.perfil_id || "").trim()) throw new Error("Selecione um perfil.");
+
       const vp = validaPerfil(form.perfil_id);
       if (!vp.ok) throw new Error(vp.error);
 
@@ -191,6 +194,7 @@ export default function Usuarios() {
           ativo: form.ativo ? 1 : 0,
         };
         if (String(form.senha || "").trim()) payload.senha = form.senha;
+
         await fetchJSON(`${API_BASE}/api/usuarios/${form.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -227,10 +231,10 @@ export default function Usuarios() {
 
   return (
     <>
-      {/* live region */}
+      {/* live region para feedbacks */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER PADRÃO */}
+      {/* HEADER PADRÃO (classes globais) */}
       <header className="main-header" role="region" aria-labelledby="titulo-pagina">
         <div className="header-content">
           <h1 id="titulo-pagina">Usuários</h1>
@@ -238,7 +242,7 @@ export default function Usuarios() {
         </div>
         <div className="header-actions">
           <button className="btn btn--primary" onClick={novo} aria-label="Criar novo usuário">
-            <PlusIcon className="icon" />
+            <PlusIcon className="icon-sm" />
             <span>Novo Usuário</span>
           </button>
           <button
@@ -249,7 +253,7 @@ export default function Usuarios() {
             aria-label="Atualizar lista de usuários"
             title="Atualizar"
           >
-            <RefreshIcon className={`icon ${loading ? "animate-spin" : ""}`} />
+            <ArrowPathIcon className={`icon-sm ${loading ? "animate-spin" : ""}`} />
             <span>{loading ? "Atualizando..." : "Atualizar"}</span>
           </button>
         </div>
@@ -257,8 +261,8 @@ export default function Usuarios() {
 
       {err && <div className="error-alert" role="alert">{err}</div>}
 
-      {/* BUSCA */}
-      <div className="search-row" style={{ marginBottom: 12 }}>
+      {/* BUSCA — usando .search-input global + gap abaixo */}
+      <div className="search-row" style={{ marginBottom: 16 }}>
         <label htmlFor="busca" className="visually-hidden">Buscar por nome, e-mail, pessoa ou perfil</label>
         <input
           id="busca"
@@ -271,9 +275,9 @@ export default function Usuarios() {
       </div>
 
       {/* LISTAGEM */}
-      <div className="stat-card list-card">
-        {/* TABELA (desktop) */}
-        <div className="table-wrapper hide-on-mobile-only">
+      <div className="stat-card" style={{ padding: 0 }}>
+        {/* Tabela (desktop) */}
+        <div className="table-wrapper desktop-only">
           {loading ? (
             <div className="loading-message" role="status">Carregando…</div>
           ) : filtrados.length === 0 ? (
@@ -301,10 +305,12 @@ export default function Usuarios() {
                     <td>
                       <div className="actions-buttons">
                         <button className="btn btn--neutral btn--sm" onClick={() => editar(u)} aria-label={`Editar ${u.nome}`}>
-                          <EditIcon className="icon" /><span>Editar</span>
+                          <PencilSquareIcon className="icon-sm" />
+                          <span>Editar</span>
                         </button>
                         <button className="btn btn--danger btn--sm" onClick={() => excluir(u)} aria-label={`Excluir ${u.nome}`}>
-                          <TrashIcon className="icon" /><span>Excluir</span>
+                          <TrashIcon className="icon-sm" />
+                          <span>Excluir</span>
                         </button>
                       </div>
                     </td>
@@ -315,7 +321,7 @@ export default function Usuarios() {
           )}
         </div>
 
-        {/* CARDS (mobile) */}
+        {/* Cards (mobile) */}
         <div className="cards-mobile">
           {loading ? (
             <div className="loading-message" role="status">Carregando…</div>
@@ -336,10 +342,12 @@ export default function Usuarios() {
                   </div>
                   <footer className="item-actions">
                     <button className="btn btn--neutral btn--sm" onClick={() => editar(u)} aria-label={`Editar ${u.nome}`}>
-                      <EditIcon className="icon" /><span>Editar</span>
+                      <PencilSquareIcon className="icon-sm" />
+                      <span>Editar</span>
                     </button>
                     <button className="btn btn--danger btn--sm" onClick={() => excluir(u)} aria-label={`Excluir ${u.nome}`}>
-                      <TrashIcon className="icon" /><span>Excluir</span>
+                      <TrashIcon className="icon-sm" />
+                      <span>Excluir</span>
                     </button>
                   </footer>
                 </article>
@@ -351,7 +359,7 @@ export default function Usuarios() {
 
       {/* FORMULÁRIO (card) */}
       {showForm && (
-        <div className="stat-card form-card" data-accent="info" style={{ borderLeft: "4px solid var(--accent-bg)", marginTop: 16 }}>
+        <div className="stat-card" data-accent="info" style={{ borderLeft: "4px solid var(--accent-bg)", marginTop: 16 }}>
           <h2 className="title" style={{ margin: 0, marginBottom: 12 }}>
             {form.id ? "Editar Usuário" : "Novo Usuário"}
           </h2>
@@ -435,7 +443,7 @@ export default function Usuarios() {
                 <span>Cancelar</span>
               </button>
               <button type="submit" className="btn btn--success" disabled={saving}>
-                <CheckIcon className="icon" />
+                <CheckIcon className="icon-sm" />
                 <span>{saving ? "Salvando..." : form.id ? "Salvar alterações" : "Criar usuário"}</span>
               </button>
             </div>
@@ -443,85 +451,57 @@ export default function Usuarios() {
         </div>
       )}
 
-      {/* estilos locais só do Usuarios (usa tokens e utilitários globais) */}
+      {/* CSS leve só para responsividade da listagem e grid do form;
+          todo o resto vem do seu global.css */}
       <style jsx>{`
-        .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-        .search-row { margin-bottom: 16px; }
-        .search-input {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          font-size: var(--fs-16);
-          background: var(--panel);
-          color: var(--fg);
-        }
-
-        .list-card { padding: 0; }
-        .table-wrapper { overflow-x: auto; }
+        /* tabela padrão aproveitando tokens globais */
         .std-table { width: 100%; border-collapse: collapse; min-width: 760px; }
         .std-table th {
-          text-align: left;
-          padding: 14px 12px;
-          border-bottom: 1px solid var(--border);
-          background: var(--panel-muted);
-          color: var(--muted);
-          font-weight: 700;
+          padding: 14px 12px; text-align: left; font-weight: 700;
+          color: var(--muted); border-bottom: 1px solid var(--border); background: var(--panel-muted);
         }
-        .std-table td {
-          padding: 14px 12px;
-          border-bottom: 1px solid var(--border);
-          vertical-align: top;
-        }
+        .std-table td { padding: 14px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
         .actions-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
-        .btn--sm { padding: 8px 10px; font-size: var(--fs-14); }
 
-        /* Cards mobile */
+        /* cards no mobile */
         .cards-mobile { display: none; }
         .cards-grid { display: grid; gap: 10px; padding: 12px; }
         .item-card {
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          background: var(--panel);
-          padding: 12px;
-          border-left: 4px solid var(--accent-bg);
+          border: 1px solid var(--border); border-radius: 12px; background: var(--panel);
+          padding: 12px; border-left: 4px solid var(--accent-bg);
         }
-        .item-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .item-title { font-size: 1rem; }
         .badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
         .badge.ok { background: rgba(16,185,129,.12); color: var(--success-strong); border-color: rgba(16,185,129,.35); }
         .badge.muted { background: var(--panel-muted); color: var(--muted); }
-        .item-body { display: grid; gap: 2px; color: var(--fg); }
+        .item-body { display: grid; gap: 2px; }
         .item-body .label { color: var(--muted); margin-right: 4px; }
         .item-actions { display: flex; gap: 6px; margin-top: 10px; }
 
-        /* Form grid */
-        .form-card .hint { color: var(--muted); }
+        /* grid do formulário */
         .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
         .form-field { display: flex; flex-direction: column; gap: 6px; }
         .form-field input, .form-field select {
-          width: 100%; min-height: 44px; padding: 10px 12px;
-          border: 1px solid var(--border); border-radius: 12px;
-          background: #fff; color: #111; font-size: var(--fs-16);
+          min-height: 44px; padding: 10px 12px; border: 1px solid var(--border);
+          border-radius: 12px; background: #fff; color: #111; font-size: var(--fs-16);
         }
         .form-field input:focus-visible, .form-field select:focus-visible {
           outline: 3px solid var(--focus); outline-offset: 2px;
         }
-        .form-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .form-field.span-2 { grid-column: span 1; }
 
-        /* Responsividade */
         @media (min-width: 768px) {
-          .hide-on-mobile-only { display: block; }
+          .desktop-only { display: block; }
           .cards-mobile { display: none; }
           .form-grid { grid-template-columns: 1fr 1fr; }
           .form-field.span-2 { grid-column: span 2; }
         }
         @media (max-width: 767px) {
-          .hide-on-mobile-only { display: none; }
+          .desktop-only { display: none; }
           .cards-mobile { display: block; }
           .item-actions .btn { width: 100%; }
-          .form-actions { flex-direction: column; }
+          .form-actions { flex-direction: column; gap: 10px; }
           .form-actions .btn { width: 100%; }
         }
       `}</style>
