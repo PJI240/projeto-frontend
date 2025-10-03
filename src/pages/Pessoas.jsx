@@ -420,7 +420,9 @@ export default function Pessoas() {
       {/* estilos locais — só o que é específico desta página */}
       <style jsx>{`
         .listagem-container { width: 100%; }
-
+.search-container {
+  margin-bottom: 16px;
+}
         /* Tabela (desktop) e Cards (mobile) alternados por CSS */
         .table-only { display: block; }
         .cards-only { display: none; }
