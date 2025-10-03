@@ -161,7 +161,21 @@ export default function PerfisPermissoes() {
     }
   }
 
-  // CRUD Perfil (mesma lógica)
+  async function excluirPerfil(perfil) {
+    if (!confirm(`Deseja realmente excluir o perfil "${perfil.nome}"?`)) return;
+    setErr("");
+    try {
+      await fetchJson(`${API_BASE}/api/perfis/${perfil.id}`, { method: "DELETE" });
+      setSuccess("Perfil excluído com sucesso.");
+      await carregarPerfis();
+      if (liveRef.current) liveRef.current.textContent = "Perfil excluído.";
+    } catch (e) {
+      setErr(e.message || "Falha ao excluir perfil.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao excluir perfil.";
+    }
+  }
+
+  // CRUD Perfil
   function abrirNovo() { setErr(""); setSuccess(""); setEditId(null); setForm({ nome: "", ativo: 1 }); setShowForm(true); }
   function abrirEdicao(p) { setErr(""); setSuccess(""); setEditId(p.id); setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 }); setShowForm(true); }
   function fecharForm() { setShowForm(false); }
@@ -221,10 +235,10 @@ export default function PerfisPermissoes() {
       {/* região viva */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER */}
-      <header className="page-header" role="region" aria-labelledby="ttl">
+      {/* HEADER - Padrão igual Pessoas */}
+      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
         <div>
-          <h1 id="ttl" className="page-title">Perfis e Permissões</h1>
+          <h1 id="titulo-pagina" className="page-title">Perfis e Permissões</h1>
           <p className="page-subtitle">Gerencie perfis de acesso e suas permissões no sistema.</p>
         </div>
         <div className="page-header__toolbar" aria-label="Ações da página">
@@ -257,17 +271,21 @@ export default function PerfisPermissoes() {
 
       {err && <div className="error-alert" role="alert">{err}</div>}
       {Boolean(success) && (
-        <div className="stat-card" data-accent="success" role="status" style={{ marginBottom: 16 }}>
+        <div className="stat-card" data-accent="success" role="status" style={{ marginBottom: '16px' }}>
           {success}
         </div>
       )}
 
-      {/* LISTA EM CARDS */}
-      <div className="stats-grid" style={{ gridTemplateColumns: "1fr" }}>
+      {/* LISTA EM CARDS - Reaproveitando stats-grid */}
+      <div className="stats-grid" style={{ gridTemplateColumns: "1fr", gap: '16px' }}>
         {loading ? (
-          <div className="stat-card"><span className="spinner" aria-hidden="true" /> Carregando…</div>
+          <div className="stat-card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <span className="spinner" aria-hidden="true" /> Carregando…
+          </div>
         ) : perfis.length === 0 ? (
-          <div className="stat-card">Nenhum perfil encontrado.</div>
+          <div className="stat-card" style={{ textAlign: 'center', padding: '3rem' }}>
+            Nenhum perfil encontrado.
+          </div>
         ) : (
           perfis.map((p) => {
             const isAdmin = String(p.nome || "").trim().toLowerCase() === "administrador";
@@ -278,119 +296,122 @@ export default function PerfisPermissoes() {
 
             return (
               <section key={p.id} className="stat-card" aria-label={`Perfil ${p.nome}`}>
-                {/* Cabeçalho do card */}
-                <div className="stat-header" style={{ alignItems: "center" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <h3 className="title" style={{ margin: 0, fontSize: "1.375rem" }}>{p.nome}</h3>
+                {/* Cabeçalho do card - usando stat-header */}
+                <div className="stat-header" style={{ alignItems: "center", cursor: 'pointer' }} onClick={() => toggleExpansaoPerfil(p.id)}>
+                  <div style={{ display: "flex", alignItems: "center", gap: '12px', minWidth: 0, flex: 1 }}>
+                    <h3 style={{ margin: 0, fontSize: "1.25rem", color: 'var(--fg)' }}>{p.nome}</h3>
                     {isAdmin && (
-                      <span className="btn btn--ghost btn--sm" title="Perfil base com todas as permissões">
+                      <span className="btn btn--ghost btn--sm" style={{ pointerEvents: 'none' }}>
                         <ShieldCheckIcon className="icon" aria-hidden="true" />
-                        base
+                        Administrador
                       </span>
                     )}
-                  </div>
-
-                  {/* Ações (toolbar) */}
-                  <div className="page-header__toolbar card-toolbar">
-                    <span className="btn btn--ghost btn--sm" aria-label={`Status: ${p.ativo ? "Ativo" : "Inativo"}`}>
+                    <span className="btn btn--ghost btn--sm" style={{ pointerEvents: 'none' }}>
                       {p.ativo ? "Ativo" : "Inativo"}
                     </span>
+                  </div>
 
-                    <button className="btn btn--neutral btn--sm" onClick={() => abrirEdicao(p)} aria-label={`Editar ${p.nome}`}>
+                  <div style={{ display: "flex", alignItems: "center", gap: '8px' }}>
+                    <button 
+                      className="btn btn--neutral btn--sm" 
+                      onClick={(e) => { e.stopPropagation(); abrirEdicao(p); }}
+                      aria-label={`Editar ${p.nome}`}
+                    >
                       <CheckIcon className="icon" aria-hidden="true" />
                       <span>Editar</span>
                     </button>
 
                     <button
                       className="btn btn--neutral btn--sm"
-                      onClick={() => toggleExpansaoPerfil(p.id)}
+                      onClick={(e) => { e.stopPropagation(); toggleExpansaoPerfil(p.id); }}
                       aria-label={expandido ? `Ocultar permissões de ${p.nome}` : `Mostrar permissões de ${p.nome}`}
                       disabled={carregandoPerms}
                     >
                       {expandido ? <ChevronUpIcon className="icon" aria-hidden="true" /> : <ChevronDownIcon className="icon" aria-hidden="true" />}
-                      <span>Atribuições</span>
+                      <span>Permissões</span>
                     </button>
 
-                    <button
-                      className="btn btn--danger btn--sm"
-                      onClick={() => excluirPerfil(p)}
-                      aria-label={`Excluir perfil ${p.nome}`}
-                      disabled={isAdmin}
-                    >
-                      <XMarkIcon className="icon" aria-hidden="true" />
-                      <span>Excluir</span>
-                    </button>
+                    {!isAdmin && (
+                      <button
+                        className="btn btn--danger btn--sm"
+                        onClick={(e) => { e.stopPropagation(); excluirPerfil(p); }}
+                        aria-label={`Excluir perfil ${p.nome}`}
+                      >
+                        <XMarkIcon className="icon" aria-hidden="true" />
+                        <span>Excluir</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {/* Painel expandido (permissões) */}
                 {expandido && (
-                  <>
-                    {isAdmin && (
-                      <div className="action-card" style={{ alignItems: "flex-start" }}>
-                        <strong>Administrador:</strong>&nbsp;possui todas as permissões automaticamente.
-                      </div>
-                    )}
-
-                    {!isAdmin && (
-                      <div className="page-header__toolbar card-toolbar" style={{ marginBottom: 12 }}>
-                        <button className="btn btn--neutral btn--sm" onClick={() => marcarTodasPermissoes(p.id, true)} disabled={salvandoPerms}>
-                          Marcar Todas
-                        </button>
-                        <button className="btn btn--neutral btn--sm" onClick={() => marcarTodasPermissoes(p.id, false)} disabled={salvandoPerms}>
-                          Limpar Todas
-                        </button>
-                        <button className="btn btn--success btn--sm" onClick={() => salvarPermissoes(p.id)} disabled={salvandoPerms}>
-                          <CheckIcon className="icon" aria-hidden="true" />
-                          <span>{salvandoPerms ? "Salvando…" : "Salvar Permissões"}</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {carregandoPerms ? (
-                      <div className="btn btn--ghost btn--sm">
-                        <span className="spinner" aria-hidden="true" /> Carregando permissões…
+                  <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                    {isAdmin ? (
+                      <div className="action-card" style={{ textAlign: 'left', alignItems: 'flex-start' }}>
+                        <strong>Administrador:</strong> possui todas as permissões automaticamente.
                       </div>
                     ) : (
-                      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-                        {Array.from(gruposPermissoes.keys()).map((escopo) => {
-                          const itens = gruposPermissoes.get(escopo) || [];
-                          const total = itens.length;
-                          const marcadas = itens.filter(perm => permissoesPerfil.has(perm.id)).length;
+                      <>
+                        <div className="page-header__toolbar" style={{ marginBottom: '16px' }}>
+                          <button className="btn btn--neutral btn--sm" onClick={() => marcarTodasPermissoes(p.id, true)} disabled={salvandoPerms}>
+                            Marcar Todas
+                          </button>
+                          <button className="btn btn--neutral btn--sm" onClick={() => marcarTodasPermissoes(p.id, false)} disabled={salvandoPerms}>
+                            Limpar Todas
+                          </button>
+                          <button className="btn btn--success btn--sm" onClick={() => salvarPermissoes(p.id)} disabled={salvandoPerms}>
+                            {salvandoPerms ? <span className="spinner" aria-hidden="true" /> : <CheckIcon className="icon" aria-hidden="true" />}
+                            <span>{salvandoPerms ? "Salvando…" : "Salvar Permissões"}</span>
+                          </button>
+                        </div>
 
-                          return (
-                            <div key={escopo} className="stat-card" data-accent="info" aria-label={`Escopo ${escopo}`}>
-                              <div className="stat-header">
-                                <h4 className="title" style={{ margin: 0, textTransform: "capitalize" }}>
-                                  {escopo} ({marcadas}/{total})
-                                </h4>
-                              </div>
+                        {carregandoPerms ? (
+                          <div style={{ textAlign: 'center', padding: '2rem' }}>
+                            <span className="spinner" aria-hidden="true" /> Carregando permissões…
+                          </div>
+                        ) : (
+                          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: '12px' }}>
+                            {Array.from(gruposPermissoes.keys()).map((escopo) => {
+                              const itens = gruposPermissoes.get(escopo) || [];
+                              const total = itens.length;
+                              const marcadas = itens.filter(perm => permissoesPerfil.has(perm.id)).length;
 
-                              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
-                                {itens.map((perm) => {
-                                  const checked = permissoesPerfil.has(perm.id);
-                                  return (
-                                    <li key={perm.id}>
-                                      <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                        <input
-                                          type="checkbox"
-                                          checked={checked}
-                                          onChange={() => togglePermissao(p.id, perm.id)}
-                                          aria-checked={checked ? "true" : "false"}
-                                        />
-                                        <strong>{perm.codigo}</strong>
-                                        <span style={{ color: "var(--muted)" }}>{perm.descricao || ""}</span>
-                                      </label>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-                          );
-                        })}
-                      </div>
+                              return (
+                                <div key={escopo} className="stat-card" data-accent="info" style={{ padding: '16px' }}>
+                                  <div className="stat-header" style={{ marginBottom: '12px' }}>
+                                    <h4 style={{ margin: 0, textTransform: "capitalize" }}>
+                                      {escopo} <small>({marcadas}/{total})</small>
+                                    </h4>
+                                  </div>
+
+                                  <div style={{ display: 'grid', gap: '8px' }}>
+                                    {itens.map((perm) => {
+                                      const checked = permissoesPerfil.has(perm.id);
+                                      return (
+                                        <label key={perm.id} style={{ display: "flex", alignItems: "flex-start", gap: '8px', padding: '8px', borderRadius: '6px', cursor: 'pointer' }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => togglePermissao(p.id, perm.id)}
+                                            style={{ marginTop: '2px' }}
+                                          />
+                                          <div>
+                                            <div style={{ fontWeight: '600', color: 'var(--fg)' }}>{perm.codigo}</div>
+                                            <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-14)' }}>{perm.descricao || ""}</div>
+                                          </div>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
-                  </>
+                  </div>
                 )}
               </section>
             );
@@ -398,7 +419,7 @@ export default function PerfisPermissoes() {
         )}
       </div>
 
-      {/* DIALOG: CRIAR/EDITAR PERFIL */}
+      {/* DIALOG: CRIAR/EDITAR PERFIL - Reaproveitando form-overlay padrão */}
       {showForm && (
         <div className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-form" onKeyDown={onOverlayKeyDown}>
           <div className="form-container">
@@ -411,7 +432,7 @@ export default function PerfisPermissoes() {
 
             <form className="form" onSubmit={salvarPerfil}>
               <div className="form-grid">
-                <div className="form-field">
+                <div className="form-field span-2">
                   <label htmlFor="pf_nome">Nome do Perfil</label>
                   <input
                     id="pf_nome"
@@ -422,14 +443,15 @@ export default function PerfisPermissoes() {
                   />
                 </div>
 
-                <div className="form-field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="form-field" style={{ display: "flex", alignItems: "center", gap: '8px', padding: '8px 0' }}>
                   <input
                     id="pf_ativo"
                     type="checkbox"
                     checked={!!form.ativo}
                     onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked ? 1 : 0 }))}
+                    style={{ width: '16px', height: '16px' }}
                   />
-                  <label htmlFor="pf_ativo">Ativo</label>
+                  <label htmlFor="pf_ativo" style={{ margin: 0 }}>Perfil ativo</label>
                 </div>
               </div>
 
@@ -438,49 +460,15 @@ export default function PerfisPermissoes() {
                   <XMarkIcon className="icon" aria-hidden="true" />
                   <span>Cancelar</span>
                 </button>
-                <button type="submit" className="btn btn--success">
-                  <CheckIcon className="icon" aria-hidden="true" />
-                  <span>Salvar</span>
+                <button type="submit" className="btn btn--success" disabled={loading}>
+                  {loading ? <span className="spinner" aria-hidden="true" /> : <CheckIcon className="icon" aria-hidden="true" />}
+                  <span>{loading ? "Salvando…" : "Salvar"}</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* ajustes mínimos locais */}
-      <style jsx>{`
-        .card-toolbar {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          align-items: center;
-          justify-content: flex-end;
-        }
-        @media (max-width: 768px) {
-          .card-toolbar { justify-content: flex-start; }
-        }
-        /* Dialog (reaproveita padrão já usado nas outras páginas) */
-        .form-overlay {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,.5);
-          display: flex; align-items: center; justify-content: center;
-          padding: 20px; z-index: 1000;
-        }
-        .form-container {
-          background: var(--panel);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          padding: 24px;
-          width: 100%; max-width: 560px;
-          max-height: 90vh; overflow-y: auto;
-          box-shadow: var(--shadow);
-        }
-        .form-header {
-          display: flex; justify-content: space-between; align-items: center;
-          gap: 8px; margin-bottom: 16px;
-        }
-      `}</style>
     </>
   );
 }
