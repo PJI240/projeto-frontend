@@ -1,5 +1,5 @@
 // src/pages/Empresas.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowPathIcon,
   PlusIcon,
