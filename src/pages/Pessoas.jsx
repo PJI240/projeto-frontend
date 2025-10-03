@@ -311,112 +311,116 @@ export default function Pessoas() {
         </div>
       </div>
 
-      {/* Dialog de formulário */}
-      {showForm && (
-        <div
-          className="form-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="titulo-form"
-          onKeyDown={onOverlayKeyDown}
+     {/* Dialog de formulário */}
+{showForm && (
+  <div
+    className="form-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="titulo-form"
+    onKeyDown={onOverlayKeyDown}
+  >
+    <div className="form-container">
+      <div className="form-header">
+        <h2 id="titulo-form">{editId ? "Editar Pessoa" : "Nova Pessoa"}</h2>
+        <button
+          className="btn btn--neutral btn--icon-only"
+          onClick={() => setShowForm(false)}
+          aria-label="Fechar formulário"
+          title="Fechar"
         >
-          <div className="form-container">
-            <div className="form-header">
-              <h2 id="titulo-form">{editId ? "Editar Pessoa" : "Nova Pessoa"}</h2>
-              <button
-                className="btn btn--neutral btn--icon-only"
-                onClick={() => setShowForm(false)}
-                aria-label="Fechar formulário"
-                title="Fechar"
-              >
-                <XMarkIcon className="icon" aria-hidden="true" />
-              </button>
-            </div>
+          <XMarkIcon className="icon" aria-hidden="true" />
+        </button>
+      </div>
 
-            <form className="form" onSubmit={salvar}>
-              <div className="form-group">
-                <label htmlFor="nome">Nome</label>
-                <input
-                  id="nome"
-                  ref={nomeRef}
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  required
-                  autoComplete="name"
-                />
-              </div>
+      <form className="form" onSubmit={salvar}>
+        {/* GRID: 2 colunas >= 640px, 1 no mobile */}
+        <div className="form-grid">
+          {/* Nome ocupa a largura toda */}
+          <div className="form-field span-2">
+            <label htmlFor="nome">Nome</label>
+            <input
+              id="nome"
+              ref={nomeRef}
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              required
+              autoComplete="name"
+            />
+          </div>
 
-              <div className="form-group">
-                <label htmlFor="cpf">CPF</label>
-                <input
-                  id="cpf"
-                  value={form.cpf}
-                  onChange={(e) => setForm({ ...form, cpf: e.target.value })}
-                  inputMode="numeric"
-                  placeholder="Somente números"
-                  autoComplete="off"
-                />
-              </div>
+          <div className="form-field">
+            <label htmlFor="cpf">CPF</label>
+            <input
+              id="cpf"
+              value={form.cpf}
+              onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+              inputMode="numeric"
+              placeholder="Somente números"
+              autoComplete="off"
+            />
+          </div>
 
-              <div className="form-group">
-                <label htmlFor="nasc">Data de Nascimento</label>
-                <input
-                  id="nasc"
-                  type="date"
-                  value={form.data_nascimento}
-                  onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
-                  autoComplete="bday"
-                />
-              </div>
+          <div className="form-field">
+            <label htmlFor="nasc">Data de Nascimento</label>
+            <input
+              id="nasc"
+              type="date"
+              value={form.data_nascimento}
+              onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
+              autoComplete="bday"
+            />
+          </div>
 
-              <div className="form-group">
-                <label htmlFor="tel">Telefone</label>
-                <input
-                  id="tel"
-                  value={form.telefone}
-                  onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                  autoComplete="tel"
-                />
-              </div>
+          <div className="form-field">
+            <label htmlFor="tel">Telefone</label>
+            <input
+              id="tel"
+              value={form.telefone}
+              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+              autoComplete="tel"
+            />
+          </div>
 
-              <div className="form-group">
-                <label htmlFor="email">E-mail</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  autoComplete="email"
-                />
-              </div>
-
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className="btn btn--neutral"
-                  onClick={() => setShowForm(false)}
-                >
-                  <XMarkIcon className="icon" aria-hidden="true" />
-                  <span>Cancelar</span>
-                </button>
-                <button type="submit" className="btn btn--sucess">
-                  <CheckIcon className="icon" aria-hidden="true" />
-                  <span>{editId ? "Salvar Alterações" : "Salvar"}</span>
-                </button>
-              </div>
-
-              {!editId && (
-                <div className="form-tip" id="form-tip">
-                  <small>
-                    * Dica: para a pessoa aparecer nesta lista, vincule-a depois como funcionário (módulo Funcionários).
-                  </small>
-                </div>
-              )}
-            </form>
+          <div className="form-field">
+            <label htmlFor="email">E-mail</label>
+            <input
+              id="email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              autoComplete="email"
+            />
           </div>
         </div>
-      )}
 
+        {/* Ações com respiro e alinhamento consistente */}
+        <div className="form-actions">
+          <button
+            type="button"
+            className="btn btn--neutral"
+            onClick={() => setShowForm(false)}
+          >
+            <XMarkIcon className="icon" aria-hidden="true" />
+            <span>Cancelar</span>
+          </button>
+          <button type="submit" className="btn btn--success">
+            <CheckIcon className="icon" aria-hidden="true" />
+            <span>{editId ? "Salvar Alterações" : "Salvar"}</span>
+          </button>
+        </div>
+
+        {!editId && (
+          <div className="form-tip" id="form-tip">
+            <small>
+              * Dica: para a pessoa aparecer nesta lista, vincule-a depois como funcionário (módulo Funcionários).
+            </small>
+          </div>
+        )}
+      </form>
+    </div>
+  </div>
+)}
       {/* estilos locais — só o que é específico desta página */}
       <style jsx>{`
         .listagem-container { width: 100%; }
