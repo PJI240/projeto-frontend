@@ -172,19 +172,33 @@ export default function Pessoas() {
         </div>
       )}
 
-      {/* Busca */}
-      <div className="search-container">
-        <label htmlFor="busca" className="visually-hidden">Buscar por nome, CPF ou e-mail</label>
-        <input
-          id="busca"
-          placeholder="Buscar por nome, CPF ou e-mail…"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          className="search-input"
-          autoComplete="off"
-        />
-      </div>
-
+    {/* Busca */}
+<div className="search-container">
+  <div className="search-bar" role="search" aria-label="Buscar pessoas">
+    <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+    <label htmlFor="busca" className="visually-hidden">Buscar por nome, CPF ou e-mail</label>
+    <input
+      id="busca"
+      type="search"
+      className="input input--lg"
+      placeholder="Buscar por nome, CPF ou e-mail…"
+      value={filtro}
+      onChange={(e) => setFiltro(e.target.value)}
+      autoComplete="off"
+    />
+    {Boolean(filtro) && (
+      <button
+        type="button"
+        className="btn btn--neutral btn--icon-only"
+        onClick={() => setFiltro("")}
+        aria-label="Limpar busca"
+        title="Limpar"
+      >
+        <XMarkIcon className="icon" aria-hidden="true" />
+      </button>
+    )}
+  </div>
+</div>
       {/* LISTAGEM: Tabela (desktop) + Cards (mobile) */}
       <div className="listagem-container">
         {/* Desktop/tablet: Tabela */}
