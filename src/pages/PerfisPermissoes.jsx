@@ -508,7 +508,7 @@ export default function PerfisPermissoes() {
     <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-14)' }}>{perm.descricao || ""}</div>
   </label>
 </div>
-              </div>
+        
 
               <div className="form-actions">
                 <button type="button" className="btn btn--neutral" onClick={fecharForm}>
