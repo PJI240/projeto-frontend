@@ -399,9 +399,9 @@ export default function Pessoas() {
                   <XMarkIcon className="icon" aria-hidden="true" />
                   <span>Cancelar</span>
                 </button>
-                <button type="submit" className="btn btn--primary">
+                <button type="submit" className="btn btn--sucess">
                   <CheckIcon className="icon" aria-hidden="true" />
-                  <span>{editId ? "Salvar alterações" : "Criar pessoa"}</span>
+                  <span>{editId ? "Salvar Alterações" : "Salvar"}</span>
                 </button>
               </div>
 
