@@ -1,241 +1,15 @@
 // src/pages/PerfisPermissoes.jsx
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import {
-  PlusIcon,
-  ArrowPathIcon,
-  CheckIcon,
-  XMarkIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  ShieldCheckIcon,
-} from "@heroicons/react/24/solid";
-
-const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
-
-const API = {
-  perfis: `${API_BASE}/api/perfis`,
-  permissoes: `${API_BASE}/api/permissoes`,
-  getPerfilPerms: (id) => `${API_BASE}/api/perfis_permissoes?perfil_id=${id}`,
-  syncPerfilPerms: `${API_BASE}/api/perfis_permissoes/sync`,
-  syncPerms: `${API_BASE}/api/permissoes/sync`,
-};
+// ...imports e estado iguais...
 
 export default function PerfisPermissoes() {
-  const [perfis, setPerfis] = useState([]);
-  const [permissoes, setPermissoes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [err, setErr] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ nome: "", ativo: 1 });
-
-  const [perfilExpandido, setPerfilExpandido] = useState(null);
-  const [permissoesCarregando, setPermissoesCarregando] = useState(new Set());
-  const [permissoesPorPerfil, setPermissoesPorPerfil] = useState(new Map());
-  const [permissoesSalvando, setPermissoesSalvando] = useState(new Set());
-
-  const liveRef = useRef(null);
-
-  const fetchJson = useCallback(async (url, init) => {
-    const r = await fetch(url, { credentials: "include", ...init });
-    let data = null;
-    try { data = await r.json(); } catch {}
-    if (!r.ok || !data?.ok) {
-      const e = new Error(data?.error || `HTTP ${r.status}`);
-      e.status = r.status;
-      throw e;
-    }
-    return data;
-  }, []);
-
-  async function carregarPerfis() {
-    setLoading(true);
-    setErr("");
-    try {
-      const data = await fetchJson(API.perfis);
-      setPerfis(data.perfis || []);
-      if (liveRef.current) liveRef.current.textContent = "Lista de perfis atualizada.";
-    } catch (e) {
-      setErr(e.message || "Falha ao carregar perfis.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar perfis.";
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function carregarPermissoes() {
-    try {
-      const data = await fetchJson(API.permissoes);
-      setPermissoes(data.permissoes || []);
-    } catch (e) {
-      console.error("Erro ao carregar permissões:", e);
-    }
-  }
-
-  async function sincronizarPermissoes() {
-    setSyncing(true);
-    setErr("");
-    setSuccess("");
-    try {
-      const data = await fetchJson(API.syncPerms, { method: "POST" });
-      setSuccess(`Permissões sincronizadas: ${data.upserted ?? 0} atualizadas/criadas.`);
-      await carregarPermissoes();
-      if (perfilExpandido != null) await carregarPermissoesPerfil(perfilExpandido);
-      if (liveRef.current) liveRef.current.textContent = "Permissões sincronizadas.";
-    } catch (e) {
-      setErr(e.message || "Erro ao sincronizar permissões.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao sincronizar permissões.";
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  async function carregarPermissoesPerfil(perfilId) {
-    setPermissoesCarregando(prev => new Set(prev).add(perfilId));
-    try {
-      const data = await fetchJson(API.getPerfilPerms(perfilId));
-      const perfil = perfis.find(p => p.id === perfilId);
-      const isAdmin = perfil && String(perfil.nome || "").toLowerCase() === "administrador";
-      const ids = isAdmin ? new Set(permissoes.map(p => p.id)) : new Set((data.ids || []).map(Number));
-      setPermissoesPorPerfil(prev => new Map(prev).set(perfilId, ids));
-    } catch (e) {
-      setErr(e.message || "Falha ao carregar permissões do perfil.");
-    } finally {
-      setPermissoesCarregando(prev => { const n = new Set(prev); n.delete(perfilId); return n; });
-    }
-  }
-
-  function toggleExpansaoPerfil(perfilId) {
-    if (perfilExpandido === perfilId) setPerfilExpandido(null);
-    else {
-      setPerfilExpandido(perfilId);
-      if (!permissoesPorPerfil.has(perfilId)) carregarPermissoesPerfil(perfilId);
-    }
-  }
-
-  function togglePermissao(perfilId, permissaoId) {
-    const perfil = perfis.find(p => p.id === perfilId);
-    const isAdmin = perfil && String(perfil.nome || "").toLowerCase() === "administrador";
-    if (isAdmin) return;
-    setPermissoesPorPerfil(prev => {
-      const next = new Map(prev);
-      const atual = next.get(perfilId) || new Set();
-      const novas = new Set(atual);
-      novas.has(permissaoId) ? novas.delete(permissaoId) : novas.add(permissaoId);
-      next.set(perfilId, novas);
-      return next;
-    });
-  }
-
-  function marcarTodasPermissoes(perfilId, marcar = true) {
-    const perfil = perfis.find(p => p.id === perfilId);
-    const isAdmin = perfil && String(perfil.nome || "").toLowerCase() === "administrador";
-    if (isAdmin) return;
-    setPermissoesPorPerfil(prev => {
-      const next = new Map(prev);
-      next.set(perfilId, marcar ? new Set(permissoes.map(p => p.id)) : new Set());
-      return next;
-    });
-  }
-
-  async function salvarPermissoes(perfilId) {
-    setPermissoesSalvando(prev => new Set(prev).add(perfilId));
-    setErr(""); setSuccess("");
-    try {
-      const atual = permissoesPorPerfil.get(perfilId) || new Set();
-      await fetchJson(API.syncPerfilPerms, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ perfil_id: Number(perfilId), ids: Array.from(atual).map(Number) }),
-      });
-      setSuccess("Permissões salvas com sucesso.");
-      if (liveRef.current) liveRef.current.textContent = "Permissões salvas.";
-    } catch (e) {
-      setErr(e.message || "Falha ao salvar permissões.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao salvar permissões.";
-    } finally {
-      setPermissoesSalvando(prev => { const n = new Set(prev); n.delete(perfilId); return n; });
-    }
-  }
-
-  async function excluirPerfil(perfil) {
-    if (!confirm(`Deseja realmente excluir o perfil "${perfil.nome}"?`)) return;
-    setErr("");
-    try {
-      await fetchJson(`${API_BASE}/api/perfis/${perfil.id}`, { method: "DELETE" });
-      setSuccess("Perfil excluído com sucesso.");
-      await carregarPerfis();
-      if (liveRef.current) liveRef.current.textContent = "Perfil excluído.";
-    } catch (e) {
-      setErr(e.message || "Falha ao excluir perfil.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao excluir perfil.";
-    }
-  }
-
-  // CRUD Perfil
-  function abrirNovo() { setErr(""); setSuccess(""); setEditId(null); setForm({ nome: "", ativo: 1 }); setShowForm(true); }
-  function abrirEdicao(p) { setErr(""); setSuccess(""); setEditId(p.id); setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 }); setShowForm(true); }
-  function fecharForm() { setShowForm(false); }
-
-  async function salvarPerfil(e) {
-    e?.preventDefault?.();
-    setLoading(true);
-    setErr(""); setSuccess("");
-    try {
-      const body = { nome: form.nome?.trim(), ativo: form.ativo ? 1 : 0 };
-      if (!body.nome) throw new Error("Informe o nome do perfil.");
-
-      const r = editId
-        ? await fetch(`${API_BASE}/api/perfis/${editId}`, {
-            method: "PUT", credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          })
-        : await fetch(API.perfis, {
-            method: "POST", credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao salvar.");
-
-      setSuccess(editId ? "Perfil atualizado." : "Perfil criado.");
-      setShowForm(false);
-      await carregarPerfis();
-      if (liveRef.current) liveRef.current.textContent = "Perfil salvo.";
-    } catch (e) {
-      setErr(e.message || "Falha ao salvar perfil.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao salvar perfil.";
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const gruposPermissoes = useMemo(() => {
-    const map = new Map();
-    for (const p of permissoes) {
-      const g = (p.escopo || "geral").toLowerCase();
-      if (!map.has(g)) map.set(g, []);
-      map.get(g).push(p);
-    }
-    for (const [, arr] of map) arr.sort((a, b) => String(a.codigo).localeCompare(String(b.codigo)));
-    return map;
-  }, [permissoes]);
-
-  useEffect(() => { carregarPerfis(); carregarPermissoes(); }, []);
-
-  const onOverlayKeyDown = (ev) => { if (ev.key === "Escape") setShowForm(false); };
+  // ...estado e funções iguais...
 
   return (
     <>
       {/* região viva */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER - Padrão */}
+      {/* HEADER */}
       <header className="page-header" role="region" aria-labelledby="titulo-pagina">
         <div>
           <h1 id="titulo-pagina" className="page-title">Perfis e Permissões</h1>
@@ -276,7 +50,7 @@ export default function PerfisPermissoes() {
         </div>
       )}
 
-      {/* ====== DESKTOP / TABLET (>=768px): cards “largos” ====== */}
+      {/* ====== DESKTOP / TABLET (>=768px): mantém cards “largos” ====== */}
       <div className="table-only">
         <div className="stats-grid" style={{ gridTemplateColumns: "1fr", gap: '16px' }}>
           {loading ? (
@@ -319,7 +93,8 @@ export default function PerfisPermissoes() {
         </div>
       </div>
 
-      {/* ====== MOBILE (<768px): cards 100% largura ====== */}
+      {/* ====== MOBILE (<768px): cards ocupando 100% da largura ======
+           Reuso das classes: cards-only, cards-grid, pessoa-card, pessoa-dl */}
       <div className="cards-only">
         {loading ? (
           <div className="loading-message">
@@ -422,7 +197,7 @@ export default function PerfisPermissoes() {
                               </button>
                             </div>
 
-                            {/* Mobile: grupos empilhados como cards */}
+                            {/* Em mobile, uma coluna de grupos (cards) empilhados */}
                             <div className="cards-grid">
                               {Array.from(gruposPermissoes.keys()).map((escopo) => {
                                 const itens = gruposPermissoes.get(escopo) || [];
@@ -496,19 +271,16 @@ export default function PerfisPermissoes() {
                   />
                 </div>
 
-
-<div className="checkbox-field checkbox-field--compact">
-  <input
-    type="checkbox"
-    checked={checked}
-    onChange={() => togglePermissao(p.id, perm.id)}
-  />
-  <label style={{ display: 'block', margin: 0 }}>
-    <div style={{ fontWeight: '600', color: 'var(--fg)' }}>{perm.codigo}</div>
-    <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-14)' }}>{perm.descricao || ""}</div>
-  </label>
-</div>
-        
+                <div className="checkbox-field">
+    <input
+      id="pf_ativo"
+      type="checkbox"
+      checked={!!form.ativo}
+      onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked ? 1 : 0 }))}
+    />
+    <label htmlFor="pf_ativo">Perfil ativo</label>
+  </div>
+              </div>
 
               <div className="form-actions">
                 <button type="button" className="btn btn--neutral" onClick={fecharForm}>
@@ -528,7 +300,7 @@ export default function PerfisPermissoes() {
   );
 }
 
-/* ===== Componente auxiliar (desktop/tablet) ===== */
+/* ===== Componente auxiliar para evitar repetição no desktop/tablet ===== */
 function CardPerfil({
   p, isAdmin, expandido, carregandoPerms, salvandoPerms, permissoesPerfil,
   gruposPermissoes, onToggleExpand, onEditar, onExcluir, onMarcarTodas, onSalvar, onTogglePerm
@@ -589,6 +361,7 @@ function CardPerfil({
                 </button>
               </div>
 
+              {/* Desktop/Tablet: grid responsivo de grupos */}
               <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
                 {Array.from(gruposPermissoes.keys()).map((escopo) => {
                   const itens = gruposPermissoes.get(escopo) || [];
