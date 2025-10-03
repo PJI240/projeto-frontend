@@ -738,42 +738,58 @@ html[data-theme="hc"] {
 /* Compat (classe antiga preservada) */
 .icon-sm-old { width: 1.25em; height: 1.25em; color: currentColor; } /* compat */
 
- .form-overlay {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,.5);
-          display: flex; align-items: center; justify-content: center;
-          padding: 20px; z-index: 1000;
-        }
-        .form-container {
-          background: var(--panel);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          padding: 24px;
-          width: 100%; max-width: 560px;
-          max-height: 90vh; overflow-y: auto;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        .form-header {
-          display: flex; justify-content: space-between; align-items: center;
-          gap: 8px; margin-bottom: 16px;
-        }
-        .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-        .form-field { display: flex; flex-direction: column; gap: 6px; }
-        .form-field input, .form-field select {
-          min-height: 44px; padding: 10px 12px; border: 1px solid var(--border);
-          border-radius: 12px; background: #fff; color: #111; font-size: var(--fs-16);
-        }
-        .form-field input:focus-visible, .form-field select:focus-visible {
-          outline: 3px solid var(--focus); outline-offset: 2px;
-        }
-        .form-field.span-2 { grid-column: span 1; }
-        @media (min-width: 640px) {
-          .form-grid { grid-template-columns: 1fr 1fr; }
-          .form-field.span-2 { grid-column: span 2; }
-        }
+/* ===== Checkbox Acessível (Grande) - Para formulários ===== */
 
-        /* Ajustes menores */
-        @media (max-width: 480px) {
-          .usuario-dl__row { grid-template-columns: 90px 1fr; }
-          .usuario-card__title { font-size: 0.95rem; }
-        }
+.form-field input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent-bg);
+  flex-shrink: 0;
+}
+
+/* Container para checkbox com label alinhado */
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.checkbox-field:hover {
+  background: var(--panel-muted);
+}
+
+.checkbox-field input[type="checkbox"] {
+  margin: 0;
+}
+
+.checkbox-field label {
+  margin: 0;
+  font-weight: 500;
+  color: var(--fg);
+  cursor: pointer;
+  flex: 1;
+}
+
+/* Estados de foco acessível */
+.checkbox-field:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Versão compacta para toolbars */
+.checkbox-field--compact {
+  padding: 8px;
+  gap: 8px;
+}
+
+.checkbox-field--compact input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
