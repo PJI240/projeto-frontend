@@ -6,6 +6,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
   CheckIcon,
+MagnifyingGlassIcon,
   XMarkIcon,
 } from "@heroicons/react/24/solid";
 
