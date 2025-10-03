@@ -496,16 +496,18 @@ export default function PerfisPermissoes() {
                   />
                 </div>
 
-                <div className="form-field span-2" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    id="pf_ativo"
-                    type="checkbox"
-                    checked={!!form.ativo}
-                    onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked ? 1 : 0 }))}
-                    style={{ width: 16, height: 16 }}
-                  />
-                  <label htmlFor="pf_ativo" style={{ margin: 0 }}>Perfil ativo</label>
-                </div>
+
+<div className="checkbox-field checkbox-field--compact">
+  <input
+    type="checkbox"
+    checked={checked}
+    onChange={() => togglePermissao(p.id, perm.id)}
+  />
+  <label style={{ display: 'block', margin: 0 }}>
+    <div style={{ fontWeight: '600', color: 'var(--fg)' }}>{perm.codigo}</div>
+    <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-14)' }}>{perm.descricao || ""}</div>
+  </label>
+</div>
               </div>
 
               <div className="form-actions">
