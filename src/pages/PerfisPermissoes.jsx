@@ -99,18 +99,12 @@ export default function PerfisPermissoes() {
       const data = await fetchJson(API.getPerfilPerms(perfilId));
       const perfil = perfis.find(p => p.id === perfilId);
       const isAdmin = perfil && String(perfil.nome || "").toLowerCase() === "administrador";
-      const idsPermissoes = isAdmin
-        ? new Set(permissoes.map(p => p.id))
-        : new Set((data.ids || []).map(Number));
-      setPermissoesPorPerfil(prev => new Map(prev).set(perfilId, idsPermissoes));
+      const ids = isAdmin ? new Set(permissoes.map(p => p.id)) : new Set((data.ids || []).map(Number));
+      setPermissoesPorPerfil(prev => new Map(prev).set(perfilId, ids));
     } catch (e) {
       setErr(e.message || "Falha ao carregar permissões do perfil.");
     } finally {
-      setPermissoesCarregando(prev => {
-        const next = new Set(prev);
-        next.delete(perfilId);
-        return next;
-      });
+      setPermissoesCarregando(prev => { const n = new Set(prev); n.delete(perfilId); return n; });
     }
   }
 
@@ -163,25 +157,13 @@ export default function PerfisPermissoes() {
       setErr(e.message || "Falha ao salvar permissões.");
       if (liveRef.current) liveRef.current.textContent = "Erro ao salvar permissões.";
     } finally {
-      setPermissoesSalvando(prev => {
-        const next = new Set(prev); next.delete(perfilId); return next;
-      });
+      setPermissoesSalvando(prev => { const n = new Set(prev); n.delete(perfilId); return n; });
     }
   }
 
   // CRUD Perfil (mesma lógica)
-  function abrirNovo() {
-    setErr(""); setSuccess("");
-    setEditId(null);
-    setForm({ nome: "", ativo: 1 });
-    setShowForm(true);
-  }
-  function abrirEdicao(p) {
-    setErr(""); setSuccess("");
-    setEditId(p.id);
-    setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 });
-    setShowForm(true);
-  }
+  function abrirNovo() { setErr(""); setSuccess(""); setEditId(null); setForm({ nome: "", ativo: 1 }); setShowForm(true); }
+  function abrirEdicao(p) { setErr(""); setSuccess(""); setEditId(p.id); setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 }); setShowForm(true); }
   function fecharForm() { setShowForm(false); }
 
   async function salvarPerfil(e) {
@@ -219,26 +201,6 @@ export default function PerfisPermissoes() {
     }
   }
 
-  async function excluirPerfil(p) {
-    setErr(""); setSuccess("");
-    const nomeLower = String(p.nome || "").trim().toLowerCase();
-    if (nomeLower === "administrador") { setErr("Este perfil não pode ser excluído."); return; }
-    if (!confirm(`Excluir o perfil "${p.nome}"?`)) return;
-    try {
-      const r = await fetch(`${API_BASE}/api/perfis/${p.id}`, {
-        method: "DELETE", credentials: "include",
-      });
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao excluir.");
-      setSuccess("Perfil excluído.");
-      await carregarPerfis();
-      if (liveRef.current) liveRef.current.textContent = "Perfil excluído.";
-    } catch (e) {
-      setErr(e.message || "Não foi possível excluir o perfil.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao excluir perfil.";
-    }
-  }
-
   const gruposPermissoes = useMemo(() => {
     const map = new Map();
     for (const p of permissoes) {
@@ -246,9 +208,7 @@ export default function PerfisPermissoes() {
       if (!map.has(g)) map.set(g, []);
       map.get(g).push(p);
     }
-    for (const [k, arr] of map) {
-      arr.sort((a, b) => String(a.codigo).localeCompare(String(b.codigo)));
-    }
+    for (const [, arr] of map) arr.sort((a, b) => String(a.codigo).localeCompare(String(b.codigo)));
     return map;
   }, [permissoes]);
 
@@ -261,7 +221,7 @@ export default function PerfisPermissoes() {
       {/* região viva */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER (global.css) */}
+      {/* HEADER */}
       <header className="page-header" role="region" aria-labelledby="ttl">
         <div>
           <h1 id="ttl" className="page-title">Perfis e Permissões</h1>
@@ -296,12 +256,16 @@ export default function PerfisPermissoes() {
       </header>
 
       {err && <div className="error-alert" role="alert">{err}</div>}
-      {success && <div className="success-alert" role="status">{success}</div>}
+      {Boolean(success) && (
+        <div className="stat-card" data-accent="success" role="status" style={{ marginBottom: 16 }}>
+          {success}
+        </div>
+      )}
 
-      {/* LISTA EM CARDS (reuso de .stat-card) */}
+      {/* LISTA EM CARDS */}
       <div className="stats-grid" style={{ gridTemplateColumns: "1fr" }}>
         {loading ? (
-          <div className="stat-card"><div className="spinner" aria-hidden="true" /> Carregando…</div>
+          <div className="stat-card"><span className="spinner" aria-hidden="true" /> Carregando…</div>
         ) : perfis.length === 0 ? (
           <div className="stat-card">Nenhum perfil encontrado.</div>
         ) : (
@@ -314,24 +278,29 @@ export default function PerfisPermissoes() {
 
             return (
               <section key={p.id} className="stat-card" aria-label={`Perfil ${p.nome}`}>
-                <div className="stat-header">
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <h3 className="title" style={{ margin: 0 }}>{p.nome}</h3>
+                {/* Cabeçalho do card */}
+                <div className="stat-header" style={{ alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <h3 className="title" style={{ margin: 0, fontSize: "1.375rem" }}>{p.nome}</h3>
                     {isAdmin && (
-                      <span className="toggle-btn is-active" aria-label="Perfil base">
+                      <span className="btn btn--ghost btn--sm" title="Perfil base com todas as permissões">
                         <ShieldCheckIcon className="icon" aria-hidden="true" />
                         base
                       </span>
                     )}
                   </div>
-                  <div className="page-header__toolbar">
-                    <span className="toggle-btn" aria-label={`Status: ${p.ativo ? "Ativo" : "Inativo"}`}>
+
+                  {/* Ações (toolbar) */}
+                  <div className="page-header__toolbar card-toolbar">
+                    <span className="btn btn--ghost btn--sm" aria-label={`Status: ${p.ativo ? "Ativo" : "Inativo"}`}>
                       {p.ativo ? "Ativo" : "Inativo"}
                     </span>
+
                     <button className="btn btn--neutral btn--sm" onClick={() => abrirEdicao(p)} aria-label={`Editar ${p.nome}`}>
                       <CheckIcon className="icon" aria-hidden="true" />
                       <span>Editar</span>
                     </button>
+
                     <button
                       className="btn btn--neutral btn--sm"
                       onClick={() => toggleExpansaoPerfil(p.id)}
@@ -341,6 +310,7 @@ export default function PerfisPermissoes() {
                       {expandido ? <ChevronUpIcon className="icon" aria-hidden="true" /> : <ChevronDownIcon className="icon" aria-hidden="true" />}
                       <span>Atribuições</span>
                     </button>
+
                     <button
                       className="btn btn--danger btn--sm"
                       onClick={() => excluirPerfil(p)}
@@ -353,6 +323,7 @@ export default function PerfisPermissoes() {
                   </div>
                 </div>
 
+                {/* Painel expandido (permissões) */}
                 {expandido && (
                   <>
                     {isAdmin && (
@@ -362,7 +333,7 @@ export default function PerfisPermissoes() {
                     )}
 
                     {!isAdmin && (
-                      <div className="page-header__toolbar" style={{ marginBottom: 12 }}>
+                      <div className="page-header__toolbar card-toolbar" style={{ marginBottom: 12 }}>
                         <button className="btn btn--neutral btn--sm" onClick={() => marcarTodasPermissoes(p.id, true)} disabled={salvandoPerms}>
                           Marcar Todas
                         </button>
@@ -377,7 +348,9 @@ export default function PerfisPermissoes() {
                     )}
 
                     {carregandoPerms ? (
-                      <div className="toggle-btn"><span className="spinner" aria-hidden="true" /> Carregando permissões…</div>
+                      <div className="btn btn--ghost btn--sm">
+                        <span className="spinner" aria-hidden="true" /> Carregando permissões…
+                      </div>
                     ) : (
                       <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
                         {Array.from(gruposPermissoes.keys()).map((escopo) => {
@@ -403,7 +376,6 @@ export default function PerfisPermissoes() {
                                           type="checkbox"
                                           checked={checked}
                                           onChange={() => togglePermissao(p.id, perm.id)}
-                                          disabled={isAdmin}
                                           aria-checked={checked ? "true" : "false"}
                                         />
                                         <strong>{perm.codigo}</strong>
@@ -426,7 +398,7 @@ export default function PerfisPermissoes() {
         )}
       </div>
 
-      {/* DIALOG: CRIAR/EDITAR PERFIL (usa classes globais) */}
+      {/* DIALOG: CRIAR/EDITAR PERFIL */}
       {showForm && (
         <div className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-form" onKeyDown={onOverlayKeyDown}>
           <div className="form-container">
@@ -449,6 +421,7 @@ export default function PerfisPermissoes() {
                     autoComplete="off"
                   />
                 </div>
+
                 <div className="form-field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input
                     id="pf_ativo"
@@ -474,6 +447,40 @@ export default function PerfisPermissoes() {
           </div>
         </div>
       )}
+
+      {/* ajustes mínimos locais */}
+      <style jsx>{`
+        .card-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
+          justify-content: flex-end;
+        }
+        @media (max-width: 768px) {
+          .card-toolbar { justify-content: flex-start; }
+        }
+        /* Dialog (reaproveita padrão já usado nas outras páginas) */
+        .form-overlay {
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,.5);
+          display: flex; align-items: center; justify-content: center;
+          padding: 20px; z-index: 1000;
+        }
+        .form-container {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 24px;
+          width: 100%; max-width: 560px;
+          max-height: 90vh; overflow-y: auto;
+          box-shadow: var(--shadow);
+        }
+        .form-header {
+          display: flex; justify-content: space-between; align-items: center;
+          gap: 8px; margin-bottom: 16px;
+        }
+      `}</style>
     </>
   );
 }
