@@ -496,7 +496,7 @@ export default function PerfisPermissoes() {
                   />
                 </div>
 
-                <div className="form-field" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}>
+                <div className="form-field span-2" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input
                     id="pf_ativo"
                     type="checkbox"
