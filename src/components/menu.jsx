@@ -44,6 +44,7 @@ const PERM = {
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
   const [isMobile, setIsMobile] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false); // <=360px
   const [open, setOpen] = useState(false);
 
   const [perms, setPerms] = useState(() => new Set());
@@ -51,7 +52,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
   const isDev = !!me?.isSuper || me?.roles?.includes("desenvolvedor");
   const isAdm = isDev || me?.roles?.includes("administrador");
-
   const has = useCallback((code) => perms.has(code), [perms]);
 
   const FIRST = useRef(null);
@@ -76,20 +76,11 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           return Array.isArray(js?.codes) ? js.codes : [];
         };
         let codes;
-        try {
-          codes = await req(`${API_BASE}/api/permissoes_menu/minhas`);
-        } catch {
-          codes = await req(`${API_BASE}/api/permissoes/minhas`);
-        }
-        if (alive) {
-          setPerms(new Set(codes));
-          setPermsLoaded(true);
-        }
+        try { codes = await req(`${API_BASE}/api/permissoes_menu/minhas`); }
+        catch { codes = await req(`${API_BASE}/api/permissoes/minhas`); }
+        if (alive) { setPerms(new Set(codes)); setPermsLoaded(true); }
       } catch {
-        if (alive) {
-          setPerms(new Set([PERM.DASHBOARD, PERM.EMPRESAS]));
-          setPermsLoaded(true);
-        }
+        if (alive) { setPerms(new Set([PERM.DASHBOARD, PERM.EMPRESAS])); setPermsLoaded(true); }
       }
     }
     fetchPerms();
@@ -98,7 +89,11 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
   /* ====== Responsivo ====== */
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    const onResize = () => {
+      const w = window.innerWidth;
+      setIsMobile(w <= 900);
+      setIsNarrow(w <= 360);
+    };
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -173,17 +168,29 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                 padding: "8px 12px",
               }}
             >
+              {/* Botão “neutro”: sem pílula/flutuante */}
               <button
-                className="menu-toggle"
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
                 aria-controls="mobile-menu-sheet"
                 aria-label={open ? "Fechar menu" : "Abrir menu"}
                 title={open ? "Fechar menu" : "Abrir menu"}
-                style={{ display: "inline-flex", alignItems: "center" }}
+                // estilos neutros, focáveis, sem criar classe nova
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--fg)",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 40,
+                  minHeight: 40,
+                }}
               >
                 <Bars3Icon className="menu-toggle-icon" />
-                <span style={{ marginLeft: 6 }}>Menu</span>
+                {!isNarrow && <span style={{ marginLeft: 6 }}>Menu</span>}
               </button>
 
               <h1
@@ -192,6 +199,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                   margin: 0,
                   lineHeight: 1,
                   flex: 1,
+                  minWidth: 0,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -214,7 +222,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           {/* spacer pro conteúdo */}
           <div aria-hidden="true" style={{ height: `${TOPBAR_H}px` }} />
 
-          {/* SHEET: ocupa a tela inteira abaixo da AppBar (sem backdrop separado) */}
+          {/* SHEET abaixo da AppBar */}
           {open && (
             <div
               id="mobile-menu-sheet"
@@ -230,9 +238,8 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                 background: "var(--panel)",
                 borderTop: "1px solid var(--panel-muted)",
                 overflowY: "auto",
-                zIndex: 999, // abaixo da appbar, acima do conteúdo
+                zIndex: 999,
               }}
-              // fechar ao clicar fora das áreas interativas não é necessário: desliza toda a tela
             >
               <div className="user-info" role="group" aria-label="Usuário" style={{ padding: "12px" }}>
                 <div className="user-details">
@@ -348,7 +355,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                 {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} />}
               </MenuBlock>
 
-              <MenuBlock title="Folha">
+                <MenuBlock title="Folha">
                 {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} />}
                 {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} />}
                 {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} />}
@@ -373,7 +380,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   );
 }
 
-/* ===== Helpers de layout desktop ===== */
 function MenuBlock({ title, children }) {
   return (
     <div className="menu-group">
