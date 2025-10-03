@@ -1,5 +1,13 @@
 // src/pages/Pessoas.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  PlusIcon,
+  ArrowPathIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  CheckIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
@@ -82,9 +90,7 @@ export default function Pessoas() {
     setErr("");
     try {
       const method = editId ? "PUT" : "POST";
-      const url = editId
-        ? `${API_BASE}/api/pessoas/${editId}`
-        : `${API_BASE}/api/pessoas`;
+      const url = editId ? `${API_BASE}/api/pessoas/${editId}` : `${API_BASE}/api/pessoas`;
 
       const r = await fetch(url, {
         method,
@@ -135,24 +141,26 @@ export default function Pessoas() {
 
       {/* HEADER NO NOVO PADRÃO */}
       <header className="page-header" role="region" aria-labelledby="titulo-pagina">
-        <div className="page-header__top">
+        <div>
           <h1 id="titulo-pagina" className="page-title">Pessoas</h1>
           <p className="page-subtitle">Gerencie as informações pessoais da sua equipe.</p>
         </div>
 
         <div className="page-header__toolbar" aria-label="Ações da página">
-          <button className="toggle-btn" onClick={abrirNovo} aria-label="Criar nova pessoa">
-            Nova Pessoa
+          <button className="btn btn--success" onClick={abrirNovo} aria-label="Criar nova pessoa">
+            <PlusIcon className="icon" aria-hidden="true" />
+            <span>Nova Pessoa</span>
           </button>
           <button
-            className="toggle-btn"
+            className="btn btn--neutral"
             onClick={carregar}
             disabled={loading}
             aria-busy={loading ? "true" : "false"}
             aria-label="Atualizar lista de pessoas"
             title="Atualizar"
           >
-            {loading ? "Atualizando..." : "Atualizar"}
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
         </div>
       </header>
@@ -163,6 +171,7 @@ export default function Pessoas() {
         </div>
       )}
 
+      {/* Busca */}
       <div className="search-container">
         <label htmlFor="busca" className="visually-hidden">Buscar por nome, CPF ou e-mail</label>
         <input
@@ -175,55 +184,50 @@ export default function Pessoas() {
         />
       </div>
 
-      <div className="table-container">
-        <div className="stat-card">
+      {/* LISTAGEM: Tabela (desktop) + Cards (mobile) */}
+      <div className="listagem-container">
+        {/* Desktop/tablet: Tabela */}
+        <div className="table-wrapper table-only" role="region" aria-label="Tabela de pessoas">
           {loading ? (
             <div className="loading-message" role="status">Carregando…</div>
           ) : listaFiltrada.length === 0 ? (
             <div className="empty-message">Nenhuma pessoa encontrada para sua empresa.</div>
           ) : (
-            <div className="table-wrapper" role="region" aria-label="Tabela de pessoas">
+            <div className="stat-card" style={{ overflow: "hidden" }}>
               <table className="pessoas-table">
                 <thead>
                   <tr>
                     <th scope="col">Nome</th>
-                    <th scope="col" className="hide-on-mobile">CPF</th>
-                    <th scope="col" className="hide-on-mobile">E-mail</th>
-                    <th scope="col" className="hide-on-small">Telefone</th>
+                    <th scope="col">CPF</th>
+                    <th scope="col">E-mail</th>
+                    <th scope="col">Telefone</th>
                     <th scope="col" className="actions-column">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {listaFiltrada.map((p) => (
                     <tr key={p.id}>
-                      <td>
-                        <div className="mobile-info">
-                          <div className="main-info">{p.nome}</div>
-                          <div className="mobile-details">
-                            {p.cpf && <span>CPF: {p.cpf}</span>}
-                            {p.email && <span>E-mail: {p.email}</span>}
-                            {p.telefone && <span>Tel: {p.telefone}</span>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hide-on-mobile">{p.cpf || "—"}</td>
-                      <td className="hide-on-mobile">{p.email || "—"}</td>
-                      <td className="hide-on-small">{p.telefone || "—"}</td>
+                      <td>{p.nome}</td>
+                      <td>{p.cpf || "—"}</td>
+                      <td>{p.email || "—"}</td>
+                      <td>{p.telefone || "—"}</td>
                       <td>
                         <div className="actions-buttons">
                           <button
-                            className="toggle-btn small-btn"
+                            className="btn btn--neutral btn--sm"
                             onClick={() => abrirEdicao(p)}
                             aria-label={`Editar ${p.nome}`}
                           >
-                            Editar
+                            <PencilSquareIcon className="icon" aria-hidden="true" />
+                            <span>Editar</span>
                           </button>
                           <button
-                            className="toggle-btn small-btn danger"
+                            className="btn btn--danger btn--sm"
                             onClick={() => excluir(p.id)}
                             aria-label={`Excluir ${p.nome}`}
                           >
-                            Excluir
+                            <TrashIcon className="icon" aria-hidden="true" />
+                            <span>Excluir</span>
                           </button>
                         </div>
                       </td>
@@ -234,9 +238,65 @@ export default function Pessoas() {
             </div>
           )}
         </div>
+
+        {/* Mobile: Cards de pessoa (largura total) */}
+        <div className="cards-wrapper cards-only" role="region" aria-label="Lista de pessoas (versão cartões)">
+          {loading ? (
+            <div className="loading-message" role="status">Carregando…</div>
+          ) : listaFiltrada.length === 0 ? (
+            <div className="empty-message">Nenhuma pessoa encontrada para sua empresa.</div>
+          ) : (
+            <ul className="cards-grid" aria-label="Cartões de pessoas">
+              {listaFiltrada.map((p) => (
+                <li key={p.id} className="pessoa-card" aria-label={`Pessoa: ${p.nome}`}>
+                  <div className="pessoa-card__head">
+                    <h3 className="pessoa-card__title">{p.nome}</h3>
+                    <div className="pessoa-card__actions">
+                      <button
+                        className="btn btn--neutral btn--sm"
+                        onClick={() => abrirEdicao(p)}
+                        aria-label={`Editar ${p.nome}`}
+                        title="Editar"
+                      >
+                        <PencilSquareIcon className="icon" aria-hidden="true" />
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        className="btn btn--danger btn--sm"
+                        onClick={() => excluir(p.id)}
+                        aria-label={`Excluir ${p.nome}`}
+                        title="Excluir"
+                      >
+                        <TrashIcon className="icon" aria-hidden="true" />
+                        <span>Excluir</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pessoa-card__body">
+                    <dl className="pessoa-dl">
+                      <div className="pessoa-dl__row">
+                        <dt>CPF</dt>
+                        <dd>{p.cpf || "—"}</dd>
+                      </div>
+                      <div className="pessoa-dl__row">
+                        <dt>E-mail</dt>
+                        <dd>{p.email || "—"}</dd>
+                      </div>
+                      <div className="pessoa-dl__row">
+                        <dt>Telefone</dt>
+                        <dd>{p.telefone || "—"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
-      {/* Drawer/ formulário simples */}
+      {/* Dialog de formulário */}
       {showForm && (
         <div
           className="form-overlay"
@@ -249,11 +309,12 @@ export default function Pessoas() {
             <div className="form-header">
               <h2 id="titulo-form">{editId ? "Editar Pessoa" : "Nova Pessoa"}</h2>
               <button
-                className="close-btn"
+                className="btn btn--neutral btn--icon-only"
                 onClick={() => setShowForm(false)}
                 aria-label="Fechar formulário"
+                title="Fechar"
               >
-                ×
+                <XMarkIcon className="icon" aria-hidden="true" />
               </button>
             </div>
 
@@ -317,13 +378,15 @@ export default function Pessoas() {
               <div className="form-actions">
                 <button
                   type="button"
-                  className="toggle-btn secondary"
+                  className="btn btn--neutral"
                   onClick={() => setShowForm(false)}
                 >
-                  Cancelar
+                  <XMarkIcon className="icon" aria-hidden="true" />
+                  <span>Cancelar</span>
                 </button>
-                <button type="submit" className="toggle-btn primary">
-                  {editId ? "Salvar alterações" : "Criar pessoa"}
+                <button type="submit" className="btn btn--primary">
+                  <CheckIcon className="icon" aria-hidden="true" />
+                  <span>{editId ? "Salvar alterações" : "Criar pessoa"}</span>
                 </button>
               </div>
 
@@ -339,309 +402,123 @@ export default function Pessoas() {
         </div>
       )}
 
+      {/* estilos locais — só o que é específico desta página */}
       <style jsx>{`
-        .visually-hidden {
-          position: absolute !important;
-          width: 1px;
-          height: 1px;
-          padding: 0;
-          margin: -1px;
-          overflow: hidden;
-          clip: rect(0, 0, 0, 0);
-          white-space: nowrap;
-          border: 0;
+        .listagem-container { width: 100%; }
+
+        /* Tabela (desktop) e Cards (mobile) alternados por CSS */
+        .table-only { display: block; }
+        .cards-only { display: none; }
+
+        @media (max-width: 768px) {
+          .table-only { display: none; }
+          .cards-only { display: block; }
         }
 
-        /* Header no novo padrão (mesmo respiro das outras páginas) */
-        .page-header {
-          background: var(--panel);
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          padding: 16px;
-          margin-bottom: 16px;
+        /* Cards grid (mobile) */
+        .cards-grid {
+          list-style: none;
+          padding: 0;
+          margin: 0;
           display: grid;
           grid-template-columns: 1fr;
           gap: 12px;
         }
-        .page-title {
-          margin: 0 0 4px 0;
-          color: var(--fg);
-          font-size: clamp(1.5rem, 4vw, 2rem);
-        }
-        .page-subtitle {
-          margin: 0;
-          color: var(--muted);
-          font-size: clamp(var(--fs-14), 3vw, var(--fs-16));
-        }
-        .page-header__toolbar {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          align-items: center;
-        }
-
-        /* Alertas */
-        .error-alert {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: var(--error-strong, #b91c1c);
-          padding: 12px 16px;
-          border-radius: 8px;
-          margin-bottom: 16px;
-        }
-
-        /* Busca */
-        .search-container {
-          margin-bottom: 16px;
-        }
-        .search-input {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          font-size: var(--fs-16, 1rem);
-          background: var(--panel);
-          color: var(--fg);
-        }
-        .search-input:focus-visible {
-          outline: 3px solid var(--focus);
-          outline-offset: 2px;
-        }
-
-        /* Container da tabela */
-        .table-container {
-          width: 100%;
-          overflow: hidden;
-        }
-        .stat-card {
+        .pessoa-card {
           background: var(--panel);
           border: 1px solid var(--border);
           border-radius: 12px;
-          padding: 0;
           box-shadow: var(--shadow);
           overflow: hidden;
+          position: relative;
         }
-
-        /* Mensagens */
-        .loading-message, .empty-message {
-          padding: 24px 16px;
-          text-align: center;
-          color: var(--muted);
-        }
-
-        /* Tabela */
-        .table-wrapper {
-          overflow-x: auto;
-        }
-        .pessoas-table {
-          width: 100%;
-          border-collapse: collapse;
-          min-width: 640px;
-          background: var(--panel);
-          color: var(--fg);
-        }
-        .pessoas-table th {
-          padding: 16px 12px;
-          text-align: left;
-          font-weight: 700;
-          color: var(--muted);
-          border-bottom: 1px solid var(--border);
-          background: var(--panel-muted);
-          position: sticky;
+        .pessoa-card::before {
+          /* “cor na lateral” – como na tela anterior */
+          content: "";
+          position: absolute;
+          left: 0;
           top: 0;
-          z-index: 1;
+          bottom: 0;
+          width: 4px;
+          background: var(--accent-bg);
         }
-        .pessoas-table td {
-          padding: 16px 12px;
-          border-bottom: 1px solid var(--border);
-          vertical-align: top;
-        }
-
-        /* Informações mobile */
-        .mobile-info .main-info {
-          font-weight: 600;
-          margin-bottom: 4px;
-          color: var(--fg);
-        }
-        .mobile-details {
-          display: none;
-          font-size: var(--fs-12, 0.8rem);
-          color: var(--muted);
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        /* Ações */
-        .actions-buttons {
-          display: flex;
-          gap: 6px;
-          justify-content: flex-start;
-          flex-wrap: wrap;
-        }
-
-        .small-btn {
-          padding: 6px 10px !important;
-          font-size: 0.8rem !important;
-        }
-        .danger {
-          border-color: color-mix(in srgb, var(--error-strong, #991b1b) 40%, var(--border));
-        }
-
-        /* Formulário overlay (dialog) */
-        .form-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,.5);
+        .pessoa-card__head {
           display: flex;
           align-items: center;
-          justify-content: center;
-          padding: 20px;
-          z-index: 1000;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 14px 14px 0 14px;
+        }
+        .pessoa-card__title {
+          margin: 0;
+          font-size: 1rem;
+          font-weight: 700;
+          color: var(--fg);
+        }
+        .pessoa-card__actions {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .pessoa-card__body {
+          padding: 12px 14px 14px 14px;
+        }
+        .pessoa-dl {
+          margin: 0;
+          display: grid;
+          gap: 8px;
+        }
+        .pessoa-dl__row {
+          display: grid;
+          grid-template-columns: 110px 1fr;
+          gap: 8px;
+          align-items: baseline;
+        }
+        .pessoa-dl__row dt {
+          color: var(--muted);
+          font-weight: 600;
+          font-size: var(--fs-12);
+        }
+        .pessoa-dl__row dd {
+          margin: 0;
+          color: var(--fg);
+          font-weight: 500;
+        }
+
+        /* Tabela padrão (desktop) já segue os estilos globais */
+        .pessoas-table th,
+        .pessoas-table td { white-space: nowrap; }
+        .pessoas-table td:first-child,
+        .pessoas-table th:first-child { white-space: normal; }
+
+        /* Ações desktop */
+        .actions-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* Form (dialog) – reaproveita tokens globais */
+        .form-overlay {
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,.5);
+          display: flex; align-items: center; justify-content: center;
+          padding: 20px; z-index: 1000;
         }
         .form-container {
           background: var(--panel);
           border: 1px solid var(--border);
           border-radius: 12px;
           padding: 24px;
-          width: 100%;
-          max-width: 520px;
-          max-height: 90vh;
-          overflow-y: auto;
+          width: 100%; max-width: 520px;
+          max-height: 90vh; overflow-y: auto;
           box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
         .form-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-        .form-header h2 {
-          margin: 0;
-          font-size: clamp(var(--fs-18), 3vw, 1.3rem);
-          color: var(--fg);
-        }
-        .close-btn {
-          background: none;
-          border: none;
-          font-size: 1.5rem;
-          cursor: pointer;
-          color: var(--muted);
-          padding: 0;
-          width: 32px;
-          height: 32px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 6px;
-        }
-        .close-btn:hover, .close-btn:focus-visible {
-          background: var(--panel-muted);
-          color: var(--fg);
-          outline: 2px solid var(--focus);
-          outline-offset: 2px;
+          display: flex; justify-content: space-between; align-items: center;
+          gap: 8px; margin-bottom: 16px;
         }
 
-        .form-group {
-          margin-bottom: 16px;
-        }
-        .form-group label {
-          display: block;
-          margin-bottom: 6px;
-          font-weight: 600;
-          color: var(--fg);
-        }
-        .form-group input {
-          width: 100%;
-          padding: 10px 12px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          font-size: var(--fs-16, 1rem);
-          background: #fff;
-          color: #111;
-        }
-        .form-group input:focus-visible {
-          outline: 3px solid var(--focus);
-          outline-offset: 2px;
-        }
-
-        .form-actions {
-          display: flex;
-          gap: 10px;
-          margin-top: 24px;
-          flex-wrap: wrap;
-        }
-        .form-actions .toggle-btn {
-          flex: 1 1 200px;
-        }
-        .form-tip {
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid var(--border);
-        }
-        .form-tip small { color: var(--muted); }
-
-        /* Botões padronizados (usam tokens do tema) */
-        .toggle-btn {
-          padding: 10px 16px;
-          border: 1px solid var(--border);
-          background: var(--panel);
-          color: var(--fg);
-          border-radius: var(--radius);
-          cursor: pointer;
-          font-size: var(--fs-14, 0.9rem);
-          font-weight: 600;
-          transition: all 0.2s ease;
-          box-shadow: var(--shadow);
-        }
-        .toggle-btn:hover,
-        .toggle-btn:focus-visible {
-          background: var(--accent);
-          color: #fff;
-          border-color: var(--accent-strong);
-          outline: none;
-        }
-        .toggle-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .toggle-btn.primary {
-          background: var(--accent-bg, #1d4ed8);
-          color: #fff;
-          border-color: var(--accent-bg-hover, #1e40af);
-        }
-        .toggle-btn.primary:hover,
-        .toggle-btn.primary:focus-visible {
-          background: var(--accent-bg-hover, #1e40af);
-        }
-        .toggle-btn.secondary {
-          background: var(--panel);
-          color: var(--fg);
-        }
-
-        /* Media Queries */
-        @media (max-width: 768px) {
-          .actions-buttons {
-            flex-direction: column;
-            gap: 4px;
-          }
-          .small-btn {
-            padding: 8px !important;
-            font-size: 0.75rem !important;
-          }
-          .mobile-details { display: flex; }
-          .hide-on-mobile { display: none !important; }
-          .form-container { padding: 20px; margin: 10px; }
-          .form-actions { flex-direction: column; }
-        }
+        /* Pequenos ajustes extras para telas menores */
         @media (max-width: 480px) {
-          .hide-on-small { display: none !important; }
-          .page-title { font-size: clamp(1.35rem, 6vw, 1.5rem); }
-          .form-overlay { padding: 10px; }
-          .form-container { padding: 16px; }
-          .form-header h2 { font-size: 1.1rem; }
-        }
-        @media (min-width: 769px) {
-          .actions-column { width: 180px; }
+          .pessoa-dl__row { grid-template-columns: 90px 1fr; }
+          .pessoa-card__title { font-size: 0.95rem; }
         }
       `}</style>
     </>
