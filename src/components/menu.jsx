@@ -1,7 +1,6 @@
 // src/components/menu.jsx
 import { NavLink } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Dialog } from "@headlessui/react"; // Headless UI acessível
 import {
   Bars3Icon,
   UserGroupIcon,
@@ -45,7 +44,7 @@ const PERM = {
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
   const [isMobile, setIsMobile] = useState(false);
-  const [isNarrow, setIsNarrow] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false); // <=360px
   const [open, setOpen] = useState(false);
 
   const [perms, setPerms] = useState(() => new Set());
@@ -100,6 +99,22 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  /* ====== A11y: esc, foco, scroll lock ====== */
+  useEffect(() => {
+    if (!isMobile) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = open ? "hidden" : prev || "";
+    if (open && FIRST.current) FIRST.current.focus();
+    return () => { document.body.style.overflow = prev; };
+  }, [isMobile, open]);
+
   const Section = ({ title, items }) => {
     const visible = useMemo(() => items.some((i) => has(i.perm)), [items, has]);
     if (!visible) return null;
@@ -128,7 +143,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
   return (
     <>
-      {/* ===== MOBILE: AppBar fixa + Dialog acessível ===== */}
+      {/* ===== MOBILE: AppBar fixa + Sheet ===== */}
       {isMobile && (
         <>
           <header
@@ -153,11 +168,14 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                 padding: "8px 12px",
               }}
             >
+              {/* Botão “neutro”: sem pílula/flutuante */}
               <button
-                onClick={() => setOpen(true)}
+                onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
                 aria-controls="mobile-menu-sheet"
-                aria-label="Abrir menu"
+                aria-label={open ? "Fechar menu" : "Abrir menu"}
+                title={open ? "Fechar menu" : "Abrir menu"}
+                // estilos neutros, focáveis, sem criar classe nova
                 style={{
                   background: "none",
                   border: "none",
@@ -204,17 +222,24 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           {/* spacer pro conteúdo */}
           <div aria-hidden="true" style={{ height: `${TOPBAR_H}px` }} />
 
-          {/* ===== Headless UI Dialog ===== */}
-          <Dialog
-            as="div"
-            open={open}
-            onClose={() => setOpen(false)}
-            className="relative z-50"
-          >
-            <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
+          {/* SHEET abaixo da AppBar */}
+          {open && (
             <div
               id="mobile-menu-sheet"
-              className="fixed inset-x-0 top-[56px] bottom-0 bg-[var(--panel)] overflow-y-auto border-t border-[var(--panel-muted)]"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu principal"
+              style={{
+                position: "fixed",
+                top: `${TOPBAR_H}px`,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "var(--panel)",
+                borderTop: "1px solid var(--panel-muted)",
+                overflowY: "auto",
+                zIndex: 999,
+              }}
             >
               <div className="user-info" role="group" aria-label="Usuário" style={{ padding: "12px" }}>
                 <div className="user-details">
@@ -280,7 +305,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                 </nav>
               )}
             </div>
-          </Dialog>
+          )}
         </>
       )}
 
@@ -313,26 +338,31 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                 {has(PERM.DASHBOARD_FUNC) && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} />}
                 {has(PERM.DASHBOARD_ADM) && <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} />}
               </MenuBlock>
+
               <MenuBlock title="Cadastros">
                 {has(PERM.PESSOAS) && <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} />}
                 {has(PERM.EMPRESAS) && <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} />}
               </MenuBlock>
+
               <MenuBlock title="Segurança">
                 {has(PERM.USUARIOS) && <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} />}
                 {has(PERM.PERFIS_PERMISSOES) && <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} />}
               </MenuBlock>
+
               <MenuBlock title="Operação">
                 {has(PERM.ESCALAS) && <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} />}
                 {has(PERM.APONTAMENTOS) && <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} />}
                 {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} />}
               </MenuBlock>
-              <MenuBlock title="Folha">
+
+                <MenuBlock title="Folha">
                 {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} />}
                 {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} />}
                 {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} />}
                 {has(PERM.FOLHAS_FUNC) && <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} />}
                 {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} />}
               </MenuBlock>
+
               <MenuBlock title="Dev">
                 {has(PERM.DEV_INSPECAO) && <MenuItem to="/dev-inspecao" label="Inspeção / SQL" icon={<MagnifyingGlassIcon />} />}
                 {has(PERM.DEV_AUDITORIA) && <MenuItem to="/dev-auditoria" label="Auditoria" icon={<ClipboardDocumentListIcon />} />}
