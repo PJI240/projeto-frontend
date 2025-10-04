@@ -1,19 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { EyeIcon } from "@heroicons/react/24/outline";
 
-/* SVG simples do ícone universal de acessibilidade (sem dependência extra) */
-function AccessibilityGlyph(props) {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
-      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.8"/>
-      <circle cx="12" cy="7.5" r="2" fill="currentColor"/>
-      <path d="M5 9.5c2.5 1 5 .9 7 .9s4.5.1 7-.9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M9.5 11.5L12 17l2.5-5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-    </svg>
-  );
-}
-
-/* Ícone 'A' minimalista para “Fonte grande” */
+/* Ícone 'A' para “Fonte grande” */
 function AIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" {...props}>
@@ -74,48 +62,57 @@ export default function AccessibilityToggles() {
 
   return (
     <>
-<button
-  ref={btnRef}
-  type="button"
-  onClick={() => setOpen((v) => !v)}
-  aria-haspopup="menu"
-  aria-expanded={open}
-  aria-controls="a11y-menu"
-  aria-label={open ? "Fechar opções de acessibilidade" : "Abrir opções de acessibilidade"}
-  style={{
-    position: "fixed",
-    right: "16px",
-    bottom: "16px",
-    zIndex: 70,
-    width: "56px",
-    height: "56px",
-    borderRadius: "50%",
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    boxShadow: "0 6px 18px rgba(0,0,0,.12)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "var(--fg)",
-  }}
->
-  {/* Ícone universal de acessibilidade */}
-  <svg
-    viewBox="0 0 24 24"
-    width="26"
-    height="26"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    aria-hidden="true"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="7.5" r="2" fill="currentColor" />
-    <path d="M5 9.5c2.5 1 5 .9 7 .9s4.5.1 7-.9" strokeLinecap="round" />
-    <path d="M9.5 11.5L12 17l2.5-5.5" strokeLinecap="round" />
-  </svg>
-  <span className="sr-only">Acessibilidade</span>
-</button>
+      {/* FAB flutuante com SVG azul */}
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls="a11y-menu"
+        aria-label={open ? "Fechar opções de acessibilidade" : "Abrir opções de acessibilidade"}
+        style={{
+          position: "fixed",
+          right: "16px",
+          bottom: "16px",
+          zIndex: 70,
+          width: "56px",
+          height: "56px",
+          borderRadius: "50%",
+          background: "var(--panel)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 6px 18px rgba(0,0,0,.12)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--fg)",
+        }}
+      >
+        {/* Símbolo universal de acessibilidade (azul) */}
+        <svg
+          viewBox="0 0 24 24"
+          width="26"
+          height="26"
+          aria-hidden="true"
+          /* permite customizar o tom via CSS var, com fallback */
+          style={{ color: "var(--a11y-blue, #1e90ff)" }}
+        >
+          {/* contorno principal */}
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          {/* cabeça (preenchida) */}
+          <circle cx="12" cy="7.5" r="2.2" fill="currentColor" />
+          {/* braços curvos */}
+          <path d="M4.5 9.2c2.7 1.2 5.5 1.2 7.5 1.2s4.8 0 7.5-1.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+          {/* pernas em V */}
+          <path d="M9.5 11.8L12 17.5l2.5-5.7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+          {/* nós azuis nas extremidades (ornamentais, como no desenho que você mandou) */}
+          <circle cx="4.3" cy="9.7" r="1.2" fill="currentColor"/>
+          <circle cx="19.7" cy="9.7" r="1.2" fill="currentColor"/>
+          <circle cx="7.2" cy="20" r="1.2" fill="currentColor"/>
+          <circle cx="16.8" cy="20" r="1.2" fill="currentColor"/>
+        </svg>
+        <span className="sr-only">Acessibilidade</span>
+      </button>
 
       {/* Popover com as duas opções */}
       {open && (
@@ -127,7 +124,7 @@ export default function AccessibilityToggles() {
           style={{
             position: "fixed",
             right: "16px",
-            bottom: "76px", // acima do FAB
+            bottom: "76px",
             zIndex: 71,
             background: "var(--panel)",
             border: "1px solid var(--border)",
