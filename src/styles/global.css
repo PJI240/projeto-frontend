@@ -120,18 +120,48 @@ body {
   }
 }
 
-/* Modo Alto Contraste opcional via atributo no HTML */
-html[data-theme="hc"] {
+/* =========================
+   Modo Alto Contraste manual (toggle)
+   ========================= */
+html[data-theme="hc"]{
+  /* superfícies/texto (+++ ADIÇÃO IMPORTANTE +++) */
+  --bg: #000000;
+  --panel: #0b0b0b;
+  --panel-muted: #151515;
+  --fg: #ffffff;
+  --muted: #d1d5db;
+  --border: #ffffff;
+
+  /* botões (cores já existentes, preservadas) */
   --btn-primary-bg: #00ff6a;       --btn-primary-bg-hover: #32ff90;
   --btn-success-bg: #00ffaa;       --btn-success-bg-hover: #66ffcc;
   --btn-warning-bg: #ffd000;       --btn-warning-bg-hover: #ffe066;
   --btn-danger-bg: #ff4444;        --btn-danger-bg-hover: #ff6666;
 
-  --btn-neutral-fg: #fff;
-  --btn-neutral-bg: #111;
-  --btn-neutral-bg-hover: #222;
-  --btn-neutral-bd: #fff;
+  --btn-neutral-fg: #ffffff;
+  --btn-neutral-bg: #111111;
+  --btn-neutral-bg-hover: #222222;
+  --btn-neutral-bd: #ffffff;
+
+  /* foco continua alto e visível */
+  --focus: #ffbf47;
+  --accent: #3b82f6; /* usado em hovers */
+  --accent-strong: #60a5fa;
+
+  /* sombras sutis no dark */
+  --shadow: 0 0 0 rgba(0,0,0,0);
 }
+
+/* No modo HC: textos “normais” viram semibold para melhor leitura */
+html[data-theme="hc"] body { font-weight: 600; }
+html[data-theme="hc"] p,
+html[data-theme="hc"] li,
+html[data-theme="hc"] label,
+html[data-theme="hc"] .nav-item-label,
+html[data-theme="hc"] .user-email,
+html[data-theme="hc"] .form-field label,
+html[data-theme="hc"] .stat-title,
+html[data-theme="hc"] .page-subtitle { font-weight: 600; }
 
 /* =========================
    A11y Utilities
@@ -173,7 +203,7 @@ html[data-theme="hc"] {
 .stat-icon-svg { width: 2em; height: 2em; color: currentColor; }
 .action-icon-svg { width: 1.5em; height: 1.5em; color: currentColor; }
 
-/* Transições suaves aplicadas a ícones interativos */
+/* Transições suaves para ícones interativos */
 .nav-item-icon, .logout-icon, .close-menu-icon, .icon, .icon-sm, .icon-lg,
 .stat-icon-svg, .action-icon-svg { transition: color .2s ease; }
 
@@ -196,7 +226,7 @@ html[data-theme="hc"] {
   color: var(--btn-neutral-fg);
   box-shadow: var(--shadow);
   transition: transform .02s ease, background .15s ease, border-color .15s ease, color .15s ease;
-  min-height: 44px; /* alvo mínimo toque */
+  min-height: 44px;
 }
 .btn svg { width: var(--icon-size); height: var(--icon-size); }
 .btn:active { transform: translateY(1px); }
@@ -342,7 +372,7 @@ html[data-theme="hc"] {
   padding: 48px 40px;
   display: flex; flex-direction: column; gap: 16px;
 }
-.brand { font-weight: 800; letter-spacing: .5px; font-size: var(--fs-18); color: var(--fg); }
+.brand { font-weight: 800; letter-spacing: .5px; font-size: var(--fs-18); color: var(--fg); margin: 0; }
 .title { margin: 0; font-size: var(--fs-24); color: var(--fg); }
 .form { display: flex; flex-direction: column; gap: 12px; }
 .form label { font-size: var(--fs-14); color: var(--fg); }
@@ -487,7 +517,6 @@ html[data-theme="hc"] {
 /* =========================
    Componentes
    ========================= */
-/* Header padrão de página */
 .page-header {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -506,12 +535,10 @@ html[data-theme="hc"] {
 .page-subtitle { margin: 0; color: var(--muted); font-size: clamp(var(--fs-14), 3vw, var(--fs-16)); }
 .page-header__toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
-/* Header antigo (dash) */
 .main-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
 .header-content h1 { font-size: 2rem; font-weight: 700; color: var(--fg); margin: 0 0 .5rem; }
 .header-content p { color: var(--muted); margin: 0; }
 
-/* Botão refresh */
 .refresh-btn {
   display: inline-flex; align-items: center; gap: .5rem;
   padding: .75rem 1.5rem; background: var(--accent-bg); color: #fff; border: none;
@@ -736,10 +763,9 @@ html[data-theme="hc"] {
 .refresh-btn:hover .icon-sm-old, .action-card:hover .action-icon-svg { color: inherit; }
 
 /* Compat (classe antiga preservada) */
-.icon-sm-old { width: 1.25em; height: 1.25em; color: currentColor; } /* compat */
+.icon-sm-old { width: 1.25em; height: 1.25em; color: currentColor; }
 
 /* ===== Checkbox Acessível (Grande) - Para formulários ===== */
-
 .form-field input[type="checkbox"] {
   width: 20px;
   height: 20px;
@@ -748,8 +774,6 @@ html[data-theme="hc"] {
   accent-color: var(--accent-bg);
   flex-shrink: 0;
 }
-
-/* Container para checkbox com label alinhado */
 .checkbox-field {
   display: flex;
   align-items: center;
@@ -759,51 +783,26 @@ html[data-theme="hc"] {
   transition: background-color 0.2s ease;
   cursor: pointer;
 }
-
-.checkbox-field:hover {
-  background: var(--panel-muted);
-}
-
-.checkbox-field input[type="checkbox"] {
-  margin: 0;
-}
-
+.checkbox-field:hover { background: var(--panel-muted); }
+.checkbox-field input[type="checkbox"] { margin: 0; }
 .checkbox-field label {
-  margin: 0;
-  font-weight: 500;
-  color: var(--fg);
-  cursor: pointer;
-  flex: 1;
+  margin: 0; font-weight: 500; color: var(--fg);
+  cursor: pointer; flex: 1;
 }
-
-/* Estados de foco acessível */
-.checkbox-field:focus-within {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: 8px;
-}
-
-/* Versão compacta para toolbars */
-.checkbox-field--compact {
-  padding: 8px;
-  gap: 8px;
-}
-
-.checkbox-field--compact input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-}
+.checkbox-field:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
+.checkbox-field--compact { padding: 8px; gap: 8px; }
+.checkbox-field--compact input[type="checkbox"] { width: 18px; height: 18px; }
 
 /* Visually hidden, mas acessível para leitores de tela */
 .sr-only {
   position: absolute !important;
-  width: 1px; 
+  width: 1px;
   height: 1px;
   padding: 0;
   margin: -1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
-  white-space: nowrap; 
+  white-space: nowrap;
   border: 0;
-  clip-path: inset(50%); /* navegadores modernos */
+  clip-path: inset(50%);
 }
