@@ -74,36 +74,48 @@ export default function AccessibilityToggles() {
 
   return (
     <>
-      {/* FAB flutuante no canto inferior direito */}
-      <button
-        ref={btnRef}
-        type="button"
-        className="logout-btn" /* reaproveita estilo base (cor/herança/foco) */
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls="a11y-menu"
-        aria-label={open ? "Fechar opções de acessibilidade" : "Abrir opções de acessibilidade"}
-        style={{
-          position: "fixed",
-          right: "16px",
-          bottom: "16px",
-          zIndex: 70,
-          width: "52px",
-          height: "52px",
-          borderRadius: "50%",
-          background: "var(--panel)",
-          border: "1px solid var(--border)",
-          boxShadow: "0 6px 18px rgba(0,0,0,.12)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--fg)",
-        }}
-      >
-        <AccessibilityGlyph />
-        <span className="sr-only">Acessibilidade</span>
-      </button>
+<button
+  ref={btnRef}
+  type="button"
+  onClick={() => setOpen((v) => !v)}
+  aria-haspopup="menu"
+  aria-expanded={open}
+  aria-controls="a11y-menu"
+  aria-label={open ? "Fechar opções de acessibilidade" : "Abrir opções de acessibilidade"}
+  style={{
+    position: "fixed",
+    right: "16px",
+    bottom: "16px",
+    zIndex: 70,
+    width: "56px",
+    height: "56px",
+    borderRadius: "50%",
+    background: "var(--panel)",
+    border: "1px solid var(--border)",
+    boxShadow: "0 6px 18px rgba(0,0,0,.12)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--fg)",
+  }}
+>
+  {/* Ícone universal de acessibilidade */}
+  <svg
+    viewBox="0 0 24 24"
+    width="26"
+    height="26"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="7.5" r="2" fill="currentColor" />
+    <path d="M5 9.5c2.5 1 5 .9 7 .9s4.5.1 7-.9" strokeLinecap="round" />
+    <path d="M9.5 11.5L12 17l2.5-5.5" strokeLinecap="round" />
+  </svg>
+  <span className="sr-only">Acessibilidade</span>
+</button>
 
       {/* Popover com as duas opções */}
       {open && (
