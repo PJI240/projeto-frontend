@@ -124,7 +124,7 @@ body {
    Modo Alto Contraste manual (toggle)
    ========================= */
 html[data-theme="hc"]{
-  /* superfícies/texto (+++ ADIÇÃO IMPORTANTE +++) */
+  /* superfícies/texto (ADICIONADOS) */
   --bg: #000000;
   --panel: #0b0b0b;
   --panel-muted: #151515;
@@ -132,7 +132,7 @@ html[data-theme="hc"]{
   --muted: #d1d5db;
   --border: #ffffff;
 
-  /* botões (cores já existentes, preservadas) */
+  /* botões (mantidos e ajustados) */
   --btn-primary-bg: #00ff6a;       --btn-primary-bg-hover: #32ff90;
   --btn-success-bg: #00ffaa;       --btn-success-bg-hover: #66ffcc;
   --btn-warning-bg: #ffd000;       --btn-warning-bg-hover: #ffe066;
@@ -143,9 +143,9 @@ html[data-theme="hc"]{
   --btn-neutral-bg-hover: #222222;
   --btn-neutral-bd: #ffffff;
 
-  /* foco continua alto e visível */
+  /* foco/realce */
   --focus: #ffbf47;
-  --accent: #3b82f6; /* usado em hovers */
+  --accent: #3b82f6;
   --accent-strong: #60a5fa;
 
   /* sombras sutis no dark */
@@ -319,20 +319,39 @@ html[data-theme="hc"] .page-subtitle { font-weight: 600; }
 .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .form-field { display: flex; flex-direction: column; gap: 6px; }
 .form-field label { font-weight: 600; color: var(--fg); }
-.form-field input, .form-field select, .form-field textarea {
+
+/* >>> AJUSTE: sem cores fixas (#fff/#111) */
+.form-field input,
+.form-field select,
+.form-field textarea {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   font-size: var(--fs-16);
-  background: #fff;
-  color: #111;
+  background: var(--panel);
+  color: var(--fg);
 }
+.form-field input::placeholder,
+.form-field textarea::placeholder { color: color-mix(in srgb, var(--muted) 65%, transparent); }
+
 .form-field textarea { min-height: 120px; }
 .form-field input:focus-visible,
 .form-field select:focus-visible,
 .form-field textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* HC: garantir contraste em selects/listas */
+html[data-theme="hc"] select,
+html[data-theme="hc"] .input {
+  background: var(--panel) !important;
+  color: var(--fg) !important;
+  border-color: var(--border) !important;
+}
+html[data-theme="hc"] select option {
+  background: #000 !important;
+  color: #fff !important;
+}
 
 .form-actions {
   display: flex;
@@ -378,7 +397,7 @@ html[data-theme="hc"] .page-subtitle { font-weight: 600; }
 .form label { font-size: var(--fs-14); color: var(--fg); }
 .form input {
   padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
-  font-size: var(--fs-16); background: #fff; color: #111;
+  font-size: var(--fs-16); background: var(--panel); color: var(--fg);
 }
 .form input:focus { border-color: var(--accent-bg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-bg) 25%, transparent); }
 .form button {
