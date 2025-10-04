@@ -10,6 +10,42 @@ function AIcon(props) {
   );
 }
 
+/* Ícone clássico “Universal Access” – traço arredondado, com folga no viewBox */
+function ClassicA11yIcon({ size = 36 }) {
+  return (
+    <svg
+      viewBox="-2 -2 52 52" /* folga p/ não clipar */
+      width={size}
+      height={size}
+      aria-hidden="true"
+      style={{ color: "#fff" }} /* branco, independente do CSS global */
+    >
+      {/* círculo externo */}
+      <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+      {/* cabeça */}
+      <circle cx="24" cy="13.5" r="4" fill="currentColor" />
+      {/* braços (leve curva) */}
+      <path
+        d="M6 22 C 14 18, 34 18, 42 22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* pernas em V */}
+      <path
+        d="M19 25 L24 37 L29 25"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function AccessibilityToggles() {
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "default");
   const [font,  setFont ] = useState(localStorage.getItem("font")  || "md");
@@ -60,51 +96,34 @@ export default function AccessibilityToggles() {
   return (
     <>
       {/* FAB flutuante azul com pulse */}
-     <button
-  ref={btnRef}
-  type="button"
-  onClick={() => setOpen((v) => !v)}
-  aria-haspopup="menu"
-  aria-expanded={open}
-  aria-controls="a11y-menu"
-  aria-label={open ? "Fechar opções de acessibilidade" : "Abrir opções de acessibilidade"}
-  style={{
-    position: "fixed",
-    right: "16px",
-    bottom: "16px",
-    zIndex: 70,
-    width: "64px",
-    height: "64px",
-    borderRadius: "50%",
-    background: "var(--a11y-blue, #1e90ff)",
-    border: "none",
-    boxShadow: "0 6px 18px rgba(0,0,0,.25)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    animation: "pulse 2s infinite",
-  }}
->
-  {/* Ícone universal em branco, com padding no viewBox pra não cortar */}
-  <svg
-    viewBox="-1 -1 26 26"     // <-- dá folga nas bordas
-    width="34"
-    height="34"
-    aria-hidden="true"
-    style={{ color: '#fff' }}  // <-- força branco mesmo se o CSS global definir currentColor
-  >
-    {/* contorno */}
-    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    {/* cabeça */}
-    <circle cx="12" cy="7.6" r="2.2" fill="currentColor" />
-    {/* braços */}
-    <path d="M4.5 9.3c2.7 1.1 5.7 1.1 7.5 1.1s4.8 0 7.5-1.1"
-          fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    {/* pernas */}
-    <path d="M9.4 11.9L12 17.6l2.6-5.7"
-          fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-</button>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls="a11y-menu"
+        aria-label={open ? "Fechar opções de acessibilidade" : "Abrir opções de acessibilidade"}
+        style={{
+          position: "fixed",
+          right: "16px",
+          bottom: "16px",
+          zIndex: 70,
+          width: "64px",
+          height: "64px",
+          borderRadius: "50%",
+          background: "var(--a11y-blue, #1e90ff)",
+          border: "none",
+          boxShadow: "0 6px 18px rgba(0,0,0,.25)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          animation: "pulse 2s infinite",
+        }}
+      >
+        <ClassicA11yIcon size={36} />
+      </button>
+
       {/* Popover com as duas opções */}
       {open && (
         <div
