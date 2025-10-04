@@ -21,7 +21,6 @@ export default function AccessibilityToggles() {
   const menuRef = useRef(null);
   const btnRef  = useRef(null);
 
-  // aplica dataset + persiste
   useEffect(() => {
     const html = document.documentElement;
     html.dataset.theme = isHC ? "hc" : "";
@@ -30,7 +29,6 @@ export default function AccessibilityToggles() {
     localStorage.setItem("font",  font);
   }, [theme, font, isHC, isLG]);
 
-  // fecha no ESC / clique fora
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
@@ -50,7 +48,6 @@ export default function AccessibilityToggles() {
     };
   }, [open]);
 
-  // bloqueia rolagem de fundo quando o menu abre em telas pequenas
   useEffect(() => {
     const prev = document.body.style.overflow;
     if (open) document.body.style.overflow = "hidden";
@@ -62,7 +59,7 @@ export default function AccessibilityToggles() {
 
   return (
     <>
-      {/* FAB flutuante com SVG azul */}
+      {/* FAB flutuante azul com pulse */}
       <button
         ref={btnRef}
         type="button"
@@ -76,42 +73,33 @@ export default function AccessibilityToggles() {
           right: "16px",
           bottom: "16px",
           zIndex: 70,
-          width: "56px",
-          height: "56px",
+          width: "64px",
+          height: "64px",
           borderRadius: "50%",
-          background: "var(--panel)",
-          border: "1px solid var(--border)",
-          boxShadow: "0 6px 18px rgba(0,0,0,.12)",
+          background: "var(--a11y-blue, #1e90ff)",
+          border: "none",
+          boxShadow: "0 6px 18px rgba(0,0,0,.25)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "var(--fg)",
+          animation: "pulse 2s infinite",
         }}
       >
-        {/* Símbolo universal de acessibilidade (azul) */}
+        {/* Ícone universal branco */}
         <svg
           viewBox="0 0 24 24"
-          width="26"
-          height="26"
+          width="32"
+          height="32"
           aria-hidden="true"
-          /* permite customizar o tom via CSS var, com fallback */
-          style={{ color: "var(--a11y-blue, #1e90ff)" }}
+          fill="white"
+          stroke="white"
+          strokeWidth="1.5"
         >
-          {/* contorno principal */}
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.8" />
-          {/* cabeça (preenchida) */}
-          <circle cx="12" cy="7.5" r="2.2" fill="currentColor" />
-          {/* braços curvos */}
-          <path d="M4.5 9.2c2.7 1.2 5.5 1.2 7.5 1.2s4.8 0 7.5-1.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-          {/* pernas em V */}
-          <path d="M9.5 11.8L12 17.5l2.5-5.7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-          {/* nós azuis nas extremidades (ornamentais, como no desenho que você mandou) */}
-          <circle cx="4.3" cy="9.7" r="1.2" fill="currentColor"/>
-          <circle cx="19.7" cy="9.7" r="1.2" fill="currentColor"/>
-          <circle cx="7.2" cy="20" r="1.2" fill="currentColor"/>
-          <circle cx="16.8" cy="20" r="1.2" fill="currentColor"/>
+          <circle cx="12" cy="12" r="10" fill="none" />
+          <circle cx="12" cy="7.5" r="2.2" />
+          <path d="M4.5 9.2c2.7 1.2 5.5 1.2 7.5 1.2s4.8 0 7.5-1.2" fill="none" strokeLinecap="round"/>
+          <path d="M9.5 11.8L12 17.5l2.5-5.7" fill="none" strokeLinecap="round"/>
         </svg>
-        <span className="sr-only">Acessibilidade</span>
       </button>
 
       {/* Popover com as duas opções */}
@@ -124,7 +112,7 @@ export default function AccessibilityToggles() {
           style={{
             position: "fixed",
             right: "16px",
-            bottom: "76px",
+            bottom: "90px",
             zIndex: 71,
             background: "var(--panel)",
             border: "1px solid var(--border)",
@@ -135,7 +123,6 @@ export default function AccessibilityToggles() {
           }}
         >
           <div className="menu-group-items" style={{ display: "grid", gap: "8px" }}>
-            {/* Fonte grande */}
             <button
               type="button"
               role="menuitemcheckbox"
@@ -158,7 +145,6 @@ export default function AccessibilityToggles() {
               <span className="nav-item-label">{isLG ? "Fonte normal" : "Fonte grande"}</span>
             </button>
 
-            {/* Alto contraste */}
             <button
               type="button"
               role="menuitemcheckbox"
@@ -183,6 +169,14 @@ export default function AccessibilityToggles() {
           </div>
         </div>
       )}
+
+      {/* Keyframes pulse */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+      `}</style>
     </>
   );
 }
