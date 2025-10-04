@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { EyeIcon } from "@heroicons/react/24/outline";
-import AccessibilityLogo from "../assets/Accessibility_logo.png"; // ✅ import do ícone
+import AccessibilityLogo from "../assets/Accessibility_logo.png";
 
 /* Ícone 'A' para “Fonte grande” */
 function AIcon(props) {
@@ -88,28 +88,29 @@ export default function AccessibilityToggles() {
           right: "16px",
           bottom: "16px",
           zIndex: 70,
-          width: "68px",
-          height: "68px",
+          width: "70px",
+          height: "70px",
           borderRadius: "50%",
-          background: "var(--a11y-blue, #1e90ff)",
-          border: "none",
+          background: isHC ? "#00ffaa" : "var(--a11y-blue, #1e90ff)",
+          border: isHC ? "2px solid #fff" : "none",
           boxShadow: "0 6px 18px rgba(0,0,0,.25)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           animation: "pulse 2s infinite",
+          transition: "all .2s ease",
         }}
       >
         <img
           src={AccessibilityLogo}
-          alt=""
-          width="44"
-          height="44"
+          alt="Acessibilidade"
+          width="46"
+          height="46"
           style={{
             display: "block",
             objectFit: "contain",
             pointerEvents: "none",
-            filter: "brightness(0) invert(1)", // torna o ícone branco
+            filter: isHC ? "brightness(1)" : "brightness(0) invert(1)",
           }}
         />
       </button>
@@ -124,7 +125,7 @@ export default function AccessibilityToggles() {
           style={{
             position: "fixed",
             right: "16px",
-            bottom: "96px",
+            bottom: "100px",
             zIndex: 71,
             background: "var(--panel)",
             border: "1px solid var(--border)",
@@ -132,9 +133,12 @@ export default function AccessibilityToggles() {
             boxShadow: "0 12px 28px rgba(0,0,0,.16)",
             padding: "10px",
             minWidth: "220px",
+            color: "var(--fg)",
+            fontSize: isLG ? "1.1rem" : "1rem",
           }}
         >
           <div style={{ display: "grid", gap: "8px" }}>
+            {/* Fonte */}
             <button
               type="button"
               role="menuitemcheckbox"
@@ -148,14 +152,18 @@ export default function AccessibilityToggles() {
                 justifyContent: "flex-start",
                 borderRadius: "10px",
                 padding: "10px 12px",
-                background: isLG ? "var(--panel-muted)" : "transparent",
+                background: isLG ? "color-mix(in srgb, var(--accent) 12%, var(--panel))" : "transparent",
                 border: "1px solid var(--border)",
+                color: "var(--fg)",
+                fontWeight: isLG ? "700" : "600",
+                transition: "all .2s ease",
               }}
             >
               <AIcon />
               <span>{isLG ? "Fonte normal" : "Fonte grande"}</span>
             </button>
 
+            {/* Contraste */}
             <button
               type="button"
               role="menuitemcheckbox"
@@ -169,8 +177,11 @@ export default function AccessibilityToggles() {
                 justifyContent: "flex-start",
                 borderRadius: "10px",
                 padding: "10px 12px",
-                background: isHC ? "var(--panel-muted)" : "transparent",
+                background: isHC ? "color-mix(in srgb, var(--accent) 12%, var(--panel))" : "transparent",
                 border: "1px solid var(--border)",
+                color: "var(--fg)",
+                fontWeight: isHC ? "700" : "600",
+                transition: "all .2s ease",
               }}
             >
               <EyeIcon width={20} height={20} />
@@ -180,6 +191,7 @@ export default function AccessibilityToggles() {
         </div>
       )}
 
+      {/* Animação do botão */}
       <style>{`
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
