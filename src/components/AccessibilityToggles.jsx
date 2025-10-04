@@ -1,46 +1,14 @@
 import { useEffect, useState, useRef } from "react";
 import { EyeIcon } from "@heroicons/react/24/outline";
+import AccessibilityLogo from "../assets/Accessibility_logo.png"; // ✅ import do ícone
 
 /* Ícone 'A' para “Fonte grande” */
 function AIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" {...props}>
-      <path d="M12 4l6 16h-2.4l-1.4-4H9.8L8.4 20H6L12 4zm-1.6 9.4h3.2L12 7.8l-1.6 5.6z" fill="currentColor"/>
-    </svg>
-  );
-}
-
-/* Ícone clássico “Universal Access” – traço arredondado, com folga no viewBox */
-function ClassicA11yIcon({ size = 36 }) {
-  return (
-    <svg
-      viewBox="-2 -2 52 52" /* folga p/ não clipar */
-      width={size}
-      height={size}
-      aria-hidden="true"
-      style={{ color: "#fff" }} /* branco, independente do CSS global */
-    >
-      {/* círculo externo */}
-      <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-      {/* cabeça */}
-      <circle cx="24" cy="13.5" r="4" fill="currentColor" />
-      {/* braços (leve curva) */}
       <path
-        d="M6 22 C 14 18, 34 18, 42 22"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* pernas em V */}
-      <path
-        d="M19 25 L24 37 L29 25"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M12 4l6 16h-2.4l-1.4-4H9.8L8.4 20H6L12 4zm-1.6 9.4h3.2L12 7.8l-1.6 5.6z"
+        fill="currentColor"
       />
     </svg>
   );
@@ -48,29 +16,33 @@ function ClassicA11yIcon({ size = 36 }) {
 
 export default function AccessibilityToggles() {
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "default");
-  const [font,  setFont ] = useState(localStorage.getItem("font")  || "md");
-  const [open,  setOpen ] = useState(false);
+  const [font, setFont] = useState(localStorage.getItem("font") || "md");
+  const [open, setOpen] = useState(false);
 
   const isHC = theme === "hc";
   const isLG = font === "lg";
 
   const menuRef = useRef(null);
-  const btnRef  = useRef(null);
+  const btnRef = useRef(null);
 
+  /* aplica tema e fonte */
   useEffect(() => {
     const html = document.documentElement;
     html.dataset.theme = isHC ? "hc" : "";
-    html.dataset.font  = isLG ? "lg" : "";
+    html.dataset.font = isLG ? "lg" : "";
     localStorage.setItem("theme", theme);
-    localStorage.setItem("font",  font);
+    localStorage.setItem("font", font);
   }, [theme, font, isHC, isLG]);
 
+  /* fecha com ESC ou clique fora */
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
     const onDown = (e) => {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target) && !btnRef.current.contains(e.target)) {
+      if (
+        !menuRef.current?.contains(e.target) &&
+        !btnRef.current?.contains(e.target)
+      ) {
         setOpen(false);
       }
     };
@@ -84,10 +56,13 @@ export default function AccessibilityToggles() {
     };
   }, [open]);
 
+  /* bloqueia rolagem quando o menu abre */
   useEffect(() => {
     const prev = document.body.style.overflow;
     if (open) document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   const toggleHC = () => setTheme(isHC ? "default" : "hc");
@@ -95,7 +70,7 @@ export default function AccessibilityToggles() {
 
   return (
     <>
-      {/* FAB flutuante azul com pulse */}
+      {/* FAB flutuante com ícone PNG */}
       <button
         ref={btnRef}
         type="button"
@@ -103,14 +78,18 @@ export default function AccessibilityToggles() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="a11y-menu"
-        aria-label={open ? "Fechar opções de acessibilidade" : "Abrir opções de acessibilidade"}
+        aria-label={
+          open
+            ? "Fechar opções de acessibilidade"
+            : "Abrir opções de acessibilidade"
+        }
         style={{
           position: "fixed",
           right: "16px",
           bottom: "16px",
           zIndex: 70,
-          width: "64px",
-          height: "64px",
+          width: "68px",
+          height: "68px",
           borderRadius: "50%",
           background: "var(--a11y-blue, #1e90ff)",
           border: "none",
@@ -121,10 +100,21 @@ export default function AccessibilityToggles() {
           animation: "pulse 2s infinite",
         }}
       >
-        <ClassicA11yIcon size={36} />
+        <img
+          src={AccessibilityLogo}
+          alt=""
+          width="44"
+          height="44"
+          style={{
+            display: "block",
+            objectFit: "contain",
+            pointerEvents: "none",
+            filter: "brightness(0) invert(1)", // torna o ícone branco
+          }}
+        />
       </button>
 
-      {/* Popover com as duas opções */}
+      {/* Menu popover com opções */}
       {open && (
         <div
           ref={menuRef}
@@ -134,7 +124,7 @@ export default function AccessibilityToggles() {
           style={{
             position: "fixed",
             right: "16px",
-            bottom: "90px",
+            bottom: "96px",
             zIndex: 71,
             background: "var(--panel)",
             border: "1px solid var(--border)",
@@ -144,13 +134,12 @@ export default function AccessibilityToggles() {
             minWidth: "220px",
           }}
         >
-          <div className="menu-group-items" style={{ display: "grid", gap: "8px" }}>
+          <div style={{ display: "grid", gap: "8px" }}>
             <button
               type="button"
               role="menuitemcheckbox"
               aria-checked={isLG}
               onClick={toggleFont}
-              className={`toggle-btn ${isLG ? "is-active" : ""}`}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -163,8 +152,8 @@ export default function AccessibilityToggles() {
                 border: "1px solid var(--border)",
               }}
             >
-              <span className="nav-item-icon" aria-hidden="true"><AIcon /></span>
-              <span className="nav-item-label">{isLG ? "Fonte normal" : "Fonte grande"}</span>
+              <AIcon />
+              <span>{isLG ? "Fonte normal" : "Fonte grande"}</span>
             </button>
 
             <button
@@ -172,7 +161,6 @@ export default function AccessibilityToggles() {
               role="menuitemcheckbox"
               aria-checked={isHC}
               onClick={toggleHC}
-              className={`toggle-btn ${isHC ? "is-active" : ""}`}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -185,14 +173,13 @@ export default function AccessibilityToggles() {
                 border: "1px solid var(--border)",
               }}
             >
-              <span className="nav-item-icon" aria-hidden="true"><EyeIcon width={20} height={20} /></span>
-              <span className="nav-item-label">{isHC ? "Tema padrão" : "Alto contraste"}</span>
+              <EyeIcon width={20} height={20} />
+              <span>{isHC ? "Tema padrão" : "Alto contraste"}</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Keyframes pulse */}
       <style>{`
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
