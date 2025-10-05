@@ -1,7 +1,16 @@
 // src/pages/Escalas.jsx
 import { useEffect, useMemo, useState, useCallback } from "react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CalendarDaysIcon,
+  PlusCircleIcon,
+  Cog6ToothIcon,
+  ArrowPathIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/solid";
 
-const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
+const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 
 /* ========== utils de data BR ========== */
 function toISO(d) {
@@ -10,12 +19,10 @@ function toISO(d) {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
 }
-
 function fromISO(s) {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
-
 function startOfWeek(d) {
   const dt = new Date(d);
   const day = dt.getDay();
@@ -24,620 +31,315 @@ function startOfWeek(d) {
   dt.setHours(0, 0, 0, 0);
   return dt;
 }
-
 function addDays(d, n) {
   const r = new Date(d);
   r.setDate(r.getDate() + n);
   return r;
 }
-
 function formatDateBR(d) {
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
-
 function formatMonthYear(d) {
-  return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
-
 function calcularDuracao(entrada, saida) {
   if (!entrada || !saida) return "0:00";
-  
-  const [h1, m1] = entrada.split(':').map(Number);
-  const [h2, m2] = saida.split(':').map(Number);
-  
-  const totalMinutos = (h2 * 60 + m2) - (h1 * 60 + m1);
-  const horas = Math.floor(totalMinutos / 60);
-  const minutos = totalMinutos % 60;
-  
-  return `${horas}:${minutos.toString().padStart(2, '0')}`;
+  const [h1, m1] = entrada.split(":").map(Number);
+  const [h2, m2] = saida.split(":").map(Number);
+  const totalMin = (h2 * 60 + m2) - (h1 * 60 + m1);
+  const h = Math.max(0, Math.floor(totalMin / 60));
+  const m = Math.max(0, totalMin % 60);
+  return `${h}:${String(m).padStart(2, "0")}`;
 }
-
 function calcularDuracaoEmMinutos(entrada, saida) {
   if (!entrada || !saida) return 0;
-  
-  const [h1, m1] = entrada.split(':').map(Number);
-  const [h2, m2] = saida.split(':').map(Number);
-  
+  const [h1, m1] = entrada.split(":").map(Number);
+  const [h2, m2] = saida.split(":").map(Number);
   return (h2 * 60 + m2) - (h1 * 60 + m1);
 }
-
 function formatarHorasTotais(horas, minutos) {
-  if (horas === 0 && minutos === 0) return "-";
-  return `${horas}:${minutos.toString().padStart(2, '0')}h`;
+  if (!horas && !minutos) return "-";
+  return `${horas}:${String(minutos).padStart(2, "0")}h`;
 }
 
-const DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 const DIAS_SEMANA_CURTO = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
-// Configuração de horários flexível
-const CONFIG_HORARIOS = {
-  inicio: 6,
-  fim: 22,
-  incremento: 1 // horas entre cada linha
+// Config de horários da grade (pode ser alterada no modal)
+const CONFIG_HORARIOS = { inicio: 6, fim: 22, incremento: 1 };
+function gerarHorarios() {
+  const arr = [];
+  for (let h = CONFIG_HORARIOS.inicio; h <= CONFIG_HORARIOS.fim; h += CONFIG_HORARIOS.incremento) {
+    arr.push(`${String(h).padStart(2, "0")}:00`);
+  }
+  return arr;
+}
+
+// Cores por funcionário (alimentam uma CSS var para respeitar HC)
+const CORES_FUNCIONARIOS = [
+  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16",
+  "#f97316", "#6366f1", "#14b8a6", "#84cc16", "#eab308", "#a855f7", "#f43f5e", "#0ea5e9",
+];
+const getCorFuncionario = (id) => {
+  const n = Math.abs(Number(id) || 0);
+  return CORES_FUNCIONARIOS[n % CORES_FUNCIONARIOS.length];
 };
 
-// Função para gerar horários baseado na configuração
-function gerarHorarios() {
-  const horarios = [];
-  for (let hora = CONFIG_HORARIOS.inicio; hora <= CONFIG_HORARIOS.fim; hora += CONFIG_HORARIOS.incremento) {
-    horarios.push(`${hora.toString().padStart(2, '0')}:00`);
-  }
-  return horarios;
-}
-
-// Cores para os funcionários
-const CORES_FUNCIONARIOS = [
-  "#3b82f6", "#ef4444", "#10b981", "#f59e0b", 
-  "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16",
-  "#f97316", "#6366f1", "#14b8a6", "#84cc16",
-  "#eab308", "#a855f7", "#f43f5e", "#0ea5e9"
-];
-
-function getCorFuncionario(id) {
-  return CORES_FUNCIONARIOS[id % CORES_FUNCIONARIOS.length];
-}
-
-/* ========== Modal ========== */
+/* ========== Modal acessível (padrão visual do app) ========== */
 function Modal({ open, onClose, title, children, footer, size = "medium" }) {
   if (!open) return null;
-  
-  const sizes = {
-    small: "min(400px, 100%)",
-    medium: "min(500px, 100%)",
-    large: "min(800px, 100%)",
-    xlarge: "min(95vw, 1200px)"
-  };
-  
+  const sizes = { small: 380, medium: 520, large: 820, xlarge: 1100 };
   return (
     <div
       role="dialog"
       aria-modal="true"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.35)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: 16,
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
-      }}
+      aria-labelledby="modal-title"
+      className="modal-backdrop"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
-      <div
-        style={{
-          width: sizes[size],
-          background: "var(--panel)",
-          borderRadius: "12px",
-          border: "1px solid var(--border)",
-          padding: 20,
-          maxHeight: "90vh",
-          overflow: "auto"
-        }}
-      >
-        <div style={{ 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "space-between", 
-          marginBottom: 16,
-          paddingBottom: 12,
-          borderBottom: "1px solid var(--border)"
-        }}>
-          <h2 style={{ margin: 0, fontSize: "18px" }}>{title}</h2>
-          <button 
-            className="toggle-btn" 
-            onClick={onClose}
-            style={{ padding: "8px" }}
-          >
-            ✕
+      <div className="modal-panel" style={{ maxWidth: sizes[size] }}>
+        <div className="modal-header">
+          <h2 id="modal-title" className="modal-title">{title}</h2>
+          <button className="btn btn--icon" aria-label="Fechar" onClick={onClose}>
+            <XMarkIcon className="icon" aria-hidden="true" />
           </button>
         </div>
-        <div style={{ marginBottom: 16 }}>
-          {children}
-        </div>
-        {footer && (
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            {footer}
-          </div>
-        )}
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-footer">{footer}</div>}
       </div>
+      <style jsx>{`
+        .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+        .modal-panel{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);max-height:90vh;overflow:auto}
+        .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border)}
+        .modal-title{font-size:18px;font-weight:700}
+        .modal-body{padding:16px}
+        .modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border)}
+        .btn--icon{background:var(--panel-muted)}
+      `}</style>
     </div>
   );
 }
 
-/* ========== Componente Calendário Multi Seleção ========== */
+/* ========== Calendário multi-seleção (com tokens de cor) ========== */
 function CalendarioMultiSelecao({ datasSelecionadas, onDatasChange, mesInicial }) {
   const [mesAtual, setMesAtual] = useState(mesInicial || new Date());
-  
   const primeiroDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
-  const ultimoDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0);
   const primeiroDiaGrid = new Date(primeiroDiaMes);
   primeiroDiaGrid.setDate(primeiroDiaGrid.getDate() - (primeiroDiaMes.getDay() + 6) % 7);
-  
+
   const dias = [];
-  const dataAtual = new Date(primeiroDiaGrid);
-  
-  // 6 semanas para cobrir todos os cenários
-  for (let i = 0; i < 42; i++) {
-    dias.push(new Date(dataAtual));
-    dataAtual.setDate(dataAtual.getDate() + 1);
-  }
-  
+  const d = new Date(primeiroDiaGrid);
+  for (let i = 0; i < 42; i++) { dias.push(new Date(d)); d.setDate(d.getDate() + 1); }
+
   const toggleData = (data) => {
-    const dataISO = toISO(data);
-    const novasDatas = new Set(datasSelecionadas);
-    
-    if (novasDatas.has(dataISO)) {
-      novasDatas.delete(dataISO);
-    } else {
-      novasDatas.add(dataISO);
-    }
-    
-    onDatasChange(Array.from(novasDatas));
+    const iso = toISO(data);
+    const set = new Set(datasSelecionadas);
+    set.has(iso) ? set.delete(iso) : set.add(iso);
+    onDatasChange(Array.from(set));
   };
-  
-  const mesAnterior = () => {
-    setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1));
-  };
-  
-  const mesSeguinte = () => {
-    setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1));
-  };
-  
-  const hoje = toISO(new Date());
-  
+
+  const hojeISO = toISO(new Date());
+
   return (
-    <div style={{ 
-      background: "var(--panel)", 
-      borderRadius: "var(--radius)", 
-      padding: "16px",
-      border: "1px solid var(--border)",
-      boxShadow: "var(--shadow)"
-    }}>
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center", 
-        marginBottom: "16px" 
-      }}>
-        <button 
-          className="toggle-btn" 
-          onClick={mesAnterior}
-          style={{ 
-            padding: "8px 12px", 
-            background: "var(--panel)", 
-            color: "var(--fg)", 
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)", 
-            cursor: "pointer",
-            fontSize: "var(--fs-14)",
-            fontWeight: "600"
-          }}
-        >
-          ←
+    <div className="calendar">
+      <div className="calendar__toolbar">
+        <button className="btn btn--neutral" onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1))}>
+          <ChevronLeftIcon className="icon" aria-hidden="true" /><span>Anterior</span>
         </button>
-        <h3 style={{ 
-          margin: 0, 
-          fontSize: "var(--fs-16)", 
-          color: "var(--fg)",
-          fontWeight: "600"
-        }}>
-          {mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-        </h3>
-        <button 
-          className="toggle-btn" 
-          onClick={mesSeguinte}
-          style={{ 
-            padding: "8px 12px", 
-            background: "var(--panel)", 
-            color: "var(--fg)", 
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)", 
-            cursor: "pointer",
-            fontSize: "var(--fs-14)",
-            fontWeight: "600"
-          }}
-        >
-          →
+        <div className="calendar__title">{mesAtual.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</div>
+        <button className="btn btn--neutral" onClick={() => setMesAtual(new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1))}>
+          <span>Próximo</span><ChevronRightIcon className="icon" aria-hidden="true" />
         </button>
       </div>
-      
-      <div style={{ 
-        display: "grid", 
-        gridTemplateColumns: "repeat(7, 1fr)", 
-        gap: "4px", 
-        marginBottom: "8px" 
-      }}>
-        {DIAS_SEMANA_CURTO.map(dia => (
-          <div key={dia} style={{ 
-            textAlign: "center", 
-            fontSize: "var(--fs-12)", 
-            fontWeight: "600", 
-            padding: "8px 0",
-            color: "var(--muted)",
-            background: "var(--panel-muted)",
-            borderRadius: "4px"
-          }}>
-            {dia}
-          </div>
-        ))}
+
+      <div className="calendar__grid calendar__grid--head">
+        {DIAS_SEMANA_CURTO.map((d) => <div key={d} className="calendar__dow">{d}</div>)}
       </div>
-      
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px" }}>
-        {dias.map((dia, index) => {
-          const dataISO = toISO(dia);
-          const isMesAtual = dia.getMonth() === mesAtual.getMonth();
-          const isSelecionado = datasSelecionadas.includes(dataISO);
-          const isHoje = dataISO === hoje;
-          
+
+      <div className="calendar__grid">
+        {dias.map((dia, idx) => {
+          const iso = toISO(dia);
+          const isMes = dia.getMonth() === mesAtual.getMonth();
+          const ativo = datasSelecionadas.includes(iso);
+          const hoje = iso === hojeISO;
           return (
             <button
-              key={index}
+              key={idx}
+              className={`calendar__cell ${ativo ? "is-active" : ""} ${hoje ? "is-today" : ""} ${!isMes ? "is-out" : ""}`}
               onClick={() => toggleData(dia)}
-              style={{
-                padding: "8px",
-                border: "none",
-                background: isSelecionado 
-                  ? "var(--accent)"  // Azul para selecionado
-                  : isHoje 
-                    ? "color-mix(in srgb, var(--accent) 20%, transparent)"  // Azul claro para hoje
-                    : isMesAtual 
-                      ? "var(--panel)"  // Branco para mês atual
-                      : "var(--panel-muted)", // Cinza claro para outros meses
-                color: isSelecionado 
-                  ? "white"  // Branco para selecionado
-                  : isMesAtual 
-                    ? "var(--fg)"  // Texto escuro para mês atual
-                    : "var(--muted)", // Cinza para outros meses
-                borderRadius: "var(--radius)",
-                cursor: "pointer",
-                fontSize: "var(--fs-14)",
-                fontWeight: isHoje ? "600" : "normal",
-                border: isHoje ? "2px solid var(--accent)" : "1px solid var(--border)",
-                transition: "all 0.2s ease"
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelecionado) {
-                  e.target.style.backgroundColor = isMesAtual 
-                    ? "var(--panel-muted)" 
-                    : "color-mix(in srgb, var(--panel-muted) 80%, var(--panel))";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelecionado) {
-                  e.target.style.backgroundColor = isSelecionado 
-                    ? "var(--accent)"
-                    : isHoje 
-                      ? "color-mix(in srgb, var(--accent) 20%, transparent)"
-                      : isMesAtual 
-                        ? "var(--panel)" 
-                        : "var(--panel-muted)";
-                }
-              }}
-              title={dia.toLocaleDateString('pt-BR')}
+              title={dia.toLocaleDateString("pt-BR")}
             >
               {dia.getDate()}
             </button>
           );
         })}
       </div>
-      
-      <div style={{ 
-        marginTop: "16px", 
-        fontSize: "var(--fs-12)", 
-        color: "var(--muted)",
-        textAlign: "center",
-        padding: "8px",
-        background: "var(--panel-muted)",
-        borderRadius: "4px"
-      }}>
-        {datasSelecionadas.length} data{datasSelecionadas.length !== 1 ? 's' : ''} selecionada{datasSelecionadas.length !== 1 ? 's' : ''}
+
+      <div className="calendar__foot">
+        {datasSelecionadas.length} data{datasSelecionadas.length !== 1 ? "s" : ""} selecionada{datasSelecionadas.length !== 1 ? "s" : ""}
       </div>
+
+      <style jsx>{`
+        .calendar{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px}
+        .calendar__toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+        .calendar__title{font-weight:700;text-transform:capitalize}
+        .calendar__grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+        .calendar__grid--head{margin:6px 0}
+        .calendar__dow{font-size:12px;font-weight:600;text-align:center;color:var(--muted);background:var(--panel-muted);padding:6px;border-radius:4px}
+        .calendar__cell{padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer}
+        .calendar__cell:hover{background:var(--panel-muted)}
+        .calendar__cell.is-active{background:var(--accent);color:var(--on-accent, #fff);border-color:var(--accent)}
+        .calendar__cell.is-today{outline:2px solid var(--accent);outline-offset:0}
+        .calendar__cell.is-out{opacity:.6}
+        .calendar__foot{margin-top:8px;font-size:12px;color:var(--muted);text-align:center;background:var(--panel-muted);padding:6px;border-radius:6px}
+      `}</style>
     </div>
   );
 }
 
 /* ========== Página Escalas ========== */
 export default function Escalas() {
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 900 : false);
+  useEffect(() => {
+    const onR = () => setIsMobile(window.innerWidth <= 900);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
   const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(dataRef, i)), [dataRef]);
 
   const [funcionarios, setFuncionarios] = useState([]);
   const [escalas, setEscalas] = useState([]);
-  
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [sucesso, setSucesso] = useState("");
 
-  // Estados para modais
+  // Modais
   const [modalAberto, setModalAberto] = useState(false);
   const [modalMultiploAberto, setModalMultiploAberto] = useState(false);
   const [modalConfigAberto, setModalConfigAberto] = useState(false);
   const [editando, setEditando] = useState(null);
-  
-  const [form, setForm] = useState({
-    funcionario_id: "",
-    data: toISO(new Date()),
-    turno_ordem: 1,
-    entrada: "",
-    saida: "",
-    origem: "FIXA",
-  });
-  
-  const [formMultiplo, setFormMultiplo] = useState({
-    funcionario_id: "",
-    datas: [],
-    turno_ordem: 1,
-    entrada: "",
-    saida: "",
-    origem: "FIXA",
-  });
+
+  const [form, setForm] = useState({ funcionario_id: "", data: toISO(new Date()), turno_ordem: 1, entrada: "", saida: "", origem: "FIXA" });
+  const [formMultiplo, setFormMultiplo] = useState({ funcionario_id: "", datas: [], turno_ordem: 1, entrada: "08:00", saida: "17:00", origem: "FIXA" });
 
   const api = useCallback(async (path, init = {}) => {
     const url = `${API_BASE}${path}`;
-    console.log('🌐 API Call:', init.method || 'GET', url);
-    
-    const r = await fetch(url, { 
-      credentials: "include", 
-      ...init 
-    });
-    
-    let data = null;
-    try { 
-      data = await r.json(); 
-    } catch (e) {
-      console.error('❌ Erro ao parsear JSON:', e);
-      throw new Error(`Resposta inválida do servidor: ${r.status}`);
-    }
-    
-    console.log('📦 API Response:', data);
-    
-    if (!r.ok || data?.ok === false) {
-      throw new Error(data?.error || `HTTP ${r.status}`);
-    }
-    
+    const r = await fetch(url, { credentials: "include", ...init });
+    let data = null; try { data = await r.json(); } catch { /* no-op */ }
+    if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
     return data;
   }, []);
 
   const carregarFuncionarios = useCallback(async () => {
-    try {
-      const d = await api(`/api/funcionarios?ativos=1`);
-      console.log('👥 Funcionários carregados:', d.funcionarios?.length);
-      setFuncionarios(d.funcionarios || []);
-    } catch (e) {
-      console.error('❌ Erro ao carregar funcionários:', e);
-      throw e;
-    }
+    const d = await api(`/api/funcionarios?ativos=1`);
+    setFuncionarios(d.funcionarios || []);
   }, [api]);
 
   const carregarEscalas = useCallback(async () => {
     const de = toISO(dias[0]);
     const ate = toISO(dias[6]);
-    
-    console.log('📅 Carregando escalas de', de, 'até', ate);
-    
-    try {
-      const d = await api(`/api/escalas?from=${de}&to=${ate}`);
-      console.log('🕒 Escalas carregadas:', d.escalas?.length);
-      setEscalas(d.escalas || []);
-    } catch (e) {
-      console.error('❌ Erro ao carregar escalas:', e);
-      throw e;
-    }
+    const d = await api(`/api/escalas?from=${encodeURIComponent(de)}&to=${encodeURIComponent(ate)}`);
+    setEscalas(d.escalas || []);
   }, [api, dias]);
 
   const recarregar = useCallback(async () => {
-    setLoading(true);
-    setErr("");
-    setSucesso("");
-    
-    console.log('🔄 Iniciando recarregamento...');
-    
-    try {
-      await Promise.all([
-        carregarFuncionarios(),
-        carregarEscalas()
-      ]);
-      console.log('✅ Recarregamento concluído');
-    } catch (e) {
-      console.error('❌ Erro no recarregar:', e);
-      setErr(e.message || "Falha ao carregar dados.");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setErr(""); setSucesso("");
+    try { await Promise.all([carregarFuncionarios(), carregarEscalas()]); }
+    catch (e) { setErr(e.message || "Falha ao carregar dados."); }
+    finally { setLoading(false); }
   }, [carregarFuncionarios, carregarEscalas]);
 
-  useEffect(() => {
-    recarregar();
-  }, [recarregar]);
-
-  // Recarregar quando mudar a semana
-  useEffect(() => {
-    if (escalas.length > 0) {
-      carregarEscalas();
-    }
-  }, [dataRef]);
+  useEffect(() => { recarregar(); }, [recarregar]);
+  useEffect(() => { if (escalas.length >= 0) carregarEscalas(); }, [dataRef]); // atualiza ao mudar semana
 
   // Navegação
   const semanaAnterior = () => setDataRef(addDays(dataRef, -7));
   const semanaSeguinte = () => setDataRef(addDays(dataRef, 7));
   const semanaAtual = () => setDataRef(startOfWeek(new Date()));
 
-  // Agrupar escalas por hora e dia para visualização
+  // Agrupar escalas por data|hora
   const escalasAgrupadas = useMemo(() => {
-    const mapa = new Map();
-
-    escalas.forEach((escala) => {
-      const funcId =
-        escala.funcionario_id ??
-        escala.funcionarioId ??
-        escala.funcionario ??
-        null;
-
-      const entradaStr = escala.entrada || escala.hora_entrada || null;
-      const saidaStr   = escala.saida   || escala.hora_saida   || null;
-
-      if (!funcId || !entradaStr || !saidaStr) return;
-
-      const funcionario = funcionarios.find((f) => f.id === funcId);
-      if (!funcionario) return;
-
-      const [h1, m1] = entradaStr.split(":").map(Number);
-      const [h2, m2] = saidaStr.split(":").map(Number);
-
+    const map = new Map();
+    escalas.forEach((esc) => {
+      const funcId = esc.funcionario_id ?? esc.funcionarioId ?? esc.funcionario ?? null;
+      const entrada = esc.entrada || esc.hora_entrada || null;
+      const saida = esc.saida || esc.hora_saida || null;
+      if (!funcId || !entrada || !saida) return;
+      const f = funcionarios.find((x) => x.id === funcId); if (!f) return;
+      const [h1] = entrada.split(":").map(Number);
+      const [h2, m2] = saida.split(":").map(Number);
+      const endHour = Number.isFinite(h2) ? (m2 === 0 ? h2 - 1 : h2) : h1;
       const startHour = Number.isFinite(h1) ? h1 : 0;
-      const endHour = Number.isFinite(h2)
-        ? (m2 === 0 ? h2 - 1 : h2)
-        : startHour;
 
-      for (let hora = startHour; hora <= endHour; hora++) {
-        const chave = `${escala.data}|${String(hora).padStart(2, "0")}`;
-        if (!mapa.has(chave)) mapa.set(chave, []);
-        if (!mapa.get(chave).some((e) => e.id === escala.id)) {
-          mapa.get(chave).push({
-            ...escala,
+      for (let h = startHour; h <= endHour; h++) {
+        const key = `${esc.data}|${String(h).padStart(2, "0")}`;
+        if (!map.has(key)) map.set(key, []);
+        const arr = map.get(key);
+        if (!arr.some((e) => e.id === esc.id)) {
+          arr.push({
+            ...esc,
             funcionario_id: funcId,
-            funcionario_nome: funcionario.pessoa_nome,
-            cargo: funcionario.cargo_nome,
+            funcionario_nome: f.pessoa_nome,
+            cargo: f.cargo_nome,
             cor: getCorFuncionario(funcId),
           });
         }
       }
     });
-
-    return mapa;
+    return map;
   }, [escalas, funcionarios]);
 
-  // Calcular horas totais por funcionário por dia
+  // Totais por funcionário/dia
   const horasTotaisPorDia = useMemo(() => {
-    const resultado = {};
-    
-    // Inicializar estrutura para cada funcionário
-    funcionarios.forEach(func => {
-      resultado[func.id] = {
-        nome: func.pessoa_nome,
-        cor: getCorFuncionario(func.id),
-        totaisPorDia: {}
-      };
-      
-      // Inicializar cada dia com 0 horas
-      dias.forEach(dia => {
-        const dataISO = toISO(dia);
-        resultado[func.id].totaisPorDia[dataISO] = {
-          horas: 0,
-          minutos: 0,
-          escalas: []
-        };
-      });
+    const r = {};
+    funcionarios.forEach((f) => {
+      r[f.id] = { nome: f.pessoa_nome, cor: getCorFuncionario(f.id), totaisPorDia: {} };
+      dias.forEach((d) => { r[f.id].totaisPorDia[toISO(d)] = { horas: 0, minutos: 0, escalas: [] }; });
     });
-    
-    // Calcular horas para cada escala
-    escalas.forEach(escala => {
-      const funcId = escala.funcionario_id;
-      const dataISO = escala.data;
-      
-      if (resultado[funcId] && resultado[funcId].totaisPorDia[dataISO]) {
-        const duracao = calcularDuracaoEmMinutos(escala.entrada, escala.saida);
-        
-        resultado[funcId].totaisPorDia[dataISO].horas += Math.floor(duracao / 60);
-        resultado[funcId].totaisPorDia[dataISO].minutos += duracao % 60;
-        resultado[funcId].totaisPorDia[dataISO].escalas.push(escala);
-        
-        // Ajustar se minutos passarem de 60
-        if (resultado[funcId].totaisPorDia[dataISO].minutos >= 60) {
-          resultado[funcId].totaisPorDia[dataISO].horas += Math.floor(resultado[funcId].totaisPorDia[dataISO].minutos / 60);
-          resultado[funcId].totaisPorDia[dataISO].minutos = resultado[funcId].totaisPorDia[dataISO].minutos % 60;
+    escalas.forEach((e) => {
+      const fid = e.funcionario_id; const iso = e.data;
+      if (r[fid] && r[fid].totaisPorDia[iso]) {
+        const dur = calcularDuracaoEmMinutos(e.entrada, e.saida);
+        r[fid].totaisPorDia[iso].horas += Math.floor(dur / 60);
+        r[fid].totaisPorDia[iso].minutos += dur % 60;
+        r[fid].totaisPorDia[iso].escalas.push(e);
+        if (r[fid].totaisPorDia[iso].minutos >= 60) {
+          r[fid].totaisPorDia[iso].horas += Math.floor(r[fid].totaisPorDia[iso].minutos / 60);
+          r[fid].totaisPorDia[iso].minutos = r[fid].totaisPorDia[iso].minutos % 60;
         }
       }
     });
-    
-    return resultado;
+    return r;
   }, [escalas, funcionarios, dias]);
 
-  // Encontrar escala em uma célula específica
-  const encontrarEscalaNaCelula = (dataISO, hora) => {
-    const chave = `${dataISO}|${hora}`;
-    const escalas = escalasAgrupadas.get(chave) || [];
-    return escalas;
-  };
+  const encontrarEscalaNaCelula = (dataISO, hora) => escalasAgrupadas.get(`${dataISO}|${hora}`) || [];
 
-  // Modal handlers
+  // CRUD / Modais
+  const calcularHoraSaida = (entrada, horas = 8) => {
+    const [h, m] = entrada.split(":").map(Number);
+    const t = h * 60 + m + horas * 60;
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  };
   const abrirNovo = (funcId, dataISO, hora = "08:00") => {
     setEditando(null);
-    setForm({
-      funcionario_id: funcId || "",
-      data: dataISO || toISO(new Date()),
-      turno_ordem: 1,
-      entrada: hora,
-      saida: calcularHoraSaida(hora, 8),
-      origem: "FIXA",
-    });
+    setForm({ funcionario_id: funcId || "", data: dataISO || toISO(new Date()), turno_ordem: 1, entrada: hora, saida: calcularHoraSaida(hora, 8), origem: "FIXA" });
     setModalAberto(true);
   };
-
   const abrirMultiplo = () => {
-    setFormMultiplo({
-      funcionario_id: "",
-      datas: [],
-      turno_ordem: 1,
-      entrada: "08:00",
-      saida: "17:00",
-      origem: "FIXA",
-    });
+    setFormMultiplo({ funcionario_id: "", datas: [], turno_ordem: 1, entrada: "08:00", saida: "17:00", origem: "FIXA" });
     setModalMultiploAberto(true);
   };
-
-  const abrirConfig = () => {
-    setModalConfigAberto(true);
-  };
-
+  const abrirConfig = () => setModalConfigAberto(true);
   const abrirEdicao = (escala) => {
     setEditando(escala);
-    setForm({
-      funcionario_id: escala.funcionario_id,
-      data: escala.data,
-      turno_ordem: escala.turno_ordem,
-      entrada: escala.entrada || "",
-      saida: escala.saida || "",
-      origem: escala.origem || "FIXA",
-    });
+    setForm({ funcionario_id: escala.funcionario_id, data: escala.data, turno_ordem: escala.turno_ordem, entrada: escala.entrada || "", saida: escala.saida || "", origem: escala.origem || "FIXA" });
     setModalAberto(true);
-  };
-
-  const calcularHoraSaida = (entrada, horas = 8) => {
-    const [h, m] = entrada.split(':').map(Number);
-    const saidaMinutos = h * 60 + m + horas * 60;
-    const saidaHora = Math.floor(saidaMinutos / 60);
-    const saidaMinuto = saidaMinutos % 60;
-    return `${saidaHora.toString().padStart(2, '0')}:${saidaMinuto.toString().padStart(2, '0')}`;
   };
 
   const salvarEscala = async () => {
-    setErr("");
-    setSucesso("");
-    
+    setErr(""); setSucesso("");
     try {
       const payload = {
         funcionario_id: Number(form.funcionario_id),
@@ -647,323 +349,153 @@ export default function Escalas() {
         saida: form.saida || null,
         origem: form.origem || "FIXA",
       };
-
-      console.log('💾 Salvando escala:', payload);
-
-      if (!payload.funcionario_id || !payload.data) {
-        throw new Error("Selecione funcionário e data.");
-      }
-
+      if (!payload.funcionario_id || !payload.data) throw new Error("Selecione funcionário e data.");
       if (editando) {
-        await api(`/api/escalas/${editando.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await api(`/api/escalas/${editando.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         setSucesso("Escala atualizada com sucesso!");
       } else {
-        await api(`/api/escalas`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await api(`/api/escalas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         setSucesso("Escala adicionada com sucesso!");
       }
-
       setModalAberto(false);
       await carregarEscalas();
-    } catch (e) {
-      console.error('❌ Erro ao salvar escala:', e);
-      setErr(e.message || "Falha ao salvar escala.");
-    }
+    } catch (e) { setErr(e.message || "Falha ao salvar escala."); }
   };
 
   const salvarEscalasMultiplas = async () => {
-    setErr("");
-    setSucesso("");
-    setLoading(true);
-    
+    setErr(""); setSucesso(""); setLoading(true);
     try {
-      if (!formMultiplo.funcionario_id || formMultiplo.datas.length === 0) {
-        throw new Error("Selecione funcionário e pelo menos uma data.");
-      }
-
-      // Preparar array de escalas para o batch
-      const escalasBatch = formMultiplo.datas.map(data => ({
+      if (!formMultiplo.funcionario_id || formMultiplo.datas.length === 0) throw new Error("Selecione funcionário e pelo menos uma data.");
+      const escalasBatch = formMultiplo.datas.map((d) => ({
         funcionario_id: Number(formMultiplo.funcionario_id),
-        data: data,
+        data: d,
         turno_ordem: Number(formMultiplo.turno_ordem) || 1,
         entrada: formMultiplo.entrada || null,
         saida: formMultiplo.saida || null,
         origem: formMultiplo.origem || "FIXA",
       }));
-
-      console.log('💾 Salvando escalas em lote:', escalasBatch.length, 'escalas');
-
-      // Usar o novo endpoint batch
-      const resultado = await api(`/api/escalas/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ escalas: escalasBatch }),
-      });
-
-      setSucesso(resultado.message || `${escalasBatch.length} escalas adicionadas com sucesso!`);
+      const r = await api(`/api/escalas/batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ escalas: escalasBatch }) });
+      setSucesso(r.message || `${escalasBatch.length} escalas adicionadas com sucesso!`);
       setModalMultiploAberto(false);
       await carregarEscalas();
-      
-    } catch (e) {
-      console.error('❌ Erro ao salvar escalas múltiplas:', e);
-      setErr(e.message || "Falha ao salvar escalas.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setErr(e.message || "Falha ao salvar escalas."); }
+    finally { setLoading(false); }
   };
 
   const excluirEscala = async (escala) => {
     if (!confirm(`Remover escala de ${escala.funcionario_nome} no dia ${escala.data}?`)) return;
-    
-    setErr("");
-    setSucesso("");
-    
+    setErr(""); setSucesso("");
     try {
-      console.log('🗑️ Excluindo escala:', escala.id);
       await api(`/api/escalas/${escala.id}`, { method: "DELETE" });
       setSucesso("Escala removida com sucesso!");
       await carregarEscalas();
-    } catch (e) {
-      console.error('❌ Erro ao excluir escala:', e);
-      setErr(e.message || "Falha ao excluir escala.");
-    }
+    } catch (e) { setErr(e.message || "Falha ao excluir escala."); }
   };
 
-  const atualizarConfigHorarios = (novaConfig) => {
-    CONFIG_HORARIOS.inicio = novaConfig.inicio;
-    CONFIG_HORARIOS.fim = novaConfig.fim;
-    CONFIG_HORARIOS.incremento = novaConfig.incremento;
+  const atualizarConfigHorarios = (nova) => {
+    CONFIG_HORARIOS.inicio = nova.inicio;
+    CONFIG_HORARIOS.fim = nova.fim;
+    CONFIG_HORARIOS.incremento = nova.incremento;
     setModalConfigAberto(false);
-    // Forçar re-render
-    setDataRef(new Date(dataRef));
-  };
-
-  // Handler para clique na célula
-  const handleCliqueCelula = (dataISO, hora) => {
-    const escalasNaCelula = encontrarEscalaNaCelula(dataISO, hora);
-    console.log('🖱️ Célula clicada:', dataISO, hora, 'Escalas:', escalasNaCelula.length);
-    
-    if (escalasNaCelula.length > 0) {
-      abrirEdicao(escalasNaCelula[0]);
-    } else {
-      abrirNovo(null, dataISO, hora + ":00");
-    }
+    setDataRef(new Date(dataRef)); // re-render
   };
 
   const HORARIOS_DIA = gerarHorarios();
 
+  /* ===================== RENDER ===================== */
   return (
     <>
-      <header className="main-header">
-        <div className="header-content">
-          <h1>Escalas</h1>
-          <p>Clique em qualquer horário para adicionar ou editar escalas</p>
+      {/* Header no padrão visual */}
+      <header className="page-header" role="region" aria-labelledby="titulo-esc">
+        <div>
+          <h1 id="titulo-esc" className="page-title">Escalas</h1>
+          <p className="page-subtitle">Clique em qualquer horário para adicionar ou editar</p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="toggle-btn" onClick={semanaAnterior}>
-            ←
+        <div className="page-header__toolbar" aria-label="Ações da página">
+          <button className="btn btn--neutral" onClick={semanaAnterior}>
+            <ChevronLeftIcon className="icon" aria-hidden="true" /><span>Anterior</span>
           </button>
-          <button className="toggle-btn" onClick={semanaAtual}>
-            Hoje
+          <button className="btn btn--neutral" onClick={semanaAtual}>
+            <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
           </button>
-          <button className="toggle-btn" onClick={semanaSeguinte}>
-            →
+          <button className="btn btn--neutral" onClick={semanaSeguinte}>
+            <span>Seguinte</span><ChevronRightIcon className="icon" aria-hidden="true" />
           </button>
-          <button className="toggle-btn" onClick={abrirMultiplo}>
-            Nova Escala
+          <button className="btn" data-accent="success" onClick={abrirMultiplo}>
+            <PlusCircleIcon className="icon" aria-hidden="true" /><span>Nova Escala</span>
           </button>
-          <button className="toggle-btn" onClick={abrirConfig}>
-            Configurar Exibição
+          <button className="btn" data-accent="info" onClick={abrirConfig}>
+            <Cog6ToothIcon className="icon" aria-hidden="true" /><span>Configurar</span>
           </button>
-          <button className="toggle-btn" onClick={recarregar} disabled={loading}>
-            {loading ? "Atualizando..." : "Atualizar"}
+          <button
+            className="btn btn--neutral"
+            onClick={recarregar}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+            aria-label="Atualizar dados"
+          >
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
         </div>
       </header>
 
-      {err && (
-        <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
+      {/* Alerts usando a paleta (HC) */}
+      {err && <div className="alert" data-accent="error" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
+      {sucesso && <div className="alert" data-accent="success" role="status" style={{ marginBottom: 12 }}>{sucesso}</div>}
 
-      {sucesso && (
-        <div className="success-alert" role="status" style={{ marginBottom: 16 }}>
-          {sucesso}
-        </div>
-      )}
-
-      {/* Cabeçalho do período */}
-      <div style={{ 
-        background: "var(--panel)", 
-        padding: "16px", 
-        borderRadius: "8px", 
-        border: "1px solid var(--border)",
-        marginBottom: 16
-      }}>
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
-          alignItems: "center" 
-        }}>
-          <h2 style={{ margin: 0, color: "var(--fg)" }}>
-            {formatMonthYear(dataRef)} - Semana {Math.ceil((dataRef.getDate() + startOfWeek(new Date(dataRef.getFullYear(), dataRef.getMonth(), 1)).getDay()) / 7)}
-          </h2>
-          <div style={{ display: "flex", gap: 8, fontSize: "14px", color: "var(--muted)" }}>
-            <span>De: {formatDateBR(dias[0])}</span>
-            <span>À: {formatDateBR(dias[6])}</span>
+      {/* Período selecionado */}
+      <div className="stat-card" style={{ marginBottom: 12 }}>
+        <div className="stat-card__content">
+          <div className="stat-title" style={{ fontWeight: 700 }}>
+            {formatMonthYear(dataRef)} — {formatDateBR(dias[0])} a {formatDateBR(dias[6])}
           </div>
-        </div>
-        
-        {/* Debug info */}
-        <div style={{ 
-          marginTop: 8, 
-          padding: 8, 
-          background: "var(--panel-muted)", 
-          borderRadius: 4,
-          fontSize: "12px",
-          color: "var(--muted)"
-        }}>
-          📊 {funcionarios.length} funcionários • {escalas.length} escalas carregadas • Horários: {CONFIG_HORARIOS.inicio}h às {CONFIG_HORARIOS.fim}h
+          <div className="stat-subtitle" style={{ fontSize: 12, color: "var(--muted)" }}>
+            {funcionarios.length} funcionários • {escalas.length} escalas carregadas • Janela {CONFIG_HORARIOS.inicio}h–{CONFIG_HORARIOS.fim}h
+          </div>
         </div>
       </div>
 
-      {/* Timeline Visual */}
-      <div style={{ 
-        background: "var(--panel)", 
-        borderRadius: "8px", 
-        border: "1px solid var(--border)",
-        overflow: "auto",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-      }}>
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: "80px repeat(7, 1fr)",
-          minWidth: "1000px"
-        }}>
-          
-          {/* Cabeçalho dos dias */}
-          <div style={{ 
-            padding: "16px 12px", 
-            borderBottom: "2px solid var(--border)",
-            background: "var(--panel-muted)"
-          }}>
-            <div style={{ fontWeight: 600, fontSize: "14px" }}>HORA</div>
-          </div>
-          {dias.map((dia, index) => (
-            <div key={index} style={{ 
-              padding: "16px 12px", 
-              borderBottom: "2px solid var(--border)",
-              textAlign: "center",
-              background: "var(--panel-muted)"
-            }}>
-              <div style={{ fontWeight: 600, fontSize: "14px" }}>{DIAS_SEMANA_CURTO[index]}</div>
-              <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-                {formatDateBR(dia)}
-              </div>
+      {/* Grade de horários */}
+      <div className="dashboard-wrapper">
+        <div className="esc-grid">
+          <div className="esc-grid__head">HORA</div>
+          {dias.map((dia, i) => (
+            <div key={i} className="esc-grid__day">
+              <div className="esc-grid__day-name">{DIAS_SEMANA_CURTO[i]}</div>
+              <div className="esc-grid__day-date">{formatDateBR(dia)}</div>
             </div>
           ))}
-          
-          {/* Linhas de horário */}
-          {HORARIOS_DIA.map(hora => (
+
+          {HORARIOS_DIA.map((hora) => (
             <div key={hora} style={{ display: "contents" }}>
-              {/* Coluna de horas */}
-              <div style={{ 
-                padding: "12px",
-                borderBottom: "1px solid var(--border)",
-                fontSize: "12px",
-                color: "var(--muted)",
-                background: "var(--panel-muted)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}>
-                {hora}
-              </div>
-              
-              {/* Células dos dias */}
-              {dias.map((dia, diaIndex) => {
+              <div className="esc-grid__hour">{hora}</div>
+              {dias.map((dia) => {
                 const dataISO = toISO(dia);
-                const escalasNaCelula = encontrarEscalaNaCelula(dataISO, hora.split(':')[0]);
+                const hourStr = hora.split(":")[0];
+                const arr = encontrarEscalaNaCelula(dataISO, hourStr);
                 const isToday = toISO(new Date()) === dataISO;
-                
                 return (
                   <div
-                    key={diaIndex}
-                    style={{
-                      padding: "4px",
-                      borderBottom: "1px solid var(--border)",
-                      borderRight: diaIndex === 6 ? "1px solid var(--border)" : "none",
-                      background: isToday ? "rgba(59, 130, 246, 0.05)" : "transparent",
-                      minHeight: "50px",
-                      position: "relative",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s"
-                    }}
-                    onClick={() => handleCliqueCelula(dataISO, hora.split(':')[0])}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = isToday ? "rgba(59, 130, 246, 0.05)" : "transparent";
-                    }}
+                    key={`${dataISO}-${hourStr}`}
+                    className={`esc-grid__cell ${isToday ? "is-today" : ""}`}
+                    onClick={() => abrirNovo(null, dataISO, `${hourStr}:00`)}
+                    onMouseEnter={(e) => { e.currentTarget.classList.add("is-hover"); }}
+                    onMouseLeave={(e) => { e.currentTarget.classList.remove("is-hover"); }}
                   >
-                    {escalasNaCelula.map((escala, idx) => (
-                      <div
-                        key={`${escala.id}-${idx}`}
-                        style={{
-                          background: escala.cor,
-                          color: "white",
-                          padding: "6px 8px",
-                          borderRadius: "6px",
-                          fontSize: "11px",
-                          marginBottom: "2px",
-                          cursor: "pointer",
-                          boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-                          fontWeight: 500
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          abrirEdicao(escala);
-                        }}
-                        title={`${escala.funcionario_nome} - ${escala.entrada} às ${escala.saida} (Turno ${escala.turno_ordem})`}
+                    {arr.map((esc, idx) => (
+                      <button
+                        key={`${esc.id}-${idx}`}
+                        className="esc-chip"
+                        style={{ ["--func-color"]: esc.cor }}
+                        title={`${esc.funcionario_nome} • ${esc.entrada}–${esc.saida} (Turno ${esc.turno_ordem})`}
+                        onClick={(ev) => { ev.stopPropagation(); abrirEdicao(esc); }}
                       >
-                        <div style={{ 
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap"
-                        }}>
-                          {escala.funcionario_nome}
-                        </div>
-                        <div style={{ 
-                          fontSize: "9px",
-                          opacity: 0.9,
-                          marginTop: "2px"
-                        }}>
-                          {escala.entrada} - {escala.saida}
-                        </div>
-                      </div>
+                        <span className="esc-chip__name">{esc.funcionario_nome}</span>
+                        <span className="esc-chip__time">{esc.entrada}–{esc.saida}</span>
+                      </button>
                     ))}
-                    
-                    {/* Marcador de horário livre */}
-                    {escalasNaCelula.length === 0 && (
-                      <div style={{ 
-                        fontSize: "20px", 
-                        color: "var(--muted)",
-                        textAlign: "center",
-                        padding: "12px 0",
-                        opacity: 0.3
-                      }}>
-                        +
-                      </div>
-                    )}
+                    {arr.length === 0 && <div className="esc-cell__plus" aria-hidden>+</div>}
                   </div>
                 );
               })}
@@ -972,153 +504,40 @@ export default function Escalas() {
         </div>
       </div>
 
-      {/* Resumo de Horas por Funcionário */}
+      {/* Resumo por funcionário */}
       {funcionarios.length > 0 && (
-        <div style={{ 
-          background: "var(--panel)", 
-          borderRadius: "8px", 
-          border: "1px solid var(--border)",
-          overflow: "auto",
-          marginTop: "20px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-        }}>
-          <div style={{ 
-            padding: "16px", 
-            borderBottom: "1px solid var(--border)",
-            background: "var(--panel-muted)"
-          }}>
-            <h3 style={{ 
-              margin: 0, 
-              fontSize: "16px", 
-              color: "var(--fg)",
-              fontWeight: "600"
-            }}>
-              📊 Resumo de Horas por Funcionário
-            </h3>
-            <p style={{ 
-              margin: "4px 0 0", 
-              fontSize: "14px", 
-              color: "var(--muted)" 
-            }}>
-              Total de horas trabalhadas por dia
-            </p>
+        <section className="summary">
+          <div className="summary__head">
+            <h3 className="summary__title">📊 Resumo de Horas por Funcionário</h3>
+            <p className="summary__desc">Total de horas por dia na semana selecionada</p>
           </div>
-          
-          <div style={{ overflow: "auto" }}>
-            <div style={{ 
-              display: "grid", 
-              gridTemplateColumns: "200px repeat(7, 120px)",
-              minWidth: "1100px"
-            }}>
-              
-              {/* Cabeçalho - Nomes dos dias */}
-              <div style={{ 
-                padding: "12px 16px", 
-                borderBottom: "1px solid var(--border)",
-                background: "var(--panel-muted)",
-                fontWeight: "600",
-                fontSize: "14px",
-                position: "sticky",
-                left: 0,
-                background: "var(--panel-muted)",
-                zIndex: 2
-              }}>
-                Funcionário
-              </div>
-              {dias.map((dia, index) => (
-                <div key={index} style={{ 
-                  padding: "12px", 
-                  borderBottom: "1px solid var(--border)",
-                  textAlign: "center",
-                  background: "var(--panel-muted)",
-                  fontWeight: "600",
-                  fontSize: "14px"
-                }}>
-                  <div>{DIAS_SEMANA_CURTO[index]}</div>
-                  <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>
-                    {formatDateBR(dia)}
-                  </div>
+
+          <div className="summary__tablewrap">
+            <div className="summary__table">
+              <div className="summary__th summary__th--name">Funcionário</div>
+              {dias.map((dia, i) => (
+                <div key={i} className="summary__th">
+                  <div>{DIAS_SEMANA_CURTO[i]}</div>
+                  <div className="summary__th-date">{formatDateBR(dia)}</div>
                 </div>
               ))}
-              
-              {/* Linhas dos funcionários */}
-              {funcionarios.map(func => {
-                const totaisFunc = horasTotaisPorDia[func.id];
-                if (!totaisFunc) return null;
-                
+
+              {funcionarios.map((f) => {
+                const t = horasTotaisPorDia[f.id]; if (!t) return null;
                 return (
-                  <div key={func.id} style={{ display: "contents" }}>
-                    {/* Nome do funcionário */}
-                    <div style={{ 
-                      padding: "12px 16px", 
-                      borderBottom: "1px solid var(--border)",
-                      background: "var(--panel)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      position: "sticky",
-                      left: 0,
-                      background: "var(--panel)",
-                      zIndex: 1
-                    }}>
-                      <div style={{
-                        width: "12px",
-                        height: "12px",
-                        background: getCorFuncionario(func.id),
-                        borderRadius: "3px",
-                        border: "1px solid var(--border)"
-                      }}></div>
-                      <span style={{ 
-                        fontSize: "14px",
-                        fontWeight: "500"
-                      }}>
-                        {func.pessoa_nome}
-                      </span>
+                  <div key={f.id} style={{ display: "contents" }}>
+                    <div className="summary__td summary__name">
+                      <span className="summary__dot" style={{ ["--func-color"]: getCorFuncionario(f.id) }} />
+                      <span>{f.pessoa_nome}</span>
                     </div>
-                    
-                    {/* Totais por dia */}
-                    {dias.map(dia => {
-                      const dataISO = toISO(dia);
-                      const totalDia = totaisFunc.totaisPorDia[dataISO];
-                      const horas = totalDia?.horas || 0;
-                      const minutos = totalDia?.minutos || 0;
-                      const hasEscalas = totalDia?.escalas?.length > 0;
-                      
+                    {dias.map((d) => {
+                      const iso = toISO(d);
+                      const tot = t.totaisPorDia[iso];
+                      const h = tot?.horas || 0, m = tot?.minutos || 0, has = tot?.escalas?.length > 0;
                       return (
-                        <div
-                          key={dataISO}
-                          style={{
-                            padding: "12px",
-                            borderBottom: "1px solid var(--border)",
-                            borderRight: "1px solid var(--border)",
-                            textAlign: "center",
-                            background: hasEscalas ? "color-mix(in srgb, var(--success) 10%, transparent)" : "var(--panel)",
-                            fontSize: "14px",
-                            fontWeight: hasEscalas ? "600" : "400",
-                            color: hasEscalas ? "var(--success)" : "var(--muted)",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "2px"
-                          }}
-                          title={hasEscalas ? 
-                            `${totalDia.escalas.length} escala(s) neste dia` : 
-                            "Sem escalas"
-                          }
-                        >
-                          <div>{formatarHorasTotais(horas, minutos)}</div>
-                          {hasEscalas && totalDia.escalas.length > 1 && (
-                            <div style={{
-                              fontSize: "10px",
-                              color: "var(--muted)",
-                              background: "var(--panel-muted)",
-                              padding: "1px 4px",
-                              borderRadius: "3px"
-                            }}>
-                              {totalDia.escalas.length} turnos
-                            </div>
-                          )}
+                        <div key={iso} className={`summary__td ${has ? "has" : "no"}`} title={has ? `${tot.escalas.length} turno(s)` : "Sem escalas"}>
+                          <div>{formatarHorasTotais(h, m)}</div>
+                          {has && tot.escalas.length > 1 && <div className="summary__badge">{tot.escalas.length} turnos</div>}
                         </div>
                       );
                     })}
@@ -1127,199 +546,71 @@ export default function Escalas() {
               })}
             </div>
           </div>
-          
-          {/* Rodapé com totais gerais */}
-          <div style={{ 
-            padding: "12px 16px", 
-            borderTop: "1px solid var(--border)",
-            background: "var(--panel-muted)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: "14px"
-          }}>
-            <span style={{ color: "var(--muted)" }}>
-              {funcionarios.length} funcionário(s) na semana
-            </span>
-            <span style={{ fontWeight: "600", color: "var(--fg)" }}>
-              {escalas.length} escala(s) total
-            </span>
+
+          <div className="summary__foot">
+            <span>{funcionarios.length} funcionário(s) na semana</span>
+            <span><strong>{escalas.length}</strong> escala(s) no total</span>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Legenda de funcionários */}
+      {/* Legenda */}
       {funcionarios.length > 0 && (
-        <div style={{ 
-          display: "flex", 
-          gap: "16px", 
-          marginTop: "20px",
-          flexWrap: "wrap",
-          padding: "16px",
-          background: "var(--panel)",
-          borderRadius: "8px",
-          border: "1px solid var(--border)"
-        }}>
-          <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--muted)" }}>
-            Legenda:
-          </div>
-          {funcionarios.map(func => (
-            <div key={func.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{
-                width: "16px",
-                height: "16px",
-                background: getCorFuncionario(func.id),
-                borderRadius: "4px",
-                border: "1px solid var(--border)"
-              }}></div>
-              <span style={{ fontSize: "14px" }}>{func.pessoa_nome}</span>
+        <div className="legend">
+          <div className="legend__title">Legenda:</div>
+          {funcionarios.map((f) => (
+            <div key={f.id} className="legend__item">
+              <span className="legend__swatch" style={{ ["--func-color"]: getCorFuncionario(f.id) }} />
+              <span>{f.pessoa_nome}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Modal Escala Simples */}
+      {/* Modal simples */}
       <Modal
         open={modalAberto}
         onClose={() => setModalAberto(false)}
         title={editando ? "Editar Escala" : "Nova Escala"}
         footer={
           <>
-            <button className="toggle-btn" onClick={() => setModalAberto(false)}>
-              Cancelar
-            </button>
-            {editando && (
-              <button 
-                className="toggle-btn" 
-                style={{ background: "var(--error)", color: "white" }}
-                onClick={() => excluirEscala(editando)}
-              >
-                Excluir
-              </button>
-            )}
-            <button className="toggle-btn" onClick={salvarEscala}>
-              {editando ? "Salvar" : "Adicionar"}
-            </button>
+            <button className="btn btn--neutral" onClick={() => setModalAberto(false)}>Cancelar</button>
+            {editando && <button className="btn" data-accent="error" onClick={() => excluirEscala(editando)}>Excluir</button>}
+            <button className="btn" data-accent="success" onClick={salvarEscala}>{editando ? "Salvar" : "Adicionar"}</button>
           </>
         }
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Funcionário *
-            </label>
-            <select
-              value={form.funcionario_id}
-              onChange={(e) => setForm({ ...form, funcionario_id: e.target.value })}
-              style={{ 
-                width: "100%", 
-                padding: "10px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)",
-                fontSize: "14px"
-              }}
-              required
-            >
-              <option value="">Selecione um funcionário...</option>
-              {funcionarios.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.pessoa_nome} - {f.cargo_nome}
-                </option>
-              ))}
+        <div className="form-grid">
+          <div className="form-field">
+            <label>Funcionário *</label>
+            <select className="input" value={form.funcionario_id} onChange={(e) => setForm({ ...form, funcionario_id: e.target.value })} required>
+              <option value="">Selecione…</option>
+              {funcionarios.map((f) => <option key={f.id} value={f.id}>{f.pessoa_nome} — {f.cargo_nome}</option>)}
             </select>
           </div>
-
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Data *
-            </label>
-            <input
-              type="date"
-              value={form.data}
-              onChange={(e) => setForm({ ...form, data: e.target.value })}
-              style={{ 
-                width: "100%", 
-                padding: "10px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)",
-                fontSize: "14px"
-              }}
-              required
-            />
+          <div className="form-field">
+            <label>Data *</label>
+            <input type="date" className="input" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} required />
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-                Entrada
-              </label>
-              <input
-                type="time"
-                value={form.entrada}
-                onChange={(e) => setForm({ ...form, entrada: e.target.value })}
-                style={{ 
-                  width: "100%", 
-                  padding: "10px 12px", 
-                  borderRadius: "6px", 
-                  border: "1px solid var(--border)",
-                  fontSize: "14px"
-                }}
-              />
+          <div className="form-2col">
+            <div className="form-field">
+              <label>Entrada</label>
+              <input type="time" className="input" value={form.entrada} onChange={(e) => setForm({ ...form, entrada: e.target.value })} />
             </div>
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-                Saída
-              </label>
-              <input
-                type="time"
-                value={form.saida}
-                onChange={(e) => setForm({ ...form, saida: e.target.value })}
-                style={{ 
-                  width: "100%", 
-                  padding: "10px 12px", 
-                  borderRadius: "6px", 
-                  border: "1px solid var(--border)",
-                  fontSize: "14px"
-                }}
-              />
+            <div className="form-field">
+              <label>Saída</label>
+              <input type="time" className="input" value={form.saida} onChange={(e) => setForm({ ...form, saida: e.target.value })} />
             </div>
           </div>
-
-          {form.entrada && form.saida && (
-            <div style={{ 
-              padding: "12px", 
-              background: "var(--panel-muted)", 
-              borderRadius: "6px",
-              fontSize: "14px",
-              textAlign: "center",
-              border: "1px solid var(--border)"
-            }}>
-              Duração total: <strong>{calcularDuracao(form.entrada, form.saida)} horas</strong>
-            </div>
-          )}
-
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Turno (ordem)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={form.turno_ordem}
-              onChange={(e) => setForm({ ...form, turno_ordem: parseInt(e.target.value) || 1 })}
-              style={{ 
-                width: "100%", 
-                padding: "10px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)",
-                fontSize: "14px"
-              }}
-            />
+          {form.entrada && form.saida && <div className="hint-box">Duração total: <strong>{calcularDuracao(form.entrada, form.saida)} horas</strong></div>}
+          <div className="form-field">
+            <label>Turno (ordem)</label>
+            <input type="number" className="input" min="1" value={form.turno_ordem} onChange={(e) => setForm({ ...form, turno_ordem: parseInt(e.target.value) || 1 })} />
           </div>
         </div>
       </Modal>
 
-      {/* Modal Escalas Múltiplas */}
+      {/* Modal múltiplas datas */}
       <Modal
         open={modalMultiploAberto}
         onClose={() => setModalMultiploAberto(false)}
@@ -1327,114 +618,38 @@ export default function Escalas() {
         size="large"
         footer={
           <>
-            <button className="toggle-btn" onClick={() => setModalMultiploAberto(false)}>
-              Cancelar
-            </button>
-            <button className="toggle-btn" onClick={salvarEscalasMultiplas}>
-              Adicionar {formMultiplo.datas.length} Escalas
+            <button className="btn btn--neutral" onClick={() => setModalMultiploAberto(false)}>Cancelar</button>
+            <button className="btn" data-accent="success" onClick={salvarEscalasMultiplas}>
+              Adicionar {formMultiplo.datas.length} Escala(s)
             </button>
           </>
         }
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Funcionário *
-            </label>
-            <select
-              value={formMultiplo.funcionario_id}
-              onChange={(e) => setFormMultiplo({ ...formMultiplo, funcionario_id: e.target.value })}
-              style={{ 
-                width: "100%", 
-                padding: "10px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)",
-                fontSize: "14px"
-              }}
-              required
-            >
-              <option value="">Selecione um funcionário...</option>
-              {funcionarios.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.pessoa_nome} - {f.cargo_nome}
-                </option>
-              ))}
+        <div className="form-grid">
+          <div className="form-field">
+            <label>Funcionário *</label>
+            <select className="input" value={formMultiplo.funcionario_id} onChange={(e) => setFormMultiplo({ ...formMultiplo, funcionario_id: e.target.value })} required>
+              <option value="">Selecione…</option>
+              {funcionarios.map((f) => <option key={f.id} value={f.id}>{f.pessoa_nome} — {f.cargo_nome}</option>)}
             </select>
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-                Entrada
-              </label>
-              <input
-                type="time"
-                value={formMultiplo.entrada}
-                onChange={(e) => setFormMultiplo({ ...formMultiplo, entrada: e.target.value })}
-                style={{ 
-                  width: "100%", 
-                  padding: "10px 12px", 
-                  borderRadius: "6px", 
-                  border: "1px solid var(--border)",
-                  fontSize: "14px"
-                }}
-              />
+          <div className="form-2col">
+            <div className="form-field">
+              <label>Entrada</label>
+              <input type="time" className="input" value={formMultiplo.entrada} onChange={(e) => setFormMultiplo({ ...formMultiplo, entrada: e.target.value })} />
             </div>
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-                Saída
-              </label>
-              <input
-                type="time"
-                value={formMultiplo.saida}
-                onChange={(e) => setFormMultiplo({ ...formMultiplo, saida: e.target.value })}
-                style={{ 
-                  width: "100%", 
-                  padding: "10px 12px", 
-                  borderRadius: "6px", 
-                  border: "1px solid var(--border)",
-                  fontSize: "14px"
-                }}
-              />
+            <div className="form-field">
+              <label>Saída</label>
+              <input type="time" className="input" value={formMultiplo.saida} onChange={(e) => setFormMultiplo({ ...formMultiplo, saida: e.target.value })} />
             </div>
           </div>
-
-          {formMultiplo.entrada && formMultiplo.saida && (
-            <div style={{ 
-              padding: "12px", 
-              background: "var(--panel-muted)", 
-              borderRadius: "6px",
-              fontSize: "14px",
-              textAlign: "center",
-              border: "1px solid var(--border)"
-            }}>
-              Duração total: <strong>{calcularDuracao(formMultiplo.entrada, formMultiplo.saida)} horas</strong>
-            </div>
-          )}
-
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Turno (ordem)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={formMultiplo.turno_ordem}
-              onChange={(e) => setFormMultiplo({ ...formMultiplo, turno_ordem: parseInt(e.target.value) || 1 })}
-              style={{ 
-                width: "100%", 
-                padding: "10px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)",
-                fontSize: "14px"
-              }}
-            />
+          {formMultiplo.entrada && formMultiplo.saida && <div className="hint-box">Duração total: <strong>{calcularDuracao(formMultiplo.entrada, formMultiplo.saida)} horas</strong></div>}
+          <div className="form-field">
+            <label>Turno (ordem)</label>
+            <input type="number" className="input" min="1" value={formMultiplo.turno_ordem} onChange={(e) => setFormMultiplo({ ...formMultiplo, turno_ordem: parseInt(e.target.value) || 1 })} />
           </div>
-
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Selecionar Datas *
-            </label>
+          <div className="form-field">
+            <label>Selecionar Datas *</label>
             <CalendarioMultiSelecao
               datasSelecionadas={formMultiplo.datas}
               onDatasChange={(datas) => setFormMultiplo({ ...formMultiplo, datas })}
@@ -1444,108 +659,130 @@ export default function Escalas() {
         </div>
       </Modal>
 
-      {/* Modal Configuração */}
+      {/* Modal Config */}
       <Modal
         open={modalConfigAberto}
         onClose={() => setModalConfigAberto(false)}
         title="Configurar Horários de Exibição"
         footer={
           <>
-            <button className="toggle-btn" onClick={() => setModalConfigAberto(false)}>
-              Cancelar
-            </button>
-            <button className="toggle-btn" onClick={() => atualizarConfigHorarios({
-              inicio: 6,
-              fim: 22,
-              incremento: 1
-            })}>
-              Padrão
-            </button>
-            <button className="toggle-btn" onClick={() => atualizarConfigHorarios({
-              inicio: CONFIG_HORARIOS.inicio,
-              fim: CONFIG_HORARIOS.fim,
-              incremento: CONFIG_HORARIOS.incremento
-            })}>
-              Aplicar
-            </button>
+            <button className="btn btn--neutral" onClick={() => setModalConfigAberto(false)}>Cancelar</button>
+            <button className="btn" data-accent="warning" onClick={() => atualizarConfigHorarios({ inicio: 6, fim: 22, incremento: 1 })}>Padrão</button>
+            <button className="btn" data-accent="success" onClick={() => atualizarConfigHorarios({ inicio: CONFIG_HORARIOS.inicio, fim: CONFIG_HORARIOS.fim, incremento: CONFIG_HORARIOS.incremento })}>Aplicar</button>
           </>
         }
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-                Hora Inicial
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="23"
-                value={CONFIG_HORARIOS.inicio}
-                onChange={(e) => CONFIG_HORARIOS.inicio = parseInt(e.target.value) || 0}
-                style={{ 
-                  width: "100%", 
-                  padding: "10px 12px", 
-                  borderRadius: "6px", 
-                  border: "1px solid var(--border)",
-                  fontSize: "14px"
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-                Hora Final
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="24"
-                value={CONFIG_HORARIOS.fim}
-                onChange={(e) => CONFIG_HORARIOS.fim = parseInt(e.target.value) || 24}
-                style={{ 
-                  width: "100%", 
-                  padding: "10px 12px", 
-                  borderRadius: "6px", 
-                  border: "1px solid var(--border)",
-                  fontSize: "14px"
-                }}
-              />
-            </div>
+        <div className="form-2col">
+          <div className="form-field">
+            <label>Hora Inicial</label>
+            <input type="number" className="input" min="0" max="23" defaultValue={CONFIG_HORARIOS.inicio} onChange={(e) => (CONFIG_HORARIOS.inicio = parseInt(e.target.value) || 0)} />
           </div>
-
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "14px", fontWeight: 500 }}>
-              Incremento (horas entre cada linha)
-            </label>
-            <select
-              value={CONFIG_HORARIOS.incremento}
-              onChange={(e) => CONFIG_HORARIOS.incremento = parseInt(e.target.value) || 1}
-              style={{ 
-                width: "100%", 
-                padding: "10px 12px", 
-                borderRadius: "6px", 
-                border: "1px solid var(--border)",
-                fontSize: "14px"
-              }}
-            >
-              <option value="1">1 hora</option>
-              <option value="2">2 horas</option>
-              <option value="4">4 horas</option>
-            </select>
-          </div>
-
-          <div style={{ 
-            padding: "12px", 
-            background: "var(--panel-muted)", 
-            borderRadius: "6px",
-            fontSize: "14px",
-            border: "1px solid var(--border)"
-          }}>
-            <strong>Pré-visualização:</strong> Horários de {CONFIG_HORARIOS.inicio}h às {CONFIG_HORARIOS.fim}h, 
-            com intervalos de {CONFIG_HORARIOS.incremento} hora{CONFIG_HORARIOS.incremento > 1 ? 's' : ''}
+          <div className="form-field">
+            <label>Hora Final</label>
+            <input type="number" className="input" min="1" max="24" defaultValue={CONFIG_HORARIOS.fim} onChange={(e) => (CONFIG_HORARIOS.fim = parseInt(e.target.value) || 24)} />
           </div>
         </div>
+        <div className="form-field">
+          <label>Incremento (em horas)</label>
+          <select className="input" defaultValue={CONFIG_HORARIOS.incremento} onChange={(e) => (CONFIG_HORARIOS.incremento = parseInt(e.target.value) || 1)}>
+            <option value="1">1 hora</option>
+            <option value="2">2 horas</option>
+            <option value="4">4 horas</option>
+          </select>
+        </div>
+        <div className="hint-box">Pré-visualização: {CONFIG_HORARIOS.inicio}h – {CONFIG_HORARIOS.fim}h, a cada {CONFIG_HORARIOS.incremento}h</div>
       </Modal>
+
+      {/* Estilos locais (somente com variáveis do tema) */}
+      <style jsx>{`
+        /* Alerts (usando paleta do global.css) */
+        .alert{
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-left: 4px solid var(--fg);
+          padding: 12px 14px; border-radius: 8px; box-shadow: var(--shadow);
+        }
+        .alert[data-accent="success"]{ border-left-color: var(--success); }
+        .alert[data-accent="error"]{ border-left-color: var(--error); }
+
+        .dashboard-wrapper{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+        .esc-grid{display:grid;grid-template-columns:90px repeat(7,1fr);border:1px solid var(--border);border-radius:8px;background:var(--panel);box-shadow:var(--shadow);min-width:1000px;overflow:hidden}
+        .esc-grid__head{padding:14px 10px;border-bottom:2px solid var(--border);background:var(--panel-muted);font-weight:700;font-size:14px}
+        .esc-grid__day{padding:12px;border-bottom:2px solid var(--border);text-align:center;background:var(--panel-muted)}
+        .esc-grid__day-name{font-weight:700;font-size:14px}
+        .esc-grid__day-date{font-size:12px;color:var(--muted);margin-top:4px}
+        .esc-grid__hour{padding:10px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);background:var(--panel-muted);display:flex;align-items:center;justify-content:center}
+        .esc-grid__cell{position:relative;min-height:54px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);background:transparent;cursor:pointer;transition:background .15s ease}
+        .esc-grid__cell.is-today{ background: color-mix(in srgb, var(--info) 10%, transparent); }
+        .esc-grid__cell.is-hover{ background: color-mix(in srgb, var(--info) 18%, transparent); }
+        .esc-cell__plus{font-size:22px;color:var(--muted);text-align:center;padding:12px 0;opacity:.35}
+
+        /* Chip de escala com var de funcionário + HC */
+        .esc-chip{
+          --_bg: var(--func-color);
+          display:flex;gap:8px;align-items:center;justify-content:space-between;
+          width:100%;border-radius:6px;padding:6px 8px;font-size:11px;margin:2px 0;
+          background: var(--_bg);
+          color: var(--on-colored, #fff);
+          box-shadow: 0 1px 2px rgb(0 0 0 / .12);
+          border: 1px solid color-mix(in srgb, var(--_bg) 55%, var(--border));
+        }
+        .esc-chip__name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+        .esc-chip__time{opacity:.95}
+
+        [data-hc="true"] .esc-chip{
+          background: var(--panel);
+          color: var(--fg);
+          border-color: var(--fg);
+          box-shadow: none;
+          position: relative; padding-left: 20px;
+        }
+        [data-hc="true"] .esc-chip::before{
+          content:"";
+          width:10px;height:10px;border-radius:999px;
+          background: var(--func-color);
+          outline: 1px solid var(--fg);
+          position:absolute;left:6px;top:50%;transform:translateY(-50%);
+        }
+
+        .summary{background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);margin-top:16px}
+        .summary__head{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--panel-muted)}
+        .summary__title{margin:0;font-size:16px;font-weight:700}
+        .summary__desc{margin:4px 0 0;color:var(--muted);font-size:14px}
+        .summary__tablewrap{overflow:auto}
+        .summary__table{display:grid;grid-template-columns:200px repeat(7,140px);min-width:1200px}
+        .summary__th{padding:10px;border-bottom:1px solid var(--border);background:var(--panel-muted);text-align:center;font-weight:700;font-size:14px}
+        .summary__th--name{position:sticky;left:0;z-index:2}
+        .summary__th-date{font-size:11px;color:var(--muted)}
+        .summary__td{padding:12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);text-align:center;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+        .summary__td.has{background:color-mix(in srgb, var(--success) 12%, transparent);color:var(--success);font-weight:700}
+        .summary__td.no{color:var(--muted)}
+        .summary__name{position:sticky;left:0;background:var(--panel);z-index:1;display:flex;gap:8px;align-items:center;justify-content:flex-start}
+        .summary__dot{width:12px;height:12px;border-radius:3px;border:1px solid var(--border);background:var(--func-color)}
+        .summary__badge{font-size:10px;color:var(--muted);background:var(--panel-muted);padding:1px 4px;border-radius:3px}
+        .summary__foot{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--border);background:var(--panel-muted);font-size:14px}
+
+        .legend{display:flex;flex-wrap:wrap;gap:12px;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-top:12px}
+        .legend__title{font-weight:600;color:var(--muted)}
+        .legend__item{display:flex;gap:8px;align-items:center}
+        .legend__swatch{width:14px;height:14px;border-radius:4px;border:1px solid var(--border);background:var(--func-color)}
+
+        .form-grid{display:flex;flex-direction:column;gap:12px}
+        .form-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .form-field > label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+        .hint-box{padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--panel-muted);text-align:center;font-size:14px}
+
+        @media (max-width: 900px){
+          .page-header__toolbar{flex-direction:column;align-items:stretch}
+          .page-header__toolbar .btn, .page-header__toolbar .input{width:100%;justify-content:center}
+          .summary__table{grid-template-columns:160px repeat(7,120px);min-width:1000px}
+          .form-2col{grid-template-columns:1fr}
+        }
+        @media (max-width: 480px){
+          .esc-grid{min-width:800px}
+          .summary__table{grid-template-columns:140px repeat(7,110px);min-width:920px}
+        }
+      `}</style>
     </>
   );
 }
