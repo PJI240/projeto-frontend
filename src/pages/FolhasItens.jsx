@@ -9,6 +9,9 @@ import {
   TrashIcon,
   PencilSquareIcon,
   XMarkIcon,
+  ClipboardDocumentListIcon,
+  CurrencyDollarIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
@@ -58,7 +61,7 @@ function Modal({ open, onClose, title, children, footer }) {
       <div className="modal-card" role="document">
         <div className="modal-head">
           <h2 className="modal-title">{title}</h2>
-          <button className="btn btn--icon" onClick={onClose} aria-label="Fechar">
+          <button className="btn btn--neutral btn--icon" onClick={onClose} aria-label="Fechar">
             <XMarkIcon className="icon" />
           </button>
         </div>
@@ -317,101 +320,108 @@ export default function FolhasItensPage() {
 
       {/* header */}
       <header className="page-header" role="region" aria-labelledby="titulo-pagina">
-        <div>
-          <h1 id="titulo-pagina" className="page-title">Itens de Folha</h1>
-          <p className="page-subtitle">Cadastre proventos, descontos e lançamentos manuais por funcionário da folha.</p>
+        <div className="page-header__content">
+          <div className="page-header__info">
+            <h1 id="titulo-pagina" className="page-title">Itens de Folha</h1>
+            <p className="page-subtitle">Cadastre proventos, descontos e lançamentos manuais por funcionário da folha.</p>
+          </div>
+
+          <div className="page-header__toolbar">
+            <button className="btn btn--success" onClick={abrirNovo}>
+              <PlusCircleIcon className="icon" aria-hidden="true" />
+              <span>Novo Item</span>
+            </button>
+            <button className="btn btn--info" onClick={exportarCSV}>
+              <ArrowDownTrayIcon className="icon" aria-hidden="true" />
+              <span>Exportar</span>
+            </button>
+            <button
+              className="btn btn--neutral"
+              onClick={carregarItens}
+              disabled={loading}
+              aria-busy={loading ? "true" : "false"}
+            >
+              {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+              <span>{loading ? "Atualizando…" : "Atualizar"}</span>
+            </button>
+          </div>
         </div>
 
-        <div className="page-header__toolbar">
-          <div className="toolbar-grid">
-            {/* esquerda: filtros */}
-            <div className="filters-wrap">
-              <div className="btn-group" role="group" aria-label="Atalhos de período">
-                <button className={`btn btn--neutral ${periodo==='hoje'?'is-active':''}`} onClick={() => aplicarPeriodo("hoje")}>
-                  <CalendarDaysIcon className="icon" aria-hidden="true" />
-                  <span>Hoje</span>
-                </button>
-                <button className={`btn btn--neutral ${periodo==='semana'?'is-active':''}`} onClick={() => aplicarPeriodo("semana")}>
-                  <span>Semana</span>
-                </button>
-                <button className={`btn btn--neutral ${periodo==='mes'?'is-active':''}`} onClick={() => aplicarPeriodo("mes")}>
-                  <span>Mês</span>
-                </button>
-              </div>
-
-              <div className="range-inline" role="group" aria-label="Intervalo customizado">
-                <input type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-                <span className="range-sep">—</span>
-                <input type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
-              </div>
-
-              <div className="filters-inline">
-                <FunnelIcon className="icon" aria-hidden="true" />
-                <select className="input input--sm" value={folhaId} onChange={(e)=>setFolhaId(e.target.value)}>
-                  {folhas.map(f => <option key={f.id} value={f.id}>{f.competencia} {f.status ? `• ${f.status}` : ""}</option>)}
-                </select>
-
-                <select className="input input--sm" value={folhaFuncId} onChange={(e)=>setFolhaFuncId(e.target.value)}>
-                  <option value="todos">Todos os funcionários</option>
-                  {funcOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-
-                <select className="input input--sm" value={tipo} onChange={(e)=>setTipo(e.target.value)}>
-                  <option value="todos">Todos os tipos</option>
-                  {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-
-                <input
-                  className="input input--sm"
-                  placeholder="Buscar por referência/funcionário…"
-                  value={busca}
-                  onChange={(e)=>setBusca(e.target.value)}
-                />
-              </div>
+        {/* Filtros */}
+        <div className="filters-section">
+          <div className="filters-group">
+            <div className="btn-group" role="group" aria-label="Atalhos de período">
+              <button className={`btn btn--neutral ${periodo==='hoje'?'is-active':''}`} onClick={() => aplicarPeriodo("hoje")}>
+                <CalendarDaysIcon className="icon" aria-hidden="true" />
+                <span>Hoje</span>
+              </button>
+              <button className={`btn btn--neutral ${periodo==='semana'?'is-active':''}`} onClick={() => aplicarPeriodo("semana")}>
+                <span>Semana</span>
+              </button>
+              <button className={`btn btn--neutral ${periodo==='mes'?'is-active':''}`} onClick={() => aplicarPeriodo("mes")}>
+                <span>Mês</span>
+              </button>
             </div>
 
-            {/* direita: ações */}
-            <div className="actions-wrap">
-              <button className="btn" data-accent="success" onClick={abrirNovo}>
-                <PlusCircleIcon className="icon" aria-hidden="true" /><span>Novo</span>
-              </button>
-              <button className="btn" data-accent="info" onClick={exportarCSV}>
-                <ArrowDownTrayIcon className="icon" aria-hidden="true" /><span>Exportar</span>
-              </button>
-              <button
-                className="btn btn--neutral"
-                onClick={carregarItens}
-                disabled={loading}
-                aria-busy={loading ? "true" : "false"}
-              >
-                {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-                <span>{loading ? "Atualizando…" : "Atualizar"}</span>
-              </button>
+            <div className="range-inline" role="group" aria-label="Intervalo customizado">
+              <input type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+              <span className="range-sep">—</span>
+              <input type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
+            </div>
+
+            <div className="filters-inline">
+              <FunnelIcon className="icon" aria-hidden="true" />
+              <select className="input input--sm" value={folhaId} onChange={(e)=>setFolhaId(e.target.value)}>
+                {folhas.map(f => <option key={f.id} value={f.id}>{f.competencia} {f.status ? `• ${f.status}` : ""}</option>)}
+              </select>
+
+              <select className="input input--sm" value={folhaFuncId} onChange={(e)=>setFolhaFuncId(e.target.value)}>
+                <option value="todos">Todos os funcionários</option>
+                {funcOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+
+              <select className="input input--sm" value={tipo} onChange={(e)=>setTipo(e.target.value)}>
+                <option value="todos">Todos os tipos</option>
+                {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+
+              <input
+                className="input input--sm"
+                placeholder="Buscar por referência/funcionário…"
+                value={busca}
+                onChange={(e)=>setBusca(e.target.value)}
+              />
             </div>
           </div>
         </div>
       </header>
 
-      {err && <div className="error-alert" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
+      {err && <div className="alert alert--error" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
 
       {/* KPIs */}
       <div className="stats-grid">
-        <div className="stat-card" data-accent="info">
-          <div className="stat-card__icon">📄</div>
+        <div className="stat-card stat-card--info">
+          <div className="stat-card__icon">
+            <ClipboardDocumentListIcon className="icon" aria-hidden="true" />
+          </div>
           <div className="stat-card__content">
             <div className="stat-value">{kpis.itens}</div>
             <div className="stat-title">Itens no período</div>
           </div>
         </div>
-        <div className="stat-card" data-accent="success">
-          <div className="stat-card__icon">💰</div>
+        <div className="stat-card stat-card--success">
+          <div className="stat-card__icon">
+            <CurrencyDollarIcon className="icon" aria-hidden="true" />
+          </div>
           <div className="stat-card__content">
             <div className="stat-value">{kpis.valorTotalFmt}</div>
             <div className="stat-title">Valor total</div>
           </div>
         </div>
-        <div className="stat-card" data-accent="warning">
-          <div className="stat-card__icon">👥</div>
+        <div className="stat-card stat-card--warning">
+          <div className="stat-card__icon">
+            <UserGroupIcon className="icon" aria-hidden="true" />
+          </div>
           <div className="stat-card__content">
             <div className="stat-value">{kpis.funcionarios}</div>
             <div className="stat-title">Funcionários impactados</div>
@@ -420,63 +430,59 @@ export default function FolhasItensPage() {
       </div>
 
       {/* Tabela */}
-      <div className="card">
-        <div className="table-responsive">
-          <table className="tbl" role="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Funcionário</th>
-                <th>Tipo</th>
-                <th>Referência</th>
-                <th style={{textAlign:"right"}}>Qtd</th>
-                <th style={{textAlign:"right"}}>Valor Unit.</th>
-                <th style={{textAlign:"right"}}>Valor Total</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "var(--muted)" }}>
-                    Nenhum item encontrado para os filtros selecionados.
-                  </td>
-                </tr>
-              )}
-              {itens.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.id}</td>
-                  <td>{r.funcionario_nome || r.pessoa_nome || `#${r.folha_funcionario_id}`}</td>
-                  <td><span className={`tag tag--${String(r.tipo||"").toLowerCase()}`}>{r.tipo || "-"}</span></td>
-                  <td>{r.referencia || "-"}</td>
-                  <td style={{textAlign:"right"}}>{Number(r.quantidade || 0).toLocaleString("pt-BR")}</td>
-                  <td style={{textAlign:"right"}}>{toMoney(r.valor_unit)}</td>
-                  <td style={{textAlign:"right", fontWeight:600}}>{toMoney(r.valor_total)}</td>
-                  <td className="row-actions">
-                    <button className="btn btn--icon" aria-label="Editar" onClick={() => abrirEdicao(r)}>
-                      <PencilSquareIcon className="icon" />
-                    </button>
-                    <button className="btn btn--icon danger" aria-label="Excluir" onClick={() => excluir(r)}>
-                      <TrashIcon className="icon" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {itens.length > 0 && (
-              <tfoot>
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "right", fontWeight: 700 }}>Total</td>
-                  <td style={{ textAlign: "right", fontWeight: 700 }}>
-                    {toMoney(itens.reduce((s, i) => s + Number(i.valor_total || 0), 0))}
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            )}
-          </table>
+      <div className="table-wrap">
+        <div className="table">
+          <div className="th">ID</div>
+          <div className="th">Funcionário</div>
+          <div className="th">Tipo</div>
+          <div className="th">Referência</div>
+          <div className="th" style={{textAlign:"right"}}>Qtd</div>
+          <div className="th" style={{textAlign:"right"}}>Valor Unit.</div>
+          <div className="th" style={{textAlign:"right"}}>Valor Total</div>
+          <div className="th th--actions">Ações</div>
+
+          {itens.length === 0 && (
+            <div className="td td--empty" style={{ gridColumn: "1 / -1" }}>
+              Nenhum item encontrado para os filtros selecionados.
+            </div>
+          )}
+          
+          {itens.map((r) => (
+            <div key={r.id} className="row">
+              <div className="td">{r.id}</div>
+              <div className="td">{r.funcionario_nome || r.pessoa_nome || `#${r.folha_funcionario_id}`}</div>
+              <div className="td">
+                <span className={`badge badge--${String(r.tipo||"").toLowerCase()}`}>
+                  {r.tipo || "-"}
+                </span>
+              </div>
+              <div className="td">{r.referencia || "-"}</div>
+              <div className="td td--number">{Number(r.quantidade || 0).toLocaleString("pt-BR")}</div>
+              <div className="td td--number">{toMoney(r.valor_unit)}</div>
+              <div className="td td--number" style={{fontWeight:600}}>{toMoney(r.valor_total)}</div>
+              <div className="td td--actions">
+                <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(r)}>
+                  <PencilSquareIcon className="icon" />
+                </button>
+                <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(r)}>
+                  <TrashIcon className="icon" />
+                </button>
+              </div>
+            </div>
+          ))}
+          
+          {itens.length > 0 && (
+            <div className="row row--footer">
+              <div className="td" style={{gridColumn: "1 / 7", textAlign: "right", fontWeight: 700}}>Total</div>
+              <div className="td td--number" style={{fontWeight: 700}}>
+                {toMoney(itens.reduce((s, i) => s + Number(i.valor_total || 0), 0))}
+              </div>
+              <div className="td"></div>
+            </div>
+          )}
         </div>
-        <div className="card-foot">
+        
+        <div className="table-footer">
           <span className="muted">{total} registro(s)</span>
         </div>
       </div>
@@ -490,19 +496,19 @@ export default function FolhasItensPage() {
           <>
             <button className="btn btn--neutral" onClick={() => setOpenModal(false)}>Cancelar</button>
             {editando && (
-              <button className="btn" data-accent="error" onClick={() => excluir(editando)}>
+              <button className="btn btn--danger" onClick={() => excluir(editando)}>
                 <TrashIcon className="icon" aria-hidden="true" /><span>Excluir</span>
               </button>
             )}
-            <button className="btn" data-accent="success" onClick={async () => { try { await salvar(); } catch(e){ alert(e.message); } }}>
+            <button className="btn btn--success" onClick={async () => { try { await salvar(); } catch(e){ alert(e.message); } }}>
               <span>Salvar</span>
             </button>
           </>
         }
       >
         <div className="form-grid">
-          <label className="form-field">
-            <span>Funcionário (linha da folha) *</span>
+          <div className="form-field">
+            <label>Funcionário (linha da folha) *</label>
             <select
               value={form.folha_funcionario_id}
               onChange={(e)=>setForm({...form, folha_funcionario_id: e.target.value})}
@@ -512,27 +518,27 @@ export default function FolhasItensPage() {
               <option value="">Selecione…</option>
               {funcOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
-          </label>
+          </div>
 
-          <label className="form-field">
-            <span>Tipo</span>
+          <div className="form-field">
+            <label>Tipo</label>
             <select value={form.tipo} onChange={(e)=>setForm({...form, tipo: e.target.value})} className="input">
               {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
-          </label>
+          </div>
 
-          <label className="form-field">
-            <span>Referência</span>
+          <div className="form-field">
+            <label>Referência</label>
             <input
               className="input"
               value={form.referencia}
               onChange={(e)=>setForm({...form, referencia: e.target.value})}
               placeholder="ex.: Adiantamento, Vale-transporte…"
             />
-          </label>
+          </div>
 
-          <label className="form-field">
-            <span>Quantidade</span>
+          <div className="form-field">
+            <label>Quantidade</label>
             <input
               className="input"
               inputMode="decimal"
@@ -540,10 +546,10 @@ export default function FolhasItensPage() {
               onChange={(e)=>setForm({...form, quantidade: e.target.value})}
               placeholder="ex.: 1,00"
             />
-          </label>
+          </div>
 
-          <label className="form-field">
-            <span>Valor unitário (R$)</span>
+          <div className="form-field">
+            <label>Valor unitário (R$)</label>
             <input
               className="input"
               inputMode="decimal"
@@ -551,61 +557,231 @@ export default function FolhasItensPage() {
               onChange={(e)=>setForm({...form, valor_unit: e.target.value})}
               placeholder="ex.: 100,00"
             />
-          </label>
+          </div>
 
-          <label className="form-field">
-            <span>Valor total (R$)</span>
+          <div className="form-field">
+            <label>Valor total (R$)</label>
             <input
               className="input"
               inputMode="decimal"
               value={form.valor_total}
               onChange={(e)=>setForm({...form, valor_total: e.target.value})}
             />
-          </label>
+          </div>
         </div>
       </Modal>
 
-      {/* estilos locais: SEM perder o tema (usa vars do global.css) */}
+      {/* estilos locais */}
       <style jsx>{`
-        .toolbar-grid{width:100%;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
-        .filters-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;min-width:0}
-        .filters-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-        .range-inline{display:flex;align-items:center;gap:6px}
-        .range-sep{color:var(--muted)}
-        .actions-wrap{display:flex;gap:8px;justify-self:end}
-        .btn .icon{width:18px;height:18px}
-        @media (max-width: 1100px){ .toolbar-grid{grid-template-columns:1fr} .actions-wrap{justify-self:stretch} .actions-wrap .btn{width:100%;justify-content:center} }
+        /* Header layout */
+        .page-header__content{
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          width: 100%;
+        }
+        .page-header__info{
+          flex: 1;
+          min-width: 0;
+        }
+        .page-header__toolbar{
+          display: flex;
+          gap: 8px;
+          flex-shrink: 0;
+          align-items: center;
+        }
 
-        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0}
-        .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px}
-        .stat-card[data-accent="info"]{border-left:4px solid var(--info)}
-        .stat-card[data-accent="success"]{border-left:4px solid var(--success)}
-        .stat-card[data-accent="warning"]{border-left:4px solid var(--warning)}
-        .stat-card__icon{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--panel-muted)}
-        .stat-value{font-size:1.6rem;font-weight:700;line-height:1}
-        .stat-title{font-size:.85rem;color:var(--muted);font-weight:600}
+        /* Filtros section */
+        .filters-section{
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid var(--border);
+        }
+        .filters-group{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          align-items: center;
+        }
 
-        .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
-        .table-responsive{width:100%;overflow:auto}
-        table.tbl{width:100%;border-collapse:separate;border-spacing:0}
-        .tbl thead th{position:sticky;top:0;background:var(--panel-muted);border-bottom:1px solid var(--border);text-align:left;padding:10px;font-size:.9rem}
-        .tbl tbody td{border-bottom:1px solid var(--border);padding:10px;vertical-align:middle}
-        .tbl tfoot td{background:var(--panel-muted);padding:10px;border-top:1px solid var(--border)}
-        .row-actions{display:flex;gap:4px}
-        .btn--icon{padding:8px}
-        .btn--icon.danger{color:var(--error)}
-        .tag{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:.75rem;font-weight:700;border:1px solid var(--border);background:var(--panel-muted)}
-        .tag--provento{color:var(--success)}
-        .tag--desconto{color:var(--error)}
-        .tag--outro{color:var(--info)}
+        .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
+        .btn-group .btn.is-active{ 
+          outline: 2px solid var(--accent); 
+          outline-offset: -2px;
+          background: var(--accent-bg);
+          color: var(--accent-fg);
+        }
 
-        .card-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--panel-muted);font-size:.9rem}
-        .muted{color:var(--muted)}
+        .range-inline{ display:flex; align-items:center; gap:6px; flex-wrap:wrap }
+        .range-sep{ color: var(--muted) }
 
-        .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        .form-field{display:flex;flex-direction:column;gap:6px}
-        .form-field>span{font-size:.9rem;font-weight:600}
-        @media (max-width: 640px){ .form-grid{grid-template-columns:1fr} }
+        .filters-inline{ 
+          display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+          margin-left: auto;
+        }
+        .filters-inline .icon{ width:18px; height:18px; color: var(--muted) }
+
+        /* Stats grid */
+        .stats-grid{
+          display:grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap:16px;
+          margin-bottom:12px;
+          width:100%;
+        }
+        .stat-card{ 
+          background:var(--panel);
+          border:1px solid var(--border);
+          border-radius:12px;
+          padding:16px;
+          display:flex;
+          align-items:center;
+          gap:12px;
+          box-shadow:var(--shadow);
+          border-left: 4px solid var(--border);
+        }
+        .stat-card--info{ border-left-color: var(--info) }
+        .stat-card--success{ border-left-color: var(--success) }
+        .stat-card--warning{ border-left-color: var(--warning) }
+        .stat-card__icon{ 
+          width:44px;
+          height:44px;
+          border-radius:8px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          background:var(--panel-muted);
+          color: var(--muted);
+        }
+        .stat-card__content{ flex:1 }
+        .stat-value{ font-size:1.75rem; font-weight:800; line-height:1 }
+        .stat-title{ font-size:.875rem; color:var(--muted); font-weight:600 }
+
+        /* Table grid */
+        .table-wrap{ 
+          width:100%;
+          overflow:auto;
+          border:1px solid var(--border);
+          border-radius:8px;
+          background:var(--panel);
+          box-shadow:var(--shadow);
+        }
+        .table{ 
+          display:grid;
+          grid-template-columns: 80px 1.5fr 120px 1.2fr 100px 120px 120px 110px;
+          min-width: 1000px;
+        }
+        .th{ 
+          padding:12px;
+          border-bottom:2px solid var(--border);
+          background:var(--panel-muted);
+          font-weight:700;
+          font-size:14px;
+        }
+        .th--actions{ text-align:center }
+        .row{ display:contents }
+        .row--footer{ display:contents }
+        .td{ 
+          padding:12px;
+          border-bottom:1px solid var(--border);
+          display:flex;
+          align-items:center;
+          gap:8px;
+        }
+        .td--empty{
+          justify-content: center;
+          color: var(--muted);
+          font-style: italic;
+          grid-column: 1 / -1;
+          padding: 24px;
+        }
+        .td--number{ justify-content: flex-end; text-align: right }
+        .td--actions{ justify-content:center; gap:6px }
+
+        /* Badges */
+        .badge{
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid;
+        }
+        .badge--provento{ 
+          background: var(--success-bg);
+          color: var(--success-fg);
+          border-color: var(--success-border);
+        }
+        .badge--desconto{ 
+          background: var(--error-bg);
+          color: var(--error-fg);
+          border-color: var(--error-border);
+        }
+        .badge--outro{ 
+          background: var(--info-bg);
+          color: var(--info-fg);
+          border-color: var(--info-border);
+        }
+
+        .table-footer{
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 16px;
+          background: var(--panel-muted);
+          border-top: 1px solid var(--border);
+          font-size: 14px;
+        }
+        .muted{ color: var(--muted) }
+
+        /* Form */
+        .form-grid{
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        .form-field{
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .form-field > label{
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px){
+          .page-header__content{
+            flex-direction: column;
+            gap: 12px;
+          }
+          .page-header__toolbar{
+            width: 100%;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+          }
+          .filters-group{
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .filters-inline{
+            margin-left: 0;
+            width: 100%;
+          }
+          .form-grid{ grid-template-columns:1fr }
+        }
+        @media (max-width: 480px){
+          .page-header__toolbar{
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .page-header__toolbar .btn{
+            justify-content: center;
+          }
+        }
       `}</style>
     </>
   );
