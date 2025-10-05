@@ -360,26 +360,25 @@ export default function Ocorrencias() {
 
   const badgeTone = (tipo) => {
     const t = String(tipo || "").toUpperCase();
-    if (t.includes("HORA")) return "emerald";
-    if (t.includes("ATRASO")) return "yellow";
-    if (t.includes("AUS") || t.includes("FALTA")) return "red";
-    if (t.includes("ATEST")) return "blue";
-    if (t.includes("FER")) return "purple";
-    return "gray";
+    if (t.includes("HORA")) return "success";
+    if (t.includes("ATRASO")) return "warning";
+    if (t.includes("AUS") || t.includes("FALTA")) return "error";
+    if (t.includes("ATEST")) return "info";
+    if (t.includes("FER")) return "accent";
+    return "neutral";
   };
-  function StatusBadge({ children, tone = "gray" }) {
+  function StatusBadge({ children, tone = "neutral" }) {
     const map = {
-      gray: "bg-gray-100 text-gray-800 ring-gray-200",
-      green: "bg-green-100 text-green-800 ring-green-200",
-      red: "bg-red-100 text-red-800 ring-red-200",
-      yellow: "bg-yellow-100 text-yellow-800 ring-yellow-200",
-      blue: "bg-blue-100 text-blue-800 ring-blue-200",
-      emerald: "bg-emerald-100 text-emerald-800 ring-emerald-200",
-      purple: "bg-violet-100 text-violet-800 ring-violet-200",
+      neutral: "badge--neutral",
+      success: "badge--success",
+      error: "badge--error",
+      warning: "badge--warning",
+      info: "badge--info",
+      accent: "badge--accent",
     };
-    const cls = map[tone] || map.gray;
+    const cls = map[tone] || map.neutral;
     return (
-      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${cls}`}>
+      <span className={`badge ${cls}`}>
         {children}
       </span>
     );
@@ -391,103 +390,104 @@ export default function Ocorrencias() {
       {/* Região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER no padrão global */}
+      {/* HEADER no padrão global - CORRIGIDO */}
       <header className="page-header" role="region" aria-labelledby="titulo-oc">
-        <div>
-          <h1 id="titulo-oc" className="page-title">Ocorrências</h1>
-          <p className="page-subtitle">Registre e acompanhe ausências, horas extras, atestados e outras ocorrências</p>
+        <div className="page-header__content">
+          <div className="page-header__info">
+            <h1 id="titulo-oc" className="page-title">Ocorrências</h1>
+            <p className="page-subtitle">Registre e acompanhe ausências, horas extras, atestados e outras ocorrências</p>
+          </div>
+
+          <div className="page-header__toolbar" aria-label="Ações da página">
+            <button className="btn btn--success" onClick={abrirNovo} aria-label="Criar nova ocorrência">
+              <PlusCircleIcon className="icon" aria-hidden="true" />
+              <span>Nova Ocorrência</span>
+            </button>
+            <button className="btn btn--info" onClick={exportarCSV}>
+              <ArrowDownTrayIcon className="icon" aria-hidden="true" />
+              <span>Exportar</span>
+            </button>
+            <button
+              className="btn btn--neutral"
+              onClick={carregarOcorrencias}
+              disabled={loading}
+              aria-busy={loading ? "true" : "false"}
+              aria-label="Atualizar dados"
+            >
+              {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+              <span>{loading ? "Atualizando…" : "Atualizar"}</span>
+            </button>
+          </div>
         </div>
 
-       <div className="page-header__toolbar">
-  <div className="toolbar-grid">
-    {/* ESQUERDA: filtros/atalhos */}
-    <div className="filters-wrap">
-      {/* período rápido */}
-      <div className="btn-group" role="group" aria-label="Atalhos de período">
-        <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
-          <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
-        </button>
-        <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
-          <span>Semana</span>
-        </button>
-        <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
-          <span>Mês</span>
-        </button>
-      </div>
+        {/* Filtros abaixo do header principal */}
+        <div className="filters-section">
+          <div className="filters-group">
+            {/* período rápido */}
+            <div className="btn-group" role="group" aria-label="Atalhos de período">
+              <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
+                <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
+              </button>
+              <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
+                <span>Semana</span>
+              </button>
+              <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
+                <span>Mês</span>
+              </button>
+            </div>
 
-      {/* intervalo custom */}
-      <div className="range-inline" role="group" aria-label="Intervalo customizado">
-        <input type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-        <span className="range-sep">—</span>
-        <input type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
-      </div>
+            {/* intervalo custom */}
+            <div className="range-inline" role="group" aria-label="Intervalo customizado">
+              <input type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+              <span className="range-sep">—</span>
+              <input type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
+            </div>
 
-      {/* filtros */}
-      <div className="filters-inline">
-        <FunnelIcon className="icon" aria-hidden="true" />
-        <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)}>
-          <option value="todos">Todos os funcionários</option>
-          {funcionarios.map(f => (
-            <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
-          ))}
-        </select>
-        <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)}>
-          <option value="todos">Todos os tipos</option>
-          {tiposSugeridos.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <input
-          className="input input--sm"
-          placeholder="Buscar por nome, tipo ou observação…"
-          value={busca}
-          onChange={(e)=>setBusca(e.target.value)}
-        />
-      </div>
-    </div>
-
-    {/* DIREITA: ações — sempre agrupadas e alinhadas */}
-    <div className="actions-wrap">
-      <button className="btn" data-accent="success" onClick={abrirNovo}>
-        <PlusCircleIcon className="icon" aria-hidden="true" /><span>Novo</span>
-      </button>
-      <button className="btn" data-accent="info" onClick={exportarCSV}>
-        <ArrowDownTrayIcon className="icon" aria-hidden="true" /><span>Exportar</span>
-      </button>
-      <button
-        className="btn btn--neutral"
-        onClick={carregarOcorrencias}
-        disabled={loading}
-        aria-busy={loading ? "true" : "false"}
-        aria-label="Atualizar dados"
-      >
-        {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-        <span>{loading ? "Atualizando…" : "Atualizar"}</span>
-      </button>
-    </div>
-  </div>
-</div>
+            {/* filtros */}
+            <div className="filters-inline">
+              <FunnelIcon className="icon" aria-hidden="true" />
+              <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)}>
+                <option value="todos">Todos os funcionários</option>
+                {funcionarios.map(f => (
+                  <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
+                ))}
+              </select>
+              <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)}>
+                <option value="todos">Todos os tipos</option>
+                {tiposSugeridos.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <input
+                className="input input--sm"
+                placeholder="Buscar por nome, tipo ou observação…"
+                value={busca}
+                onChange={(e)=>setBusca(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
       </header>
 
-      {/* Alerts */}
-      {err && <div className="alert" data-accent="error" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
-      {sucesso && <div className="alert" data-accent="success" role="status" style={{ marginBottom: 12 }}>{sucesso}</div>}
+      {/* Alerts - CORRIGIDOS */}
+      {err && <div className="alert alert--error" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
+      {sucesso && <div className="alert alert--success" role="status" style={{ marginBottom: 12 }}>{sucesso}</div>}
 
-      {/* KPIs */}
+      {/* KPIs - CORRIGIDOS */}
       <div className="stats-grid">
-        <div className="stat-card" data-accent="info">
+        <div className="stat-card stat-card--info">
           <div className="stat-card__icon"><ClipboardDocumentListIcon className="icon" aria-hidden="true" /></div>
           <div className="stat-card__content">
             <div className="stat-value">{kpis.total}</div>
             <div className="stat-title">Ocorrências no período</div>
           </div>
         </div>
-        <div className="stat-card" data-accent="success">
+        <div className="stat-card stat-card--success">
           <div className="stat-card__icon"><ClockIcon className="icon" aria-hidden="true" /></div>
           <div className="stat-card__content">
             <div className="stat-value">{kpis.horasTotal.toFixed(2)}</div>
             <div className="stat-title">Horas acumuladas</div>
           </div>
         </div>
-        <div className="stat-card" data-accent="warning">
+        <div className="stat-card stat-card--warning">
           <div className="stat-card__icon"><UserGroupIcon className="icon" aria-hidden="true" /></div>
           <div className="stat-card__content">
             <div className="stat-value">{kpis.presentes}</div>
@@ -539,7 +539,7 @@ export default function Ocorrencias() {
                   <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
                     <PencilSquareIcon className="icon" aria-hidden="true" />
                   </button>
-                  <button className="btn" data-accent="error" aria-label="Excluir" onClick={() => excluir(o)}>
+                  <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
                     <TrashIcon className="icon" aria-hidden="true" />
                   </button>
                 </div>
@@ -562,7 +562,7 @@ export default function Ocorrencias() {
         </div>
       )}
 
-      {/* Modal CRUD */}
+      {/* Modal CRUD - CORRIGIDO */}
       <Modal
         open={modalAberto}
         onClose={() => setModalAberto(false)}
@@ -571,11 +571,11 @@ export default function Ocorrencias() {
           <>
             <button className="btn btn--neutral" onClick={() => setModalAberto(false)}>Cancelar</button>
             {editando && (
-              <button className="btn" data-accent="error" onClick={() => excluir(editando)}>
+              <button className="btn btn--danger" onClick={() => excluir(editando)}>
                 <TrashIcon className="icon" aria-hidden="true" /><span>Excluir</span>
               </button>
             )}
-            <button className="btn" data-accent="success" onClick={salvar}>
+            <button className="btn btn--success" onClick={salvar}>
               <PlusCircleIcon className="icon" aria-hidden="true" /><span>{editando ? "Salvar" : "Adicionar"}</span>
             </button>
           </>
@@ -634,108 +634,187 @@ export default function Ocorrencias() {
         </div>
       </Modal>
 
-      {/* Estilos locais (somente vars do global.css) */}
+      {/* Estilos locais - CORRIGIDOS */}
       <style jsx>{`
+        /* Alertas usando variáveis CSS */
         .alert{
           background: var(--panel);
           border: 1px solid var(--border);
           border-left: 4px solid var(--fg);
           padding: 12px 14px; border-radius: 8px; box-shadow: var(--shadow);
         }
-        .alert[data-accent="success"]{ border-left-color: var(--success); }
-        .alert[data-accent="error"]{ border-left-color: var(--error); }
+        .alert--success{ border-left-color: var(--success); }
+        .alert--error{ border-left-color: var(--error); }
 
+        /* Stats grid usando classes semânticas */
         .stats-grid{
           display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap:16px; margin-bottom:12px; width:100%;
         }
-        .stat-card{ background:var(--panel); border:1px solid var(--border); border-radius:12px;
-          padding:16px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow) }
-        .stat-card[data-accent="info"]{ border-left:4px solid var(--info) }
-        .stat-card[data-accent="success"]{ border-left:4px solid var(--success) }
-        .stat-card[data-accent="warning"]{ border-left:4px solid var(--warning) }
-        .stat-card__icon{ width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--panel-muted) }
+        .stat-card{ 
+          background:var(--panel); border:1px solid var(--border); border-radius:12px;
+          padding:16px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow);
+          border-left: 4px solid var(--border);
+        }
+        .stat-card--info{ border-left-color: var(--info) }
+        .stat-card--success{ border-left-color: var(--success) }
+        .stat-card--warning{ border-left-color: var(--warning) }
+        .stat-card__icon{ 
+          width:44px;height:44px;border-radius:8px;
+          display:flex;align-items:center;justify-content:center;
+          background:var(--panel-muted);
+          color: var(--muted);
+        }
         .stat-card__content{ flex:1 }
         .stat-value{ font-size:1.75rem; font-weight:800; line-height:1 }
         .stat-title{ font-size:.875rem; color:var(--muted); font-weight:600 }
 
+        /* Badges usando classes semânticas */
+        .badge{
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid;
+        }
+        .badge--neutral{ background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--neutral-border) }
+        .badge--success{ background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border) }
+        .badge--error{ background: var(--error-bg); color: var(--error-fg); border-color: var(--error-border) }
+        .badge--warning{ background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border) }
+        .badge--info{ background: var(--info-bg); color: var(--info-fg); border-color: var(--info-border) }
+        .badge--accent{ background: var(--accent-bg); color: var(--accent-fg); border-color: var(--accent-border) }
+
         .chips-wrap{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px }
-        .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:999px }
+        .chip{ 
+          display:inline-flex; align-items:center; gap:8px; 
+          padding:6px 8px; background:var(--panel); 
+          border:1px solid var(--border); border-radius:999px 
+        }
         .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
 
-        .table-wrap{ width:100%; overflow:auto; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:var(--shadow) }
-        .table{ display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; min-width:980px }
-        .th{ padding:12px; border-bottom:2px solid var(--border); background:var(--panel-muted); font-weight:700; font-size:14px }
+        .table-wrap{ 
+          width:100%; overflow:auto; border:1px solid var(--border); 
+          border-radius:8px; background:var(--panel); box-shadow:var(--shadow) 
+        }
+        .table{ 
+          display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; min-width:980px 
+        }
+        .th{ 
+          padding:12px; border-bottom:2px solid var(--border); 
+          background:var(--panel-muted); font-weight:700; font-size:14px 
+        }
         .th--actions{ text-align:center }
         .row{ display:contents }
-        .td{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px }
+        .td{ 
+          padding:12px; border-bottom:1px solid var(--border); 
+          display:flex; align-items:center; gap:8px 
+        }
         .td--func{ gap:10px }
         .td__main{ font-weight:700 }
         .td__sub{ font-size:12px; color:var(--muted) }
-        .dot{ width:10px; height:10px; border-radius:999px; background: var(--func-color); border:1px solid var(--border) }
-        .td--type :global(.inline-flex){ margin-right: 0 } /* Badge */
-        .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+        .dot{ 
+          width:10px; height:10px; border-radius:999px; 
+          background: var(--func-color); border:1px solid var(--border) 
+        }
+        .td--obs .obs{ 
+          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden 
+        }
         .muted{ color: var(--muted) }
         .td--actions{ justify-content:center; gap:6px }
 
-        .pagination{ display:flex; align-items:center; justify-content:center; gap:12px; padding:12px }
+        .pagination{ 
+          display:flex; align-items:center; justify-content:center; gap:12px; padding:12px 
+        }
         .pagination__status{ color:var(--muted); font-weight:600 }
 
         .form-grid{ display:flex; flex-direction:column; gap:12px }
         .form-2col{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
         .form-field > label{ display:block; font-size:14px; font-weight:600; margin-bottom:6px }
 
+        /* Filtros section */
+        .filters-section{
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid var(--border);
+        }
+        .filters-group{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          align-items: center;
+        }
+
         .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
-        .btn-group .btn.is-active{ outline: 2px solid var(--accent); outline-offset: -2px }
+        .btn-group .btn.is-active{ 
+          outline: 2px solid var(--accent); 
+          outline-offset: -2px;
+          background: var(--accent-bg);
+          color: var(--accent-fg);
+        }
 
         .range-inline{ display:flex; align-items:center; gap:6px; flex-wrap:wrap }
         .range-sep{ color: var(--muted) }
 
-        .filters-inline{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
+        .filters-inline{ 
+          display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+          margin-left: auto;
+        }
         .filters-inline .icon{ width:18px; height:18px; color: var(--muted) }
-/* Grid do header: 2 colunas no desktop, 1 no mobile */
-.toolbar-grid{
-  width:100%;
-  display:grid;
-  grid-template-columns: 1fr auto;
-  gap:12px;
-  align-items:center;
-}
 
-.filters-wrap{
-  display:flex;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:10px 12px;
-  min-width:0; /* evita “estouro” */
-}
+        /* Header layout corrigido */
+        .page-header__content{
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          width: 100%;
+        }
+        .page-header__info{
+          flex: 1;
+          min-width: 0;
+        }
+        .page-header__toolbar{
+          display: flex;
+          gap: 8px;
+          flex-shrink: 0;
+          align-items: center;
+        }
 
-.actions-wrap{
-  display:flex;
-  gap:8px;
-  justify-self:end;
-}
-
-/* Opcional: deixa os botões um pouco mais compactos no header */
-.page-header__toolbar .btn .icon{ width:18px; height:18px }
-
-/* Responsivo: empilha e expande botões de ação */
-@media (max-width: 1100px){
-  .toolbar-grid{ grid-template-columns: 1fr }
-  .actions-wrap{ justify-self:stretch }
-  .actions-wrap .btn{ width:100%; justify-content:center }
-}
-
-/* Já herdamos os comportamentos do seu global.css:
-   - .btn, .input, .btn-group etc. */
         @media (max-width: 900px){
-          .page-header__toolbar{ flex-direction:column; align-items:stretch }
-          .page-header__toolbar .btn, .page-header__toolbar .input{ width:100%; justify-content:center }
+          .page-header__content{
+            flex-direction: column;
+            gap: 12px;
+          }
+          .page-header__toolbar{
+            width: 100%;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+          }
+          .filters-group{
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .filters-inline{
+            margin-left: 0;
+            width: 100%;
+          }
           .form-2col{ grid-template-columns:1fr }
-          .table{ grid-template-columns: 110px 1.3fr 120px 90px 1.4fr 110px; min-width:860px }
+          .table{ 
+            grid-template-columns: 110px 1.3fr 120px 90px 1.4fr 110px; 
+            min-width:860px 
+          }
         }
         @media (max-width: 480px){
           .table{ min-width:780px }
+          .page-header__toolbar{
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .page-header__toolbar .btn{
+            justify-content: center;
+          }
         }
       `}</style>
     </>
