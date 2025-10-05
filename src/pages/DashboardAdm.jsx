@@ -1408,7 +1408,7 @@ export default function DashboardAdm() {
           .hours-item__name { font-size: 14px; }
           .hours-item__details { flex-direction: column; gap: 4px; }
         }
-      `}
+      }
 
 
 </style>
