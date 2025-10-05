@@ -13,8 +13,6 @@ import {
   DocumentTextIcon,
   ExclamationTriangleIcon,
   DocumentChartBarIcon,
-  CogIcon,
-  MagnifyingGlassIcon,
   ClipboardDocumentListIcon,
   ArrowRightOnRectangleIcon,
   ChevronLeftIcon,
@@ -48,7 +46,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   const [isMobile, setIsMobile] = useState(false);
   const [isNarrow, setIsNarrow] = useState(false); // <=360px
   const [open, setOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false); // Novo estado para menu recolhido
+  const [collapsed, setCollapsed] = useState(false);
 
   const [perms, setPerms] = useState(() => new Set());
   const [permsLoaded, setPermsLoaded] = useState(false);
@@ -96,7 +94,6 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
       const w = window.innerWidth;
       setIsMobile(w <= 900);
       setIsNarrow(w <= 360);
-      // Se a tela for muito estreita, recolher automaticamente
       if (w < 1200 && !isMobile) {
         setCollapsed(true);
       }
@@ -159,60 +156,22 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           <header
             role="banner"
             aria-label="Barra superior"
-            style={{
-              position: "fixed",
-              top: 0, left: 0, right: 0,
-              height: `${TOPBAR_H}px`,
-              background: "var(--bg)",
-              borderBottom: "1px solid var(--border)",
-              zIndex: 1000,
-            }}
+            className="mobile-header"
           >
-            <div
-              className="sidebar-header"
-              style={{
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "8px 12px",
-              }}
-            >
+            <div className="sidebar-header">
               <button
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
                 aria-controls="mobile-menu-sheet"
                 aria-label={open ? "Fechar menu" : "Abrir menu"}
                 title={open ? "Fechar menu" : "Abrir menu"}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--fg)",
-                  padding: "8px",
-                  borderRadius: "8px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minWidth: 40,
-                  minHeight: 40,
-                }}
+                className="mobile-menu-toggle"
               >
                 <Bars3Icon className="menu-toggle-icon" />
                 {!isNarrow && <span style={{ marginLeft: 6 }}>Menu</span>}
               </button>
 
-              <h1
-                className="brand"
-                style={{
-                  margin: 0,
-                  lineHeight: 1,
-                  flex: 1,
-                  minWidth: 0,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
+              <h1 className="brand">
                 Projeto Integrador
               </h1>
 
@@ -227,29 +186,17 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
             </div>
           </header>
 
-          {/* spacer pro conteúdo */}
-          <div aria-hidden="true" style={{ height: `${TOPBAR_H}px` }} />
+          <div aria-hidden="true" className="mobile-header-spacer" />
 
-          {/* SHEET abaixo da AppBar */}
           {open && (
             <div
               id="mobile-menu-sheet"
               role="dialog"
               aria-modal="true"
               aria-label="Menu principal"
-              style={{
-                position: "fixed",
-                top: `${TOPBAR_H}px`,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "var(--panel)",
-                borderTop: "1px solid var(--panel-muted)",
-                overflowY: "auto",
-                zIndex: 999,
-              }}
+              className="mobile-menu-sheet"
             >
-              <div className="user-info" role="group" aria-label="Usuário" style={{ padding: "12px" }}>
+              <div className="user-info" role="group" aria-label="Usuário">
                 <div className="user-details">
                   <div className="user-name">{me?.nome || "Usuário"}</div>
                   <div className="user-email">{me?.email}</div>
@@ -262,7 +209,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
               </div>
 
               {canRender && (
-                <nav className="sidebar-nav" aria-label="Navegação principal" style={{ paddingBottom: 12 }}>
+                <nav className="sidebar-nav" aria-label="Navegação principal">
                   <Section
                     title="Geral"
                     items={[
@@ -311,87 +258,92 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
       {/* ===== DESKTOP: sidebar tradicional ===== */}
       {!isMobile && (
-        <aside 
-          id="dashboard-sidebar" 
-          className={`dashboard-sidebar ${collapsed ? 'collapsed' : ''}`}
-          aria-label="Menu lateral"
-        >
-          <div className="sidebar-header">
-            {!collapsed && <h1 className="brand">Projeto Integrador</h1>}
-            <div className="flex items-center justify-between w-full">
-              {!collapsed && <h2 className="subtitle">Menu</h2>}
-              <button
-                onClick={() => setCollapsed(!collapsed)}
-                className="toggle-collapse-btn"
-                aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-                title={collapsed ? "Expandir menu" : "Recolher menu"}
+        <>
+          <aside 
+            id="dashboard-sidebar" 
+            className={`dashboard-sidebar ${collapsed ? 'collapsed' : ''}`}
+            aria-label="Menu lateral"
+          >
+            <div className="sidebar-header">
+              {!collapsed && <h1 className="brand">Projeto Integrador</h1>}
+              <div className="sidebar-header-content">
+                {!collapsed && <h2 className="subtitle">Menu</h2>}
+                <button
+                  onClick={() => setCollapsed(!collapsed)}
+                  className="toggle-collapse-btn"
+                  aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+                  title={collapsed ? "Expandir menu" : "Recolher menu"}
+                >
+                  {collapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="user-info" role="group" aria-label="Usuário">
+              {!collapsed && (
+                <div className="user-details">
+                  <div className="user-name">{me?.nome || "Usuário"}</div>
+                  <div className="user-email">{me?.email}</div>
+                  {empresaAtiva && (
+                    <div className="empresa-info">
+                      Empresa: <strong>{empresaAtiva.nome_fantasia || empresaAtiva.razao_social}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button 
+                className="logout-btn" 
+                onClick={onLogout} 
+                title="Sair" 
+                aria-label="Sair do sistema"
               >
-                {collapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
+                <ArrowRightOnRectangleIcon className="logout-icon" />
               </button>
             </div>
-          </div>
 
-          <div className="user-info" role="group" aria-label="Usuário">
+            {canRender && (
+              <nav className="sidebar-nav" aria-label="Navegação principal">
+                <MenuBlock title="Geral" collapsed={collapsed}>
+                  {has(PERM.DASHBOARD_FUNC) && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} collapsed={collapsed} />}
+                  {has(PERM.DASHBOARD_ADM) && <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} collapsed={collapsed} />}
+                </MenuBlock>
+
+                <MenuBlock title="Cadastros" collapsed={collapsed}>
+                  {has(PERM.PESSOAS) && <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} collapsed={collapsed} />}
+                  {has(PERM.EMPRESAS) && <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} collapsed={collapsed} />}
+                </MenuBlock>
+
+                <MenuBlock title="Segurança" collapsed={collapsed}>
+                  {has(PERM.USUARIOS) && <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} collapsed={collapsed} />}
+                  {has(PERM.PERFIS_PERMISSOES) && <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} collapsed={collapsed} />}
+                </MenuBlock>
+
+                <MenuBlock title="Operação" collapsed={collapsed}>
+                  {has(PERM.ESCALAS) && <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} collapsed={collapsed} />}
+                  {has(PERM.APONTAMENTOS) && <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} collapsed={collapsed} />}
+                  {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} collapsed={collapsed} />}
+                </MenuBlock>
+
+                <MenuBlock title="Folha" collapsed={collapsed}>
+                  {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} collapsed={collapsed} />}
+                  {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} collapsed={collapsed} />}
+                  {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} collapsed={collapsed} />}
+                  {has(PERM.FOLHAS_FUNC) && <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} collapsed={collapsed} />}
+                  {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} collapsed={collapsed} />}
+                </MenuBlock>
+              </nav>
+            )}
+
             {!collapsed && (
-              <div className="user-details">
-                <div className="user-name">{me?.nome || "Usuário"}</div>
-                <div className="user-email">{me?.email}</div>
-                {empresaAtiva && (
-                  <div className="empresa-info">
-                    Empresa: <strong>{empresaAtiva.nome_fantasia || empresaAtiva.razao_social}</strong>
-                  </div>
-                )}
+              <div className="sidebar-footer">
+                <small>v1.0 • Acessível</small>
               </div>
             )}
-            <button 
-              className="logout-btn" 
-              onClick={onLogout} 
-              title="Sair" 
-              aria-label="Sair do sistema"
-            >
-              <ArrowRightOnRectangleIcon className="logout-icon" />
-            </button>
-          </div>
+          </aside>
 
-          {canRender && (
-            <nav className="sidebar-nav" aria-label="Navegação principal">
-              <MenuBlock title="Geral" collapsed={collapsed}>
-                {has(PERM.DASHBOARD_FUNC) && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} collapsed={collapsed} />}
-                {has(PERM.DASHBOARD_ADM) && <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} collapsed={collapsed} />}
-              </MenuBlock>
-
-              <MenuBlock title="Cadastros" collapsed={collapsed}>
-                {has(PERM.PESSOAS) && <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} collapsed={collapsed} />}
-                {has(PERM.EMPRESAS) && <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} collapsed={collapsed} />}
-              </MenuBlock>
-
-              <MenuBlock title="Segurança" collapsed={collapsed}>
-                {has(PERM.USUARIOS) && <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} collapsed={collapsed} />}
-                {has(PERM.PERFIS_PERMISSOES) && <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} collapsed={collapsed} />}
-              </MenuBlock>
-
-              <MenuBlock title="Operação" collapsed={collapsed}>
-                {has(PERM.ESCALAS) && <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} collapsed={collapsed} />}
-                {has(PERM.APONTAMENTOS) && <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} collapsed={collapsed} />}
-                {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} collapsed={collapsed} />}
-              </MenuBlock>
-
-              <MenuBlock title="Folha" collapsed={collapsed}>
-                {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} collapsed={collapsed} />}
-                {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} collapsed={collapsed} />}
-                {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} collapsed={collapsed} />}
-                {has(PERM.FOLHAS_FUNC) && <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} collapsed={collapsed} />}
-                {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} collapsed={collapsed} />}
-              </MenuBlock>
-            </nav>
-          )}
-
-          {!collapsed && (
-            <div className="sidebar-footer">
-              <small style={{ color: "var(--muted)" }}>v1.0 • Acessível</small>
-            </div>
-          )}
-        </aside>
+          {/* Espaço para o conteúdo não sobrepor */}
+          <div className={`sidebar-spacer ${collapsed ? 'collapsed' : ''}`} />
+        </>
       )}
     </>
   );
