@@ -294,14 +294,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                       { perm: PERM.FOLHAS_ITENS, to: "/folhas-itens", label: "Itens de Folha", icon: <DocumentTextIcon /> },
                     ]}
                   />
-                  <Section
-                    title="Dev"
-                    items={[
-                      { perm: PERM.DEV_INSPECAO, to: "/dev-inspecao", label: "Inspeção / SQL", icon: <MagnifyingGlassIcon /> },
-                      { perm: PERM.DEV_AUDITORIA, to: "/dev-auditoria", label: "Auditoria", icon: <ClipboardDocumentListIcon /> },
-                      { perm: PERM.DEV_CONFIG, to: "/dev-config", label: "Configurações", icon: <CogIcon /> },
-                    ]}
-                  />
+
                 </nav>
               )}
             </div>
