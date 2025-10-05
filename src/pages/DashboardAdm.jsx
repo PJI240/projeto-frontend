@@ -1389,9 +1389,9 @@ export default function DashboardAdm() {
           .hours-item__details { flex-direction: column; gap: 4px; }
         }
       `}
-/* Horas Trabalhadas: força layout em coluna e header alinhado */
+
 .stat-card--section {
-  display: block;        /* anula o display:flex do .stat-card padrão */
+  display: block;
 }
 
 .stat-header--row {
