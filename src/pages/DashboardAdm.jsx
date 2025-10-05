@@ -247,17 +247,18 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, apontByFuncD
 
     return resultado.sort((a, b) => b.horasTrabalhadas - a.horasTrabalhadas);
   }, [funcionarios, escalasByDia, apontByKey, apontByFuncDia, filtroFuncionario, periodo]);
-
   return (
-    <div className="stat-card" style={{ width: "100%" }}>
-      <div className="stat-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-        <h3 className="stat-title">Horas Trabalhadas</h3>
+    <div className="stat-card stat-card--section" style={{ width: "100%" }}>
+      <div className="stat-header stat-header--row">
+        <h3 className="stat-title" id="titulo-horas-trabalhadas">Horas Trabalhadas</h3>
+        <label className="visually-hidden" htmlFor="periodo-horas">Selecionar período das horas trabalhadas</label>
         <select 
+          id="periodo-horas"
+          aria-labelledby="titulo-horas-trabalhadas"
           value={periodo}
           onChange={(e) => setPeriodo(e.target.value)}
           className="input input--sm"
           style={{ minWidth: 120 }}
-          aria-label="Selecionar período das horas trabalhadas"
         >
           <option value="hoje">Hoje</option>
           <option value="semana">Esta Semana</option>
@@ -283,14 +284,13 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, apontByFuncD
                   )}
                 </div>
               </div>
-              
               <div className="hours-item__progress" aria-hidden="true">
                 <div
                   className="hours-item__progress-bar"
                   style={{
                     width: `${Math.min(100, (func.horasTrabalhadas / (8 * 60)) * 100)}%`,
                     backgroundColor: func.atrasoTotal > 60 ? 'var(--error)' : 
-                                   func.atrasoTotal > 15 ? 'var(--warning)' : 'var(--success)',
+                                    func.atrasoTotal > 15 ? 'var(--warning)' : 'var(--success)',
                   }}
                 />
               </div>
@@ -301,7 +301,6 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, apontByFuncD
     </div>
   );
 }
-
 /* ====== Componente principal ====== */
 export default function DashboardAdm() {
   // Estado para controlar se está em mobile
