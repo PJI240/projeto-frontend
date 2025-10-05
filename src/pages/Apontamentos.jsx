@@ -1,5 +1,15 @@
 // src/pages/Apontamentos.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import {
+  PlusIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  XMarkIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
+  DocumentArrowDownIcon,
+} from "@heroicons/react/24/solid";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
@@ -51,42 +61,13 @@ function OrigemBadge({ origem }) {
   };
   const sty = map[o] || map.APONTADO;
   return (
-    <span style={{
+    <span className="badge" style={{
       background: sty.bg,
       color: sty.fg,
       border: "1px solid color-mix(in srgb, currentColor 25%, transparent)",
-      padding: "2px 8px",
-      borderRadius: 999,
-      fontSize: "12px",
-      fontWeight: 700
     }}>
       {sty.label}
     </span>
-  );
-}
-
-/* ===================== UI: Modal simples ===================== */
-function Modal({ open, title, onClose, children, footer }) {
-  if (!open) return null;
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => e.target === e.currentTarget && onClose?.()}
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,.35)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 1000
-      }}
-    >
-      <div style={{ width: "min(720px,100%)", background: "var(--panel)", borderRadius: 12, border: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", padding: 16, borderBottom: "1px solid var(--border)" }}>
-          <h2 style={{ margin: 0, fontSize: "18px" }}>{title}</h2>
-          <button className="toggle-btn" onClick={onClose}>Fechar</button>
-        </div>
-        <div style={{ padding: 16 }}>{children}</div>
-        {footer && <div style={{ padding: 16, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>{footer}</div>}
-      </div>
-    </div>
   );
 }
 
@@ -107,12 +88,12 @@ export default function Apontamentos() {
   /* -------- ui -------- */
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [okMsg, setOkMsg] = useState("");
+  const [success, setSuccess] = useState("");
 
   /* -------- CRUD modal -------- */
-  const [openForm, setOpenForm] = useState(false);
-  const [editando, setEditando] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
+    id: null,
     funcionario_id: "",
     data: toISO(new Date()),
     turno_ordem: 1,
@@ -123,9 +104,13 @@ export default function Apontamentos() {
   });
 
   /* -------- Import modal -------- */
-  const [openImport, setOpenImport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [preview, setPreview] = useState({ validas: [], invalidas: [], conflitos: [] });
+
+  const liveRef = useRef(null);
+
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   /* ---------------- API helper ---------------- */
   const api = useCallback(async (path, init = {}) => {
@@ -153,23 +138,25 @@ export default function Apontamentos() {
   }, [api, periodo, funcionarioId, origem]);
 
   const recarregar = useCallback(async () => {
-    setErr(""); setOkMsg(""); setLoading(true);
+    setErr(""); setSuccess(""); setLoading(true);
     try {
       await Promise.all([loadFuncionarios(), loadItens()]);
+      if (liveRef.current) liveRef.current.textContent = "Lista de apontamentos atualizada.";
     } catch (e) {
       setErr(e.message || "Falha ao carregar.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar apontamentos.";
     } finally {
       setLoading(false);
     }
   }, [loadFuncionarios, loadItens]);
 
   useEffect(() => { recarregar(); }, [recarregar]);
-  useEffect(() => { loadItens(); }, [periodo, funcionarioId, origem]); // reage aos filtros
+  useEffect(() => { loadItens(); }, [periodo, funcionarioId, origem]);
 
   /* ---------------- Ações (CRUD) ---------------- */
-  const abrirNovo = () => {
-    setEditando(null);
+  const novo = () => {
     setForm({
+      id: null,
       funcionario_id: funcionarioId || "",
       data: periodo.de,
       turno_ordem: 1,
@@ -178,20 +165,25 @@ export default function Apontamentos() {
       origem: "APONTADO",
       obs: ""
     });
-    setOpenForm(true);
+    setShowForm(true);
   };
-  const abrirEdicao = (it) => {
-    setEditando(it);
+
+  const editar = (item) => {
     setForm({
-      funcionario_id: it.funcionario_id,
-      data: it.data,
-      turno_ordem: it.turno_ordem,
-      entrada: it.entrada || "",
-      saida: it.saida || "",
-      origem: it.origem || "APONTADO",
-      obs: it.obs || "",
+      id: item.id,
+      funcionario_id: item.funcionario_id,
+      data: item.data,
+      turno_ordem: item.turno_ordem,
+      entrada: item.entrada || "",
+      saida: item.saida || "",
+      origem: item.origem || "APONTADO",
+      obs: item.obs || "",
     });
-    setOpenForm(true);
+    setShowForm(true);
+  };
+
+  const cancelarInline = () => {
+    setShowForm(false);
   };
 
   function validarFormLocal(f) {
@@ -205,8 +197,10 @@ export default function Apontamentos() {
     return null;
   }
 
-  const salvar = async () => {
-    setErr(""); setOkMsg("");
+  const salvar = async (e) => {
+    e?.preventDefault?.();
+    setErr(""); setSuccess("");
+    
     const payload = {
       funcionario_id: Number(form.funcionario_id),
       data: form.data,
@@ -216,47 +210,51 @@ export default function Apontamentos() {
       origem: String(form.origem || "APONTADO").toUpperCase(),
       obs: form.obs || null
     };
+    
     const v = validarFormLocal(payload);
     if (v) { setErr(v); return; }
 
     try {
-      if (editando) {
-        await api(`/api/apontamentos/${editando.id}`, {
+      if (form.id) {
+        await api(`/api/apontamentos/${form.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        setOkMsg("Apontamento atualizado.");
+        setSuccess("Apontamento atualizado.");
       } else {
         await api(`/api/apontamentos`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        setOkMsg("Apontamento criado.");
+        setSuccess("Apontamento criado.");
       }
-      setOpenForm(false);
+      setShowForm(false);
       await loadItens();
+      if (liveRef.current) liveRef.current.textContent = "Apontamento salvo com sucesso.";
     } catch (e) {
       setErr(e.message || "Falha ao salvar.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao salvar apontamento.";
     }
   };
 
-  const excluir = async (it) => {
-    if (!confirm("Excluir este apontamento?")) return;
-    setErr(""); setOkMsg("");
+  const excluir = async (item) => {
+    if (!window.confirm(`Excluir o apontamento do dia ${item.data}?`)) return;
+    setErr(""); setSuccess("");
     try {
-      await api(`/api/apontamentos/${it.id}`, { method: "DELETE" });
-      setOkMsg("Apontamento removido.");
+      await api(`/api/apontamentos/${item.id}`, { method: "DELETE" });
+      setSuccess("Apontamento removido.");
       await loadItens();
+      if (liveRef.current) liveRef.current.textContent = "Apontamento excluído.";
     } catch (e) {
       setErr(e.message || "Falha ao excluir.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao excluir apontamento.";
     }
   };
 
   /* ---------------- Import (CSV) ---------------- */
   function parseCSV(text) {
-    // espera ; como separador
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const out = [];
     for (const line of lines) {
@@ -269,7 +267,7 @@ export default function Apontamentos() {
   function validarLote(rows) {
     const validas = [];
     const invalidas = [];
-    const keySet = new Set(); // para detectar duplicidade no próprio arquivo
+    const keySet = new Set();
 
     rows.forEach((r, idx) => {
       const row = {
@@ -289,7 +287,7 @@ export default function Apontamentos() {
       else if (row.entrada && !isHHMM(row.entrada)) motivo = "entrada inválida";
       else if (row.saida && !isHHMM(row.saida)) motivo = "saída inválida";
       else if (row.entrada && row.saida && minutes(row.saida) < minutes(row.entrada)) motivo = "saida < entrada";
-      // chave de duplicidade (no arquivo)
+      
       const k = `${row.funcionario_id}|${row.data}|${row.turno_ordem}|${row.origem}`;
       if (!motivo && keySet.has(k)) motivo = "linha duplicada no arquivo";
       if (!motivo) keySet.add(k);
@@ -305,7 +303,6 @@ export default function Apontamentos() {
     const rows = parseCSV(csvText);
     const p = validarLote(rows);
 
-    // detecta conflitos com itens já carregados (mesma chave)
     const existentes = new Set(
       itens.map(it => `${it.funcionario_id}|${it.data}|${it.turno_ordem}|${String(it.origem || "").toUpperCase()}`)
     );
@@ -317,20 +314,22 @@ export default function Apontamentos() {
 
   const importarValidas = async () => {
     if (!preview.validas.length) return;
-    setErr(""); setOkMsg("");
+    setErr(""); setSuccess("");
     try {
       await api(`/api/apontamentos/import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: preview.validas }),
       });
-      setOkMsg(`Importadas ${preview.validas.length} linhas. Recusadas ${preview.invalidas.length + preview.conflitos.length}.`);
-      setOpenImport(false);
+      setSuccess(`Importadas ${preview.validas.length} linhas. Recusadas ${preview.invalidas.length + preview.conflitos.length}.`);
+      setShowImport(false);
       setCsvText("");
       setPreview({ validas: [], invalidas: [], conflitos: [] });
       await loadItens();
+      if (liveRef.current) liveRef.current.textContent = "Apontamentos importados com sucesso.";
     } catch (e) {
       setErr(e.message || "Falha ao importar.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao importar apontamentos.";
     }
   };
 
@@ -340,42 +339,99 @@ export default function Apontamentos() {
     [itens]
   );
 
-  /* ===================== render ===================== */
+  const onOverlayKeyDown = (ev) => {
+    if (ev.key === "Escape") {
+      setShowForm(false);
+      setShowImport(false);
+    }
+  };
+
   return (
     <>
-      <header className="main-header">
-        <div className="header-content">
-          <h1>Apontamentos</h1>
-          <p>Cadastre batidas/turnos, edite e importe CSV. Total no período: <strong>{fmtHHMM(totalMinutosPeriodo)}</strong></p>
+      {/* região viva para leitores de tela */}
+      <div ref={liveRef} aria-live="polite" className="visually-hidden" />
+
+      {/* HEADER NO PADRÃO GLOBAL */}
+      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
+        <div>
+          <h1 id="titulo-pagina" className="page-title">Apontamentos</h1>
+          <p className="page-subtitle">
+            Cadastre batidas/turnos, edite e importe CSV. Total no período: <strong>{fmtHHMM(totalMinutosPeriodo)}</strong>
+          </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="toggle-btn" onClick={abrirNovo}>Novo apontamento</button>
-          <button className="toggle-btn" onClick={() => setOpenImport(true)}>Importar CSV</button>
-          <button className="toggle-btn" onClick={recarregar} disabled={loading}>{loading ? "Atualizando..." : "Atualizar"}</button>
+
+        <div className="page-header__toolbar" aria-label="Ações da página">
+          <button className="btn btn--success" onClick={novo} aria-label="Criar novo apontamento">
+            <PlusIcon className="icon" aria-hidden="true" />
+            <span>Novo Apontamento</span>
+          </button>
+          <button 
+            className="btn btn--neutral"
+            onClick={() => setShowImport(true)}
+            aria-label="Importar apontamentos via CSV"
+          >
+            <DocumentArrowDownIcon className="icon" aria-hidden="true" />
+            <span>Importar CSV</span>
+          </button>
+          <button
+            className="btn btn--neutral"
+            onClick={recarregar}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+            aria-label="Atualizar lista de apontamentos"
+          >
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
+          </button>
         </div>
       </header>
 
+      {err && <div className="error-alert" role="alert">{err}</div>}
+      {success && <div className="success-alert" role="status">{success}</div>}
+
       {/* Filtros */}
-      <div className="container" style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Período de</label>
-            <input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8 }} />
+      <div className="search-container">
+        <div className="filters-grid" role="search" aria-label="Filtrar apontamentos">
+          <div className="form-field">
+            <label htmlFor="filtro-de" className="form-label">Período de</label>
+            <input 
+              id="filtro-de"
+              type="date" 
+              value={periodo.de} 
+              onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))}
+              className="input"
+            />
           </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Até</label>
-            <input type="date" value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8 }} />
+          <div className="form-field">
+            <label htmlFor="filtro-ate" className="form-label">Até</label>
+            <input 
+              id="filtro-ate"
+              type="date" 
+              value={periodo.ate} 
+              onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))}
+              className="input"
+            />
           </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Funcionário</label>
-            <select value={funcionarioId} onChange={(e) => setFuncionarioId(e.target.value)} style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
+          <div className="form-field">
+            <label htmlFor="filtro-funcionario" className="form-label">Funcionário</label>
+            <select 
+              id="filtro-funcionario"
+              value={funcionarioId} 
+              onChange={(e) => setFuncionarioId(e.target.value)}
+              className="input"
+            >
               <option value="">Todos</option>
               {funcionarios.map(f => <option key={f.id} value={f.id}>{f.pessoa_nome} - {f.cargo_nome}</option>)}
             </select>
           </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>Origem</label>
-            <select value={origem} onChange={(e) => setOrigem(e.target.value)} style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
+          <div className="form-field">
+            <label htmlFor="filtro-origem" className="form-label">Origem</label>
+            <select 
+              id="filtro-origem"
+              value={origem} 
+              onChange={(e) => setOrigem(e.target.value)}
+              className="input"
+            >
               <option value="">Todas</option>
               <option value="APONTADO">APONTADO</option>
               <option value="IMPORTADO">IMPORTADO</option>
@@ -385,212 +441,537 @@ export default function Apontamentos() {
         </div>
       </div>
 
-      {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
-      {okMsg && <div className="success-alert" role="status" style={{ marginBottom: 16, padding: 12, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0", borderRadius: 8 }}>{okMsg}</div>}
+      {/* LISTAGEM: Tabela (desktop) + Cards (mobile) */}
+      <div className="listagem-container">
+        {/* Desktop/tablet: Tabela */}
+        <div className="table-wrapper table-only" role="region" aria-label="Tabela de apontamentos">
+          {loading ? (
+            <div className="loading-message" role="status">Carregando…</div>
+          ) : itens.length === 0 ? (
+            <div className="empty-message">Nenhum apontamento encontrado.</div>
+          ) : (
+            <div className="stat-card" style={{ overflow: "hidden" }}>
+              <table className="apontamentos-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Data</th>
+                    <th scope="col">Funcionário</th>
+                    <th scope="col">Turno</th>
+                    <th scope="col">Entrada</th>
+                    <th scope="col">Saída</th>
+                    <th scope="col">Duração</th>
+                    <th scope="col">Origem</th>
+                    <th scope="col">Obs</th>
+                    <th scope="col" className="actions-column">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itens.map((it) => {
+                    const f = funcionarios.find(x => x.id === it.funcionario_id);
+                    const minutos = duracao(it.entrada, it.saida);
+                    const inconsistencia = (it.entrada && it.saida && minutes(it.saida) < minutes(it.entrada));
 
-      {/* Tabela */}
-      <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: "var(--panel-muted)" }}>
-              <th style={th}>Data</th>
-              <th style={th}>Funcionário</th>
-              <th style={th}>Turno</th>
-              <th style={th}>Entrada</th>
-              <th style={th}>Saída</th>
-              <th style={th}>Duração</th>
-              <th style={th}>Origem</th>
-              <th style={th}>Obs</th>
-              <th style={th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {itens.map((it) => {
-              const f = funcionarios.find(x => x.id === it.funcionario_id);
-              const minutos = duracao(it.entrada, it.saida);
-              const inconsistencia =
-                (it.entrada && it.saida && minutes(it.saida) < minutes(it.entrada)) ? "Saída < entrada" : "";
-
-              return (
-                <tr key={it.id} style={{ borderTop: "1px solid var(--border)", background: inconsistencia ? "rgba(220,38,38,.05)" : "transparent" }}>
-                  <td style={td}>{it.data}</td>
-                  <td style={td}>{f ? `${f.pessoa_nome} - ${f.cargo_nome}` : `#${it.funcionario_id}`}</td>
-                  <td style={td}>&#35;{it.turno_ordem}</td>
-                  <td style={td}>{it.entrada || "-"}</td>
-                  <td style={td}>{it.saida || "-"}</td>
-                  <td style={td}><strong>{fmtHHMM(minutos)}</strong>{inconsistencia ? " ⚠️" : ""}</td>
-                  <td style={td}><OrigemBadge origem={it.origem} /></td>
-                  <td style={td} title={it.obs || ""} >
-                    <span style={{ display: "inline-block", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {it.obs || "-"}
-                    </span>
-                  </td>
-                  <td style={{ ...td, textAlign: "right" }}>
-                    <button className="toggle-btn" onClick={() => abrirEdicao(it)} style={{ marginRight: 8 }}>Editar</button>
-                    <button className="toggle-btn" onClick={() => excluir(it)} style={{ background: "var(--error)", color: "#fff" }}>Excluir</button>
-                  </td>
-                </tr>
-              );
-            })}
-            {!itens.length && (
-              <tr>
-                <td colSpan={9} style={{ ...td, textAlign: "center", color: "var(--muted)" }}>Nenhum apontamento no período.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal de formulário */}
-      <Modal
-        open={openForm}
-        title={editando ? "Editar apontamento" : "Novo apontamento"}
-        onClose={() => setOpenForm(false)}
-        footer={
-          <>
-            <button className="toggle-btn" onClick={() => setOpenForm(false)}>Cancelar</button>
-            <button className="toggle-btn" onClick={salvar}>{editando ? "Salvar" : "Adicionar"}</button>
-          </>
-        }
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-          <div>
-            <label className="nav-item-label" style={lbl}>Funcionário *</label>
-            <select
-              value={form.funcionario_id}
-              onChange={(e) => setForm(f => ({ ...f, funcionario_id: e.target.value }))}
-              style={inp}
-            >
-              <option value="">Selecione…</option>
-              {funcionarios.map(f => <option key={f.id} value={f.id}>{f.pessoa_nome} - {f.cargo_nome}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>Data *</label>
-            <input type="date" value={form.data} onChange={(e) => setForm(f => ({ ...f, data: e.target.value }))} style={inp} />
-          </div>
-          <div>
-            <label style={lbl}>Turno (ordem)</label>
-            <input type="number" min="1" value={form.turno_ordem} onChange={(e) => setForm(f => ({ ...f, turno_ordem: parseInt(e.target.value) || 1 }))} style={inp} />
-          </div>
-          <div>
-            <label style={lbl}>Entrada</label>
-            <input type="time" value={form.entrada} onChange={(e) => setForm(f => ({ ...f, entrada: e.target.value }))} style={inp} />
-          </div>
-          <div>
-            <label style={lbl}>Saída</label>
-            <input type="time" value={form.saida} onChange={(e) => setForm(f => ({ ...f, saida: e.target.value }))} style={inp} />
-          </div>
-          <div>
-            <label style={lbl}>Origem</label>
-            <select value={form.origem} onChange={(e) => setForm(f => ({ ...f, origem: e.target.value }))} style={inp}>
-              <option>APONTADO</option>
-              <option>IMPORTADO</option>
-              <option>AJUSTE</option>
-            </select>
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label style={lbl}>Observação</label>
-            <textarea rows={3} value={form.obs} onChange={(e) => setForm(f => ({ ...f, obs: e.target.value }))} style={{ ...inp, resize: "vertical" }} />
-          </div>
+                    return (
+                      <tr key={it.id} className={inconsistencia ? "row-inconsistente" : ""}>
+                        <td>{it.data}</td>
+                        <td>{f ? `${f.pessoa_nome} - ${f.cargo_nome}` : `#${it.funcionario_id}`}</td>
+                        <td>#{it.turno_ordem}</td>
+                        <td>{it.entrada || "-"}</td>
+                        <td>{it.saida || "-"}</td>
+                        <td><strong>{fmtHHMM(minutos)}</strong>{inconsistencia && " ⚠️"}</td>
+                        <td><OrigemBadge origem={it.origem} /></td>
+                        <td className="obs-cell" title={it.obs || ""}>
+                          {it.obs || "-"}
+                        </td>
+                        <td>
+                          <div className="actions-buttons">
+                            <button
+                              className="btn btn--neutral btn--sm"
+                              onClick={() => editar(it)}
+                              aria-label={`Editar apontamento de ${it.data}`}
+                            >
+                              <PencilSquareIcon className="icon" aria-hidden="true" />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              className="btn btn--danger btn--sm"
+                              onClick={() => excluir(it)}
+                              aria-label={`Excluir apontamento de ${it.data}`}
+                            >
+                              <TrashIcon className="icon" aria-hidden="true" />
+                              <span>Excluir</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* dicas/validações */}
-        {form.entrada && form.saida && minutes(form.saida) < minutes(form.entrada) && (
-          <div className="error-alert" style={{ marginTop: 12 }}>
-            Saída menor que a entrada. Para virada de dia, lance dois apontamentos (noite/madrugada).
-          </div>
-        )}
-      </Modal>
+        {/* Mobile: Cards */}
+        <div className="cards-wrapper cards-only" role="region" aria-label="Lista de apontamentos (versão cartões)">
+          {loading ? (
+            <div className="loading-message" role="status">Carregando…</div>
+          ) : itens.length === 0 ? (
+            <div className="empty-message">Nenhum apontamento encontrado.</div>
+          ) : (
+            <ul className="cards-grid" aria-label="Cartões de apontamentos">
+              {itens.map((it) => {
+                const f = funcionarios.find(x => x.id === it.funcionario_id);
+                const minutos = duracao(it.entrada, it.saida);
+                const inconsistencia = (it.entrada && it.saida && minutes(it.saida) < minutes(it.entrada));
 
-      {/* Modal de importação */}
-      <Modal
-        open={openImport}
-        title="Importar apontamentos (CSV ; separado por ponto e vírgula)"
-        onClose={() => setOpenImport(false)}
-        footer={
-          <>
-            <button className="toggle-btn" onClick={() => setOpenImport(false)}>Fechar</button>
-            <button className="toggle-btn" onClick={onBuildPreview}>Pré-visualizar</button>
-            <button className="toggle-btn" onClick={importarValidas} disabled={!preview.validas.length}>Importar {preview.validas.length} válidas</button>
-          </>
+                return (
+                  <li key={it.id} className={`apontamento-card ${inconsistencia ? "card-inconsistente" : ""}`}>
+                    <div className="apontamento-card__head">
+                      <h3 className="apontamento-card__title">{it.data}</h3>
+                      <div className="apontamento-card__badges">
+                        <OrigemBadge origem={it.origem} />
+                        {inconsistencia && <span className="badge badge--warning">⚠️ Inconsistente</span>}
+                      </div>
+                    </div>
+                    <div className="apontamento-card__body">
+                      <dl className="apontamento-dl">
+                        <div className="apontamento-dl__row">
+                          <dt>Funcionário</dt>
+                          <dd>{f ? `${f.pessoa_nome} - ${f.cargo_nome}` : `#${it.funcionario_id}`}</dd>
+                        </div>
+                        <div className="apontamento-dl__row">
+                          <dt>Turno</dt>
+                          <dd>#{it.turno_ordem}</dd>
+                        </div>
+                        <div className="apontamento-dl__row">
+                          <dt>Entrada/Saída</dt>
+                          <dd>{it.entrada || "-"} → {it.saida || "-"}</dd>
+                        </div>
+                        <div className="apontamento-dl__row">
+                          <dt>Duração</dt>
+                          <dd><strong>{fmtHHMM(minutos)}</strong></dd>
+                        </div>
+                        {it.obs && (
+                          <div className="apontamento-dl__row">
+                            <dt>Observação</dt>
+                            <dd>{it.obs}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+                    <div className="apontamento-card__actions">
+                      <button
+                        className="btn btn--neutral btn--sm"
+                        onClick={() => editar(it)}
+                        aria-label={`Editar apontamento de ${it.data}`}
+                        title="Editar"
+                      >
+                        <PencilSquareIcon className="icon" aria-hidden="true" />
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        className="btn btn--danger btn--sm"
+                        onClick={() => excluir(it)}
+                        aria-label={`Excluir apontamento de ${it.data}`}
+                        title="Excluir"
+                      >
+                        <TrashIcon className="icon" aria-hidden="true" />
+                        <span>Excluir</span>
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* FORMULÁRIO COMO DIALOG OVERLAY */}
+      {showForm && (
+        <div
+          className="form-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-form"
+          onKeyDown={onOverlayKeyDown}
+        >
+          <div className="form-container">
+            <div className="form-header">
+              <h2 id="titulo-form">{form.id ? "Editar Apontamento" : "Novo Apontamento"}</h2>
+              <button
+                className="btn btn--neutral btn--icon-only"
+                onClick={cancelarInline}
+                aria-label="Fechar formulário"
+                title="Fechar"
+              >
+                <XMarkIcon className="icon" aria-hidden="true" />
+              </button>
+            </div>
+
+            <form className="form" onSubmit={salvar}>
+              <div className="form-grid">
+                <div className="form-field">
+                  <label htmlFor="a_funcionario">Funcionário *</label>
+                  <select
+                    id="a_funcionario"
+                    value={form.funcionario_id}
+                    onChange={(e) => setField("funcionario_id", e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione…</option>
+                    {funcionarios.map(f => <option key={f.id} value={f.id}>{f.pessoa_nome} - {f.cargo_nome}</option>)}
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="a_data">Data *</label>
+                  <input 
+                    id="a_data"
+                    type="date" 
+                    value={form.data} 
+                    onChange={(e) => setField("data", e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="a_turno">Turno (ordem)</label>
+                  <input 
+                    id="a_turno"
+                    type="number" 
+                    min="1" 
+                    value={form.turno_ordem} 
+                    onChange={(e) => setField("turno_ordem", parseInt(e.target.value) || 1)} 
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="a_entrada">Entrada</label>
+                  <input 
+                    id="a_entrada"
+                    type="time" 
+                    value={form.entrada} 
+                    onChange={(e) => setField("entrada", e.target.value)} 
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="a_saida">Saída</label>
+                  <input 
+                    id="a_saida"
+                    type="time" 
+                    value={form.saida} 
+                    onChange={(e) => setField("saida", e.target.value)} 
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="a_origem">Origem</label>
+                  <select 
+                    id="a_origem"
+                    value={form.origem} 
+                    onChange={(e) => setField("origem", e.target.value)}
+                  >
+                    <option>APONTADO</option>
+                    <option>IMPORTADO</option>
+                    <option>AJUSTE</option>
+                  </select>
+                </div>
+
+                <div className="form-field span-2">
+                  <label htmlFor="a_obs">Observação</label>
+                  <textarea 
+                    id="a_obs"
+                    rows={3} 
+                    value={form.obs} 
+                    onChange={(e) => setField("obs", e.target.value)} 
+                    placeholder="Observações sobre o apontamento..."
+                  />
+                </div>
+              </div>
+
+              {/* Validação */}
+              {form.entrada && form.saida && minutes(form.saida) < minutes(form.entrada) && (
+                <div className="error-alert" style={{ marginTop: 12 }}>
+                  Saída menor que a entrada. Para virada de dia, lance dois apontamentos (noite/madrugada).
+                </div>
+              )}
+
+              <div className="form-actions">
+                <button type="button" className="btn btn--neutral" onClick={cancelarInline}>
+                  <XMarkIcon className="icon" aria-hidden="true" />
+                  <span>Cancelar</span>
+                </button>
+                <button type="submit" className="btn btn--success">
+                  <CheckIcon className="icon" aria-hidden="true" />
+                  <span>{form.id ? "Salvar alterações" : "Criar apontamento"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE IMPORTAÇÃO */}
+      {showImport && (
+        <div
+          className="form-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-import"
+          onKeyDown={onOverlayKeyDown}
+        >
+          <div className="form-container" style={{ maxWidth: "800px", maxHeight: "90vh" }}>
+            <div className="form-header">
+              <h2 id="titulo-import">Importar Apontamentos (CSV)</h2>
+              <button
+                className="btn btn--neutral btn--icon-only"
+                onClick={() => setShowImport(false)}
+                aria-label="Fechar importação"
+                title="Fechar"
+              >
+                <XMarkIcon className="icon" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="form">
+              <p style={{ marginTop: 0, color: "var(--muted)" }}>
+                Formato: <code>funcionario_id;data;turno_ordem;entrada;saida;origem;obs</code> — 
+                datas <code>YYYY-MM-DD</code>, horas <code>HH:MM</code>.
+              </p>
+              
+              <div className="form-field span-2">
+                <label htmlFor="csv-data">Dados CSV</label>
+                <textarea
+                  id="csv-data"
+                  rows={8}
+                  placeholder="123;2025-10-01;1;08:00;12:00;APONTADO;Chegou no horário"
+                  value={csvText}
+                  onChange={(e) => setCsvText(e.target.value)}
+                  style={{ resize: "vertical" }}
+                />
+              </div>
+
+              {(preview.validas.length + preview.invalidas.length + preview.conflitos.length) > 0 && (
+                <div className="preview-stats">
+                  <div className="stat-card" data-accent="success">
+                    <strong>Válidas</strong>
+                    <div>{preview.validas.length} linhas</div>
+                  </div>
+                  <div className="stat-card" data-accent="danger">
+                    <strong>Inválidas</strong>
+                    <div>{preview.invalidas.length} linhas</div>
+                  </div>
+                  <div className="stat-card" data-accent="warning">
+                    <strong>Conflitos</strong>
+                    <div>{preview.conflitos.length} linhas</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-actions">
+                <button type="button" className="btn btn--neutral" onClick={() => setShowImport(false)}>
+                  <XMarkIcon className="icon" aria-hidden="true" />
+                  <span>Fechar</span>
+                </button>
+                <button type="button" className="btn btn--neutral" onClick={onBuildPreview}>
+                  <ArrowPathIcon className="icon" aria-hidden="true" />
+                  <span>Pré-visualizar</span>
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn--success" 
+                  onClick={importarValidas} 
+                  disabled={!preview.validas.length}
+                >
+                  <CheckIcon className="icon" aria-hidden="true" />
+                  <span>Importar {preview.validas.length} válidas</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .listagem-container { width: 100%; }
+        .search-container { margin-bottom: 16px; }
+
+        .filters-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 12px;
         }
-      >
-        <p style={{ marginTop: 0, color: "var(--muted)" }}>
-          Formato: <code>funcionario_id;data;turno_ordem;entrada;saida;origem;obs</code> — datas <code>YYYY-MM-DD</code>, horas <code>HH:MM</code>.  
-          Duplicidade evitada pela chave <em>(func, data, turno, origem)</em>.
-        </p>
-        <textarea
-          rows={8}
-          placeholder="123;2025-10-01;1;08:00;12:00;APONTADO;Chegou no horário"
-          value={csvText}
-          onChange={(e) => setCsvText(e.target.value)}
-          style={{ ...inp, width: "100%", resize: "vertical" }}
-        />
-        {(preview.validas.length + preview.invalidas.length + preview.conflitos.length) > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginTop: 12 }}>
-            <div style={card}>
-              <strong>Válidas</strong>
-              <div style={{ fontSize: 12, color: "var(--muted)" }}>{preview.validas.length} linhas</div>
-            </div>
-            <div style={card}>
-              <strong>Inválidas</strong>
-              <div style={{ fontSize: 12, color: "var(--muted)" }}>{preview.invalidas.length} linhas</div>
-            </div>
-            <div style={card}>
-              <strong>Conflitos</strong>
-              <div style={{ fontSize: 12, color: "var(--muted)" }}>{preview.conflitos.length} linhas</div>
-            </div>
-          </div>
-        )}
 
-        {preview.invalidas.length > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <h3 style={{ fontSize: 14, margin: "12px 0 6px" }}>Inválidas</h3>
-            <div style={{ maxHeight: 220, overflow: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr><th style={thSm}>#</th><th style={thSm}>func</th><th style={thSm}>data</th><th style={thSm}>turno</th><th style={thSm}>entrada</th><th style={thSm}>saida</th><th style={thSm}>origem</th><th style={thSm}>motivo</th></tr></thead>
-                <tbody>
-                  {preview.invalidas.map((r,i) => (
-                    <tr key={`inv-${i}`} style={{ borderTop: "1px solid var(--border)" }}>
-                      <td style={tdSm}>{r._idx}</td><td style={tdSm}>{r.funcionario_id}</td><td style={tdSm}>{r.data}</td>
-                      <td style={tdSm}>{r.turno_ordem}</td><td style={tdSm}>{r.entrada||"-"}</td><td style={tdSm}>{r.saida||"-"}</td>
-                      <td style={tdSm}>{r.origem}</td><td style={tdSm}>{r.motivo}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        .table-only { display: block; }
+        .cards-only { display: none; }
+        @media (max-width: 768px) {
+          .table-only { display: none; }
+          .cards-only { display: block; }
+        }
 
-        {preview.conflitos.length > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <h3 style={{ fontSize: 14, margin: "12px 0 6px" }}>Conflitos com dados existentes</h3>
-            <div style={{ maxHeight: 220, overflow: "auto", border: "1px solid var(--border)", borderRadius: 8 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr><th style={thSm}>func</th><th style={thSm}>data</th><th style={thSm}>turno</th><th style={thSm}>origem</th></tr></thead>
-                <tbody>
-                  {preview.conflitos.map((r,i) => (
-                    <tr key={`conf-${i}`} style={{ borderTop: "1px solid var(--border)" }}>
-                      <td style={tdSm}>{r.funcionario_id}</td><td style={tdSm}>{r.data}</td><td style={tdSm}>{r.turno_ordem}</td><td style={tdSm}>{r.origem}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </Modal>
+        /* Tabela */
+        .apontamentos-table th,
+        .apontamentos-table td { white-space: nowrap; }
+        .apontamentos-table td:first-child,
+        .apontamentos-table th:first-child { white-space: normal; }
+        
+        .obs-cell {
+          max-width: 280px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        
+        .row-inconsistente {
+          background: rgba(220,38,38,.05) !important;
+        }
+        
+        .actions-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* Cards grid (mobile) */
+        .cards-grid {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        
+        .apontamento-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          box-shadow: var(--shadow);
+          overflow: hidden;
+          position: relative;
+        }
+        
+        .apontamento-card::before {
+          content: "";
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 4px;
+          background: var(--accent-bg);
+        }
+        
+        .card-inconsistente::before {
+          background: var(--error);
+        }
+        
+        .apontamento-card__head {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 8px; padding: 14px 14px 0 14px;
+        }
+        
+        .apontamento-card__title {
+          margin: 0; font-size: 1rem; font-weight: 700; color: var(--fg);
+        }
+        
+        .apontamento-card__badges {
+          display: flex; gap: 6px; flex-wrap: wrap;
+        }
+        
+        .badge {
+          font-size: 0.75rem; padding: 2px 8px; border-radius: 999px;
+          border: 1px solid var(--border);
+        }
+        
+        .badge--warning {
+          background: rgba(234,179,8,.20);
+          color: #92400e;
+          border-color: rgba(234,179,8,.35);
+        }
+
+        .apontamento-card__body { padding: 12px 14px 14px 14px; }
+        
+        .apontamento-dl { margin: 0; display: grid; gap: 8px; }
+        
+        .apontamento-dl__row {
+          display: grid;
+          grid-template-columns: 100px 1fr;
+          gap: 8px; align-items: baseline;
+        }
+        
+        .apontamento-dl__row dt { 
+          color: var(--muted); 
+          font-weight: 600; 
+          font-size: var(--fs-12); 
+        }
+        
+        .apontamento-dl__row dd { 
+          margin: 0; 
+          color: var(--fg); 
+          font-weight: 500; 
+          word-break: break-word;
+        }
+
+        .apontamento-card__actions {
+          display: flex; gap: 6px; flex-wrap: wrap; padding: 0 14px 14px 14px;
+        }
+
+        /* Preview stats */
+        .preview-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 12px;
+          margin: 16px 0;
+        }
+
+        /* Form grid responsivo */
+        .form-grid { 
+          display: grid; 
+          grid-template-columns: 1fr; 
+          gap: 12px; 
+        }
+        
+        .form-field { 
+          display: flex; 
+          flex-direction: column; 
+          gap: 6px; 
+        }
+        
+        .form-field input, 
+        .form-field select, 
+        .form-field textarea {
+          min-height: 44px; 
+          padding: 10px 12px; 
+          border: 1px solid var(--border);
+          border-radius: 12px; 
+          background: #fff; 
+          color: #111; 
+          font-size: var(--fs-16);
+        }
+        
+        .form-field textarea {
+          min-height: 80px;
+          resize: vertical;
+        }
+        
+        .form-field input:focus-visible, 
+        .form-field select:focus-visible,
+        .form-field textarea:focus-visible {
+          outline: 3px solid var(--focus); 
+          outline-offset: 2px;
+        }
+        
+        .form-field.span-2 { grid-column: span 1; }
+        
+        @media (min-width: 640px) {
+          .form-grid { grid-template-columns: 1fr 1fr; }
+          .form-field.span-2 { grid-column: span 2; }
+        }
+
+        /* Ajustes menores */
+        @media (max-width: 480px) {
+          .apontamento-dl__row { grid-template-columns: 90px 1fr; }
+          .apontamento-card__title { font-size: 0.95rem; }
+          .filters-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
     </>
   );
 }
-
-/* ===================== estilos inline reutilizáveis ===================== */
-const th = { textAlign: "left", padding: "12px", fontSize: 12, color: "var(--muted)", borderBottom: "1px solid var(--border)" };
-const td = { padding: "12px", fontSize: 14, color: "var(--fg)" };
-const thSm = { ...th, padding: "8px" };
-const tdSm  = { ...td, padding: "8px" };
-const lbl = { display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 4, fontWeight: 600 };
-const inp = { width: "100%", padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "#fff", color: "#111" };
-const card = { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, padding: 12 };
