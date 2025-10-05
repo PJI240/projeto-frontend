@@ -1403,16 +1403,15 @@ export default function DashboardAdm() {
           .page-header__toolbar .input,
           .page-header__toolbar label.btn { width: 100%; justify-content: center; }
         }
-        @media (max-width: 480px) {
-          .stats-grid { grid-template-columns: 1fr; }
-          .dashboard-legend { font-size: 12px; }
-          .hours-item__name { font-size: 14px; }
-          .hours-item__details { flex-direction: column; gap: 4px; }
-        }
-      }
 
 
-</style>
+  @media (max-width: 480px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .dashboard-legend { font-size: 12px; }
+    .hours-item__name { font-size: 14px; }
+    .hours-item__details { flex-direction: column; gap: 4px; }
+  }
+`}</style>
     </>
   );
 }
