@@ -363,11 +363,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
                 {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} />}
               </MenuBlock>
 
-            //<MenuBlock title="Dev">
-               // {has(PERM.DEV_INSPECAO) && <MenuItem to="/dev-inspecao" label="Inspeção / SQL" icon={<MagnifyingGlassIcon />} />}
-               // {has(PERM.DEV_AUDITORIA) && <MenuItem to="/dev-auditoria" label="Auditoria" icon={<ClipboardDocumentListIcon />} />}
-               // {has(PERM.DEV_CONFIG) && <MenuItem to="/dev-config" label="Configurações" icon={<CogIcon />} />}
-              //</MenuBlock>
+
             </nav>
           )}
 
