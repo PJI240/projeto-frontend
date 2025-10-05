@@ -510,53 +510,74 @@ export default function DashboardAdm() {
 
   /* ========= Cálculos de KPIs ========= */
   const kpis = useMemo(() => {
-    // Mantido: KPIs focados em escalados do dia
-    const hojeISO = toISO(new Date());
-    const alvoISO = isMobile ? toISO(diaAtual) :
-      (dias.some(d => toISO(d) === hojeISO) ? hojeISO : toISO(dias[0]));
+  // alvo do dia (igual ao que já usávamos)
+  const hoje = new Date();
+  const hojeISO = toISO(hoje);
+  const alvoISO = isMobile
+    ? toISO(diaAtual)
+    : (dias.some(d => toISO(d) === hojeISO) ? hojeISO : toISO(dias[0]));
 
-    const arrEsc = escalasByDiaFiltrado.get(alvoISO) || [];
+  // escalas do dia (para escalados/ausentes)
+  const arrEsc = escalasByDiaFiltrado.get(alvoISO) || [];
 
-    const escaladosSet = new Set();
-    const presentesSet = new Set();
-    let atrasos = 0;
-    let minutosTotais = 0;
+  const escaladosSet = new Set(arrEsc.map(e => e.funcionario_id));
 
-    for (const e of arrEsc) {
-      const funcId = e.funcionario_id;
-      escaladosSet.add(funcId);
+  // Presentes COM escala (como já era)
+  const presentesComEscala = new Set();
+  let atrasos = 0;
+  let minutosTotais = 0;
 
-      const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
-      const key = `${alvoISO}|${funcId}|${e.turno_ordem ?? 1}`;
-      const cons = consolidateApontamentos(apontByKeyFiltrado.get(key) || [], alvoISO);
+  for (const e of arrEsc) {
+    const funcId = e.funcionario_id;
+    const entradaEsc = e.entrada ? hhmmToMinutes(e.entrada) : null;
+    const key = `${alvoISO}|${funcId}|${e.turno_ordem ?? 1}`;
+    const cons = consolidateApontamentos(apontByKeyFiltrado.get(key) || [], alvoISO);
 
-      if (cons?.entradaMin != null) {
-        presentesSet.add(funcId);
+    if (cons?.entradaMin != null) {
+      presentesComEscala.add(funcId);
 
-        if (entradaEsc != null) {
-          const delta = cons.entradaMin - entradaEsc;
-          if (delta > 5) atrasos++;
-        }
-
-        const fim = cons.saidaMin ?? cons.entradaMin;
-        const dur = Math.max(0, fim - cons.entradaMin);
-        minutosTotais += dur;
+      if (entradaEsc != null) {
+        const delta = cons.entradaMin - entradaEsc;
+        if (delta > 5) atrasos++;
       }
+
+      const fim = cons.saidaMin ?? cons.entradaMin;
+      const dur = Math.max(0, fim - cons.entradaMin);
+      minutosTotais += dur;
     }
+  }
 
-    const escalados = escaladosSet.size;
-    const presentes = presentesSet.size;
-    const ausentes  = Math.max(0, escalados - presentes);
+  // NOVO: Presentes SEM escala (apontamento “solto”)
+  const presentesSemEscala = new Set();
+  for (const f of funcionariosFiltrados) {
+    if (escaladosSet.has(f.id)) continue; // já contabilizados acima quando apontarem
+    const lista = apontByFuncDiaFiltrado.get(`${alvoISO}|${f.id}`) || [];
+    const cons = consolidateApontamentos(lista, alvoISO);
+    if (cons?.entradaMin != null) {
+      presentesSemEscala.add(f.id);
+      // minutosTotais: opcional somar aqui também; mantive apenas o de escalados
+    }
+  }
 
-    return {
-      escalados,
-      presentes,
-      ausentes,
-      atrasos,
-      horasTotaisFmt: minutesToHHhMM(minutosTotais),
-    };
-  }, [apontByKeyFiltrado, escalasByDiaFiltrado, dias, diaAtual, isMobile]);
+  const presentesTotal = presentesComEscala.size + presentesSemEscala.size;
+  const ausentes = Math.max(0, escaladosSet.size - presentesComEscala.size);
 
+  return {
+    escalados: escaladosSet.size,
+    presentes: presentesTotal,      // <-- agora inclui quem apontou sem escala
+    ausentes,                       // <-- segue apenas entre escalados
+    atrasos,
+    horasTotaisFmt: minutesToHHhMM(minutosTotais),
+  };
+}, [
+  apontByKeyFiltrado,
+  apontByFuncDiaFiltrado,
+  escalasByDiaFiltrado,
+  funcionariosFiltrados,
+  dias,
+  diaAtual,
+  isMobile
+]);
   /* ========= Render helpers ========= */
   const dayHeight = isMobile ? 800 : 1200;
   const minVisible = CONFIG_HORARIOS.inicio * 60;
@@ -1368,7 +1389,27 @@ export default function DashboardAdm() {
           .hours-item__name { font-size: 14px; }
           .hours-item__details { flex-direction: column; gap: 4px; }
         }
-      `}</style>
+      `}
+/* Horas Trabalhadas: força layout em coluna e header alinhado */
+.stat-card--section {
+  display: block;        /* anula o display:flex do .stat-card padrão */
+}
+
+.stat-header--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 480px) {
+  .stat-header--row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+</style>
     </>
   );
 }
