@@ -1,5 +1,15 @@
 // src/pages/DashboardAdm.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowPathIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CalendarDaysIcon,
+  UserGroupIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+} from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 
@@ -151,15 +161,6 @@ function StatusBadge({ children, tone = "gray" }) {
   );
 }
 
-/* ====== KPIs ====== */
-const Kpi = ({ label, value, sub }) => (
-  <div className="stat-card">
-    <div className="stat-value">{value}</div>
-    <div className="stat-title">{label}</div>
-    {sub ? <div className="stat-trend">{sub}</div> : null}
-  </div>
-);
-
 /* ====== Componente de Horas Trabalhadas ====== */
 function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncionario, isMobile }) {
   const [periodo, setPeriodo] = useState('hoje'); // 'hoje', 'semana', 'mes'
@@ -233,108 +234,47 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, filtroFuncio
   }, [funcionarios, escalasByDia, apontByKey, filtroFuncionario, periodo]);
 
   return (
-    <div style={{
-      background: "var(--panel)",
-      borderRadius: 8,
-      border: "1px solid var(--border)",
-      padding: 16,
-      marginBottom: 16
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-        flexWrap: 'wrap',
-        gap: 12
-      }}>
-        <h3 style={{ margin: 0, fontSize: isMobile ? 16 : 18 }}>
-          Horas Trabalhadas
-        </h3>
-        
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select 
-            value={periodo}
-            onChange={(e) => setPeriodo(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              background: 'var(--panel)',
-              fontSize: 14
-            }}
-          >
-            <option value="hoje">Hoje</option>
-            <option value="semana">Esta Semana</option>
-            <option value="mes">Este Mês</option>
-          </select>
-        </div>
+    <div className="stat-card">
+      <div className="stat-header">
+        <h3 className="stat-title">Horas Trabalhadas</h3>
+        <select 
+          value={periodo}
+          onChange={(e) => setPeriodo(e.target.value)}
+          className="input input--sm"
+          style={{ minWidth: 120 }}
+        >
+          <option value="hoje">Hoje</option>
+          <option value="semana">Esta Semana</option>
+          <option value="mes">Este Mês</option>
+        </select>
       </div>
 
       {horasPorFuncionario.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>
-          Nenhum dado encontrado para o período selecionado
-        </div>
+        <div className="empty-message">Nenhum dado encontrado para o período selecionado</div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gap: 8,
-          maxHeight: isMobile ? 300 : 400,
-          overflowY: 'auto'
-        }}>
+        <div className="hours-list">
           {horasPorFuncionario.map((func) => (
-            <div
-              key={func.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px',
-                background: 'var(--panel-muted)',
-                borderRadius: 6,
-                border: '1px solid var(--border)'
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ 
-                  fontWeight: 600, 
-                  fontSize: isMobile ? 14 : 15,
-                  marginBottom: 4
-                }}>
-                  {func.nome}
-                </div>
-                <div style={{ 
-                  fontSize: isMobile ? 11 : 12, 
-                  color: 'var(--muted)',
-                  display: 'flex',
-                  gap: 12,
-                  flexWrap: 'wrap'
-                }}>
+            <div key={func.id} className="hours-item">
+              <div className="hours-item__content">
+                <div className="hours-item__name">{func.nome}</div>
+                <div className="hours-item__details">
                   <span>Dias: {func.diasTrabalhados}</span>
                   <span>Horas: {func.horasFormatadas}</span>
                   {func.atrasoTotal > 0 && (
-                    <span style={{ color: '#ef4444' }}>
+                    <span className="hours-item__delay">
                       Atraso: {func.atrasoFormatado}
                     </span>
                   )}
                 </div>
               </div>
               
-              <div style={{
-                width: 60,
-                height: 8,
-                background: '#e5e7eb',
-                borderRadius: 4,
-                overflow: 'hidden',
-                marginLeft: 12
-              }}>
+              <div className="hours-item__progress">
                 <div
+                  className="hours-item__progress-bar"
                   style={{
                     width: `${Math.min(100, (func.horasTrabalhadas / (8 * 60)) * 100)}%`,
-                    height: '100%',
-                    background: func.atrasoTotal > 60 ? '#ef4444' : 
-                               func.atrasoTotal > 15 ? '#f59e0b' : '#10b981',
-                    borderRadius: 4
+                    backgroundColor: func.atrasoTotal > 60 ? 'var(--error)' : 
+                                   func.atrasoTotal > 15 ? 'var(--warning)' : 'var(--success)',
                   }}
                 />
               </div>
@@ -368,6 +308,7 @@ export default function DashboardAdm() {
   const [err, setErr] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const refreshRef = useRef(null);
+  const liveRef = useRef(null);
 
   // Detecta mudança de tamanho da tela
   useEffect(() => {
@@ -410,8 +351,10 @@ export default function DashboardAdm() {
       setFuncionarios(f.funcionarios || []);
       setEscalas(e.escalas || []);
       setApontamentos(Array.isArray(a) ? a : (a.apontamentos || []));
+      if (liveRef.current) liveRef.current.textContent = "Dados do dashboard atualizados.";
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar dados do dashboard.";
     } finally {
       setLoading(false);
     }
@@ -586,75 +529,32 @@ export default function DashboardAdm() {
   /* ========= Grade da Semana (Desktop) ========= */
   const DiasAgendaDesktop = () => {
     return (
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "100px repeat(7, 1fr)",
-          minWidth: 1040,
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          overflow: "hidden",
-          background: "var(--panel)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
-      >
+      <div className="dashboard-grid">
         {/* Cabeçalho */}
-        <div
-          style={{
-            padding: "16px 12px",
-            borderBottom: "2px solid var(--border)",
-            background: "var(--panel-muted)",
-            fontWeight: 600,
-            fontSize: 14,
-          }}
-        >
+        <div className="dashboard-grid__header">
           HORA
         </div>
         {dias.map((dia, i) => (
           <div
             key={i}
-            style={{
-              padding: "12px",
-              borderBottom: "2px solid var(--border)",
-              textAlign: "center",
-              background: "var(--panel-muted)",
-            }}
+            className="dashboard-grid__day-header"
           >
-            <div style={{ fontWeight: 700, fontSize: 14 }}>{DIAS_SEMANA_CURTO[i]}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{formatDateBR(dia)}</div>
+            <div className="dashboard-grid__day-name">{DIAS_SEMANA_CURTO[i]}</div>
+            <div className="dashboard-grid__day-date">{formatDateBR(dia)}</div>
           </div>
         ))}
 
         {/* Coluna de horas com linhas */}
-        <div
-          style={{
-            position: "relative",
-            borderRight: "1px solid var(--border)",
-            background:
-              "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
-            height: dayHeight,
-          }}
-        >
+        <div className="dashboard-grid__hours-column">
           {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => (
             <div
               key={idx}
+              className="dashboard-grid__hour-line"
               style={{
-                position: "absolute",
                 top: (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio),
-                left: 0,
-                right: 0,
-                height: 0,
               }}
             >
-              <div
-                style={{
-                  position: "absolute",
-                  top: -8,
-                  right: 8,
-                  fontSize: 12,
-                  color: "var(--muted)",
-                }}
-              >
+              <div className="dashboard-grid__hour-label">
                 {String(CONFIG_HORARIOS.inicio + idx).padStart(2, "0")}:00
               </div>
             </div>
@@ -669,13 +569,7 @@ export default function DashboardAdm() {
           return (
             <div
               key={idxDia}
-              style={{
-                position: "relative",
-                height: dayHeight,
-                borderRight: idxDia === 6 ? "none" : "1px solid var(--border)",
-                background:
-                  "repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px)",
-              }}
+              className="dashboard-grid__day-column"
             >
               {/* Linha "agora" */}
               {toISO(new Date()) === dataISO && (() => {
@@ -685,15 +579,8 @@ export default function DashboardAdm() {
                   const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
                   return (
                     <div
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        top,
-                        height: 2,
-                        background: "rgba(59,130,246,0.9)",
-                        boxShadow: "0 0 0 1px rgba(59,130,246,0.4)",
-                      }}
+                      className="dashboard-grid__now-line"
+                      style={{ top }}
                     />
                   );
                 }
@@ -710,29 +597,19 @@ export default function DashboardAdm() {
                 return (
                   <div
                     key={`esc-${e.id}-${idx}`}
+                    className="dashboard-block dashboard-block--scale"
                     style={{
                       ...style,
-                      border: `2px solid ${func.cor}`,
-                      background: "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "6px 8px",
-                      gap: 8,
+                      borderColor: func.cor,
                     }}
                     title={`Escala • ${func.nome} (${e.entrada || "--"} - ${e.saida || "--"}) • Turno ${e.turno_ordem}`}
                   >
                     <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 999,
-                        background: func.cor,
-                      }}
+                      className="dashboard-block__dot"
+                      style={{ backgroundColor: func.cor }}
                     />
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg)" }}>
-                      {func.nome}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    <div className="dashboard-block__name">{func.nome}</div>
+                    <div className="dashboard-block__time">
                       {e.entrada || "--"} – {e.saida || "--"}
                     </div>
                   </div>
@@ -759,38 +636,28 @@ export default function DashboardAdm() {
                   : "PONTUAL";
 
                 const tone =
-                  status === "ATRASO"   ? "yellow"
-                : status === "ADIANTADO" ? "blue"
-                : status === "PONTUAL"   ? "green"
-                : "emerald";
+                  status === "ATRASO"   ? "warning"
+                : status === "ADIANTADO" ? "info"
+                : status === "PONTUAL"   ? "success"
+                : "success";
 
                 return (
                   <div
                     key={`apo-${e.id}-${idx}`}
+                    className="dashboard-block dashboard-block--apontamento"
                     style={{
                       ...style,
-                      background: func.cor,
-                      color: "white",
-                      boxShadow: "0 2px 6px rgba(0,0,0,.12)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 8px",
+                      backgroundColor: func.cor,
                       opacity: cons.parcial ? 0.9 : 1,
                     }}
                     title={`Apontamento • ${func.nome} (${minutesToHHhMM(dur)}${cons.parcial ? " • em andamento" : ""})`}
                   >
                     <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 999,
-                        background: "white",
-                        opacity: 0.9,
-                      }}
+                      className="dashboard-block__dot"
+                      style={{ backgroundColor: "white" }}
                     />
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>{func.nome}</div>
-                    <div style={{ fontSize: 11, opacity: 0.95 }}>
+                    <div className="dashboard-block__name">{func.nome}</div>
+                    <div className="dashboard-block__time">
                       {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
                       {String(cons.entradaMin % 60).padStart(2, "0")}
                       {" – "}
@@ -798,7 +665,7 @@ export default function DashboardAdm() {
                         ? `${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}`
                         : "em andamento"}
                     </div>
-                    <div style={{ marginLeft: "auto" }}>
+                    <div className="dashboard-block__status">
                       <StatusBadge tone={tone}>
                         {status}{atrasoMin != null ? ` (${atrasoMin > 0 ? "+" : ""}${atrasoMin}m)` : ""}
                       </StatusBadge>
@@ -821,65 +688,25 @@ export default function DashboardAdm() {
     const nomeDia = DIAS_SEMANA_LONGO[(diaSemana + 6) % 7]; // Ajuste para Seg=0
 
     return (
-      <div
-        style={{
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          overflow: "hidden",
-          background: "var(--panel)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
-      >
+      <div className="dashboard-mobile">
         {/* Cabeçalho do dia */}
-        <div
-          style={{
-            padding: "16px",
-            borderBottom: "2px solid var(--border)",
-            background: "var(--panel-muted)",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
-            {nomeDia}
-          </div>
-          <div style={{ fontSize: 14, color: "var(--muted)" }}>
-            {formatDateFull(diaAtual)}
-          </div>
+        <div className="dashboard-mobile__header">
+          <div className="dashboard-mobile__day-name">{nomeDia}</div>
+          <div className="dashboard-mobile__day-date">{formatDateFull(diaAtual)}</div>
         </div>
 
         {/* Grade do dia */}
-        <div
-          style={{
-            position: "relative",
-            height: dayHeight,
-            background:
-              "repeating-linear-gradient(to bottom, transparent, transparent 39px, var(--border) 40px)",
-          }}
-        >
+        <div className="dashboard-mobile__grid">
           {/* Linhas de hora */}
           {Array.from({ length: CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio + 1 }, (_, idx) => (
             <div
               key={idx}
+              className="dashboard-mobile__hour-line"
               style={{
-                position: "absolute",
                 top: (idx * dayHeight) / (CONFIG_HORARIOS.fim - CONFIG_HORARIOS.inicio),
-                left: 0,
-                right: 0,
-                height: 0,
               }}
             >
-              <div
-                style={{
-                  position: "absolute",
-                  top: -6,
-                  left: 8,
-                  fontSize: 11,
-                  color: "var(--muted)",
-                  background: "var(--panel)",
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                }}
-              >
+              <div className="dashboard-mobile__hour-label">
                 {String(CONFIG_HORARIOS.inicio + idx).padStart(2, "0")}:00
               </div>
             </div>
@@ -893,15 +720,8 @@ export default function DashboardAdm() {
               const top = ((nowMin - minVisible) / minutesSpan) * dayHeight;
               return (
                 <div
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    right: 0,
-                    top,
-                    height: 2,
-                    background: "rgba(59,130,246,0.9)",
-                    boxShadow: "0 0 0 1px rgba(59,130,246,0.4)",
-                  }}
+                  className="dashboard-mobile__now-line"
+                  style={{ top }}
                 />
               );
             }
@@ -918,29 +738,19 @@ export default function DashboardAdm() {
             return (
               <div
                 key={`esc-mobile-${e.id}-${idx}`}
+                className="dashboard-block dashboard-block--scale"
                 style={{
                   ...style,
-                  border: `2px solid ${func.cor}`,
-                  background: "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "4px 6px",
-                  gap: 6,
+                  borderColor: func.cor,
                 }}
                 title={`Escala • ${func.nome} (${e.entrada || "--"} - ${e.saida || "--"})`}
               >
                 <div
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 999,
-                    background: func.cor,
-                  }}
+                  className="dashboard-block__dot"
+                  style={{ backgroundColor: func.cor }}
                 />
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--fg)" }}>
-                  {func.nome}
-                </div>
-                <div style={{ fontSize: 10, color: "var(--muted)" }}>
+                <div className="dashboard-block__name">{func.nome}</div>
+                <div className="dashboard-block__time">
                   {e.entrada || "--"}–{e.saida || "--"}
                 </div>
               </div>
@@ -968,29 +778,22 @@ export default function DashboardAdm() {
             return (
               <div
                 key={`apo-mobile-${e.id}-${idx}`}
+                className="dashboard-block dashboard-block--apontamento dashboard-block--mobile"
                 style={{
                   ...style,
-                  background: func.cor,
-                  color: "white",
-                  boxShadow: "0 1px 4px rgba(0,0,0,.12)",
-                  display: "flex",
-                  flexDirection: "column",
-                  padding: "4px 6px",
-                  gap: 2,
+                  backgroundColor: func.cor,
                   opacity: cons.parcial ? 0.9 : 1,
                 }}
                 title={`Apontamento • ${func.nome}`}
               >
-                <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.2 }}>
-                  {func.nome}
-                </div>
-                <div style={{ fontSize: 9, opacity: 0.95, lineHeight: 1.2 }}>
+                <div className="dashboard-block__name">{func.nome}</div>
+                <div className="dashboard-block__time">
                   {String(Math.floor(cons.entradaMin / 60)).padStart(2, "0")}:
                   {String(cons.entradaMin % 60).padStart(2, "0")}
                   {cons.saidaMin != null ? `–${String(Math.floor(cons.saidaMin / 60)).padStart(2, "0")}:${String(cons.saidaMin % 60).padStart(2, "0")}` : " (andamento)"}
                 </div>
-                <div style={{ fontSize: 8, opacity: 0.9 }}>
-                  <StatusBadge tone={status === "ATRASO" ? "yellow" : status === "ADIANTADO" ? "blue" : "green"}>
+                <div className="dashboard-block__status">
+                  <StatusBadge tone={status === "ATRASO" ? "warning" : status === "ADIANTADO" ? "info" : "success"}>
                     {status}
                   </StatusBadge>
                 </div>
@@ -1004,43 +807,29 @@ export default function DashboardAdm() {
 
   /* ========= Legenda ========= */
   const Legenda = () => (
-    <div
-      style={{
-        display: "flex",
-        gap: 12,
-        flexWrap: "wrap",
-        padding: 12,
-        background: "var(--panel)",
-        borderRadius: 8,
-        border: "1px solid var(--border)",
-        fontSize: isMobile ? 12 : 14,
-      }}
-    >
-      <div style={{ fontWeight: 600, color: "var(--muted)" }}>Legenda:</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{ width: 12, height: 12, border: "2px solid var(--fg)", borderRadius: 3 }} />
+    <div className="dashboard-legend">
+      <div className="dashboard-legend__title">Legenda:</div>
+      <div className="dashboard-legend__item">
+        <div className="dashboard-legend__symbol dashboard-legend__symbol--scale" />
         <span>Escala</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{ width: 12, height: 12, background: "var(--fg)", borderRadius: 3 }} />
+      <div className="dashboard-legend__item">
+        <div className="dashboard-legend__symbol dashboard-legend__symbol--apontamento" />
         <span>Apontamento</span>
       </div>
       {funcionariosFiltrados.slice(0, isMobile ? 6 : 12).map((f) => (
-        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ 
-            width: 12, 
-            height: 12, 
-            background: getCorFuncionario(f.id), 
-            borderRadius: 3, 
-            border: "1px solid var(--border)" 
-          }} />
-          <span style={{ fontSize: isMobile ? 11 : 13 }}>
+        <div key={f.id} className="dashboard-legend__item">
+          <div 
+            className="dashboard-legend__symbol" 
+            style={{ backgroundColor: getCorFuncionario(f.id) }}
+          />
+          <span className="dashboard-legend__name">
             {f.pessoa_nome?.split(' ')[0]}
           </span>
         </div>
       ))}
       {funcionariosFiltrados.length > (isMobile ? 6 : 12) && (
-        <div style={{ fontSize: 11, color: "var(--muted)" }}>
+        <div className="dashboard-legend__more">
           +{funcionariosFiltrados.length - (isMobile ? 6 : 12)}...
         </div>
       )}
@@ -1049,29 +838,49 @@ export default function DashboardAdm() {
 
   return (
     <>
-      <header className="main-header">
-        <div className="header-content">
-          <h1>Painel do Administrador</h1>
-          <p>
-            {isMobile 
-              ? "Escala × Apontamento" 
-              : "Escala × Apontamento"
-            }
+      {/* região viva para leitores de tela */}
+      <div ref={liveRef} aria-live="polite" className="visually-hidden" />
+
+      {/* HEADER NO PADRÃO GLOBAL */}
+      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
+        <div>
+          <h1 id="titulo-pagina" className="page-title">Painel do Administrador</h1>
+          <p className="page-subtitle">
+            {isMobile ? "Escala × Apontamento" : "Escala × Apontamento"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
- {/* Navegação por semana/dia */}
+
+        <div className="page-header__toolbar" aria-label="Ações da página">
+          {/* Navegação por semana/dia */}
           {isMobile ? (
             <>
-              <button className="toggle-btn" onClick={diaAnterior}>←</button>
-              <button className="toggle-btn" onClick={irParaHoje}>Hoje</button>
-              <button className="toggle-btn" onClick={diaSeguinte}>→</button>
+              <button className="btn btn--neutral" onClick={diaAnterior}>
+                <ChevronLeftIcon className="icon" aria-hidden="true" />
+                <span>Anterior</span>
+              </button>
+              <button className="btn btn--neutral" onClick={irParaHoje}>
+                <CalendarDaysIcon className="icon" aria-hidden="true" />
+                <span>Hoje</span>
+              </button>
+              <button className="btn btn--neutral" onClick={diaSeguinte}>
+                <span>Seguinte</span>
+                <ChevronRightIcon className="icon" aria-hidden="true" />
+              </button>
             </>
           ) : (
             <>
-              <button className="toggle-btn" onClick={semanaAnterior}>←</button>
-              <button className="toggle-btn" onClick={semanaAtual}>Hoje</button>
-              <button className="toggle-btn" onClick={semanaSeguinte}>→</button>
+              <button className="btn btn--neutral" onClick={semanaAnterior}>
+                <ChevronLeftIcon className="icon" aria-hidden="true" />
+                <span>Anterior</span>
+              </button>
+              <button className="btn btn--neutral" onClick={semanaAtual}>
+                <CalendarDaysIcon className="icon" aria-hidden="true" />
+                <span>Hoje</span>
+              </button>
+              <button className="btn btn--neutral" onClick={semanaSeguinte}>
+                <span>Seguinte</span>
+                <ChevronRightIcon className="icon" aria-hidden="true" />
+              </button>
             </>
           )}
           
@@ -1079,14 +888,8 @@ export default function DashboardAdm() {
           <select 
             value={filtroFuncionario}
             onChange={(e) => setFiltroFuncionario(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              background: 'var(--panel)',
-              fontSize: 14,
-              minWidth: 150
-            }}
+            className="input"
+            style={{ minWidth: 180 }}
           >
             <option value="todos">Todos os funcionários</option>
             {funcionarios.map(f => (
@@ -1096,46 +899,73 @@ export default function DashboardAdm() {
             ))}
           </select>
 
-         
-          
-          <button className="toggle-btn" onClick={carregarTudo} disabled={loading}>
-            {loading ? "Atualizando..." : "Atualizar"}
+          <button
+            className="btn btn--neutral"
+            onClick={carregarTudo}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+            aria-label="Atualizar dados do dashboard"
+          >
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
-          <label className="toggle-btn" style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+
+          <label className="btn btn--neutral" style={{ cursor: "pointer" }}>
             <input
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
+              style={{ marginRight: 8 }}
             />
-            Atualizar Automático
+            <span>Auto Refresh</span>
           </label>
         </div>
       </header>
 
-      {err && <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>{err}</div>}
+      {err && <div className="error-alert" role="alert">{err}</div>}
 
       {/* KPIs */}
-      <section className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{kpis.escalados}</div>
-          <div className="stat-title">Escalados (dia)</div>
+      <div className="stats-grid">
+        <div className="stat-card" data-accent="info">
+          <div className="stat-card__icon">
+            <UserGroupIcon className="icon" aria-hidden="true" />
+          </div>
+          <div className="stat-card__content">
+            <div className="stat-value">{kpis.escalados}</div>
+            <div className="stat-title">Escalados (dia)</div>
+          </div>
         </div>
 
         <div className="stat-card" data-accent="success">
-          <div className="stat-value">{kpis.presentes}</div>
-          <div className="stat-title">Presentes</div>
+          <div className="stat-card__icon">
+            <CheckCircleIcon className="icon" aria-hidden="true" />
+          </div>
+          <div className="stat-card__content">
+            <div className="stat-value">{kpis.presentes}</div>
+            <div className="stat-title">Presentes</div>
+          </div>
         </div>
 
         <div className="stat-card" data-accent="error">
-          <div className="stat-value">{kpis.ausentes}</div>
-          <div className="stat-title">Ausentes</div>
+          <div className="stat-card__icon">
+            <XCircleIcon className="icon" aria-hidden="true" />
+          </div>
+          <div className="stat-card__content">
+            <div className="stat-value">{kpis.ausentes}</div>
+            <div className="stat-title">Ausentes</div>
+          </div>
         </div>
 
         <div className="stat-card" data-accent="warning">
-          <div className="stat-value">{kpis.atrasos}</div>
-          <div className="stat-title">Atrasos (turnos)</div>
+          <div className="stat-card__icon">
+            <ClockIcon className="icon" aria-hidden="true" />
+          </div>
+          <div className="stat-card__content">
+            <div className="stat-value">{kpis.atrasos}</div>
+            <div className="stat-title">Atrasos (turnos)</div>
+          </div>
         </div>
-      </section>
+      </div>
 
       {/* Grade agenda */}
       {isMobile ? <DiaAgendaMobile /> : <DiasAgendaDesktop />}
@@ -1146,16 +976,13 @@ export default function DashboardAdm() {
       </div>
 
       {/* Notas */}
-      <section style={{ 
-        fontSize: isMobile ? 11 : 12, 
-        color: "var(--muted)", 
-        marginTop: 12 
-      }}>
-        <ul style={{ listStyle: "disc", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+      <div className="dashboard-notes">
+        <ul>
           <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
           <li><strong>Atraso</strong> é calculado pela diferença entre entrada apontada e entrada prevista na escala (tolerância de 5 minutos).</li>                    
         </ul>
-      </section>
+      </div>
+
       {/* Componente de Horas Trabalhadas */}
       <HorasTrabalhadas 
         funcionarios={funcionariosFiltrados}
@@ -1164,6 +991,464 @@ export default function DashboardAdm() {
         filtroFuncionario={filtroFuncionario}
         isMobile={isMobile}
       />
+
+      <style jsx>{`
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        .stat-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          box-shadow: var(--shadow);
+        }
+
+        .stat-card[data-accent="info"] {
+          border-left: 4px solid var(--info);
+        }
+
+        .stat-card[data-accent="success"] {
+          border-left: 4px solid var(--success);
+        }
+
+        .stat-card[data-accent="error"] {
+          border-left: 4px solid var(--error);
+        }
+
+        .stat-card[data-accent="warning"] {
+          border-left: 4px solid var(--warning);
+        }
+
+        .stat-card__icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--panel-muted);
+        }
+
+        .stat-card__icon .icon {
+          width: 24px;
+          height: 24px;
+        }
+
+        .stat-card[data-accent="info"] .stat-card__icon {
+          background: rgba(59, 130, 246, 0.1);
+          color: var(--info);
+        }
+
+        .stat-card[data-accent="success"] .stat-card__icon {
+          background: rgba(16, 185, 129, 0.1);
+          color: var(--success);
+        }
+
+        .stat-card[data-accent="error"] .stat-card__icon {
+          background: rgba(239, 68, 68, 0.1);
+          color: var(--error);
+        }
+
+        .stat-card[data-accent="warning"] .stat-card__icon {
+          background: rgba(245, 158, 11, 0.1);
+          color: var(--warning);
+        }
+
+        .stat-card__content {
+          flex: 1;
+        }
+
+        .stat-value {
+          font-size: 2rem;
+          font-weight: 700;
+          line-height: 1;
+          margin-bottom: 4px;
+        }
+
+        .stat-title {
+          font-size: 0.875rem;
+          color: var(--muted);
+          font-weight: 600;
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: 100px repeat(7, 1fr);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          overflow: hidden;
+          background: var(--panel);
+          box-shadow: var(--shadow);
+          min-width: 1040px;
+        }
+
+        .dashboard-grid__header {
+          padding: 16px 12px;
+          border-bottom: 2px solid var(--border);
+          background: var(--panel-muted);
+          font-weight: 600;
+          font-size: 14px;
+        }
+
+        .dashboard-grid__day-header {
+          padding: 12px;
+          border-bottom: 2px solid var(--border);
+          text-align: center;
+          background: var(--panel-muted);
+        }
+
+        .dashboard-grid__day-name {
+          font-weight: 700;
+          font-size: 14px;
+        }
+
+        .dashboard-grid__day-date {
+          font-size: 12px;
+          color: var(--muted);
+          margin-top: 4px;
+        }
+
+        .dashboard-grid__hours-column {
+          position: relative;
+          border-right: 1px solid var(--border);
+          background: repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px);
+          height: ${dayHeight}px;
+        }
+
+        .dashboard-grid__hour-line {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 0;
+        }
+
+        .dashboard-grid__hour-label {
+          position: absolute;
+          top: -8px;
+          right: 8px;
+          font-size: 12px;
+          color: var(--muted);
+        }
+
+        .dashboard-grid__day-column {
+          position: relative;
+          height: ${dayHeight}px;
+          border-right: 1px solid var(--border);
+          background: repeating-linear-gradient(to bottom, transparent, transparent 59px, var(--border) 60px);
+        }
+
+        .dashboard-grid__now-line {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: rgba(59,130,246,0.9);
+          box-shadow: 0 0 0 1px rgba(59,130,246,0.4);
+        }
+
+        /* Dashboard Mobile */
+        .dashboard-mobile {
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          overflow: hidden;
+          background: var(--panel);
+          box-shadow: var(--shadow);
+        }
+
+        .dashboard-mobile__header {
+          padding: 16px;
+          border-bottom: 2px solid var(--border);
+          background: var(--panel-muted);
+          text-align: center;
+        }
+
+        .dashboard-mobile__day-name {
+          font-weight: 700;
+          font-size: 16px;
+          margin-bottom: 4px;
+        }
+
+        .dashboard-mobile__day-date {
+          font-size: 14px;
+          color: var(--muted);
+        }
+
+        .dashboard-mobile__grid {
+          position: relative;
+          height: ${dayHeight}px;
+          background: repeating-linear-gradient(to bottom, transparent, transparent 39px, var(--border) 40px);
+        }
+
+        .dashboard-mobile__hour-line {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 0;
+        }
+
+        .dashboard-mobile__hour-label {
+          position: absolute;
+          top: -6px;
+          left: 8px;
+          font-size: 11px;
+          color: var(--muted);
+          background: var(--panel);
+          padding: 2px 6px;
+          border-radius: 4px;
+        }
+
+        .dashboard-mobile__now-line {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: rgba(59,130,246,0.9);
+          box-shadow: 0 0 0 1px rgba(59,130,246,0.4);
+        }
+
+        /* Dashboard Blocks */
+        .dashboard-block {
+          position: absolute;
+          left: 6px;
+          right: 6px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 8px;
+        }
+
+        .dashboard-block--scale {
+          border: 2px solid;
+          background: transparent;
+        }
+
+        .dashboard-block--apontamento {
+          background: var(--accent-bg);
+          color: white;
+          box-shadow: 0 2px 6px rgba(0,0,0,.12);
+        }
+
+        .dashboard-block--mobile {
+          flex-direction: column;
+          gap: 2px;
+          padding: 4px 6px;
+        }
+
+        .dashboard-block__dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+        }
+
+        .dashboard-block__name {
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .dashboard-block--mobile .dashboard-block__name {
+          font-size: 10px;
+          line-height: 1.2;
+        }
+
+        .dashboard-block__time {
+          font-size: 11px;
+          color: var(--muted);
+        }
+
+        .dashboard-block--apontamento .dashboard-block__time {
+          color: rgba(255,255,255,0.95);
+          font-size: 11px;
+        }
+
+        .dashboard-block--mobile .dashboard-block__time {
+          font-size: 9px;
+          line-height: 1.2;
+        }
+
+        .dashboard-block__status {
+          margin-left: auto;
+        }
+
+        .dashboard-block--mobile .dashboard-block__status {
+          margin-left: 0;
+          font-size: 8px;
+        }
+
+        /* Legend */
+        .dashboard-legend {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          padding: 12px;
+          background: var(--panel);
+          border-radius: 8px;
+          border: 1px solid var(--border);
+          font-size: 14px;
+          align-items: center;
+        }
+
+        .dashboard-legend__title {
+          font-weight: 600;
+          color: var(--muted);
+        }
+
+        .dashboard-legend__item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .dashboard-legend__symbol {
+          width: 12px;
+          height: 12px;
+          border-radius: 3px;
+          border: 1px solid var(--border);
+        }
+
+        .dashboard-legend__symbol--scale {
+          border: 2px solid var(--fg);
+          background: transparent;
+        }
+
+        .dashboard-legend__symbol--apontamento {
+          background: var(--fg);
+        }
+
+        .dashboard-legend__name {
+          font-size: 13px;
+        }
+
+        .dashboard-legend__more {
+          font-size: 11px;
+          color: var(--muted);
+        }
+
+        /* Notes */
+        .dashboard-notes {
+          font-size: 12px;
+          color: var(--muted);
+          margin-top: 12px;
+        }
+
+        .dashboard-notes ul {
+          list-style: disc;
+          padding-left: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        /* Hours List */
+        .hours-list {
+          display: grid;
+          gap: 8px;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+
+        .hours-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px;
+          background: var(--panel-muted);
+          border-radius: 6px;
+          border: 1px solid var(--border);
+        }
+
+        .hours-item__content {
+          flex: 1;
+        }
+
+        .hours-item__name {
+          font-weight: 600;
+          font-size: 15px;
+          margin-bottom: 4px;
+        }
+
+        .hours-item__details {
+          font-size: 12px;
+          color: var(--muted);
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .hours-item__delay {
+          color: var(--error);
+        }
+
+        .hours-item__progress {
+          width: 60px;
+          height: 8px;
+          background: #e5e7eb;
+          border-radius: 4px;
+          overflow: hidden;
+          margin-left: 12px;
+        }
+
+        .hours-item__progress-bar {
+          height: 100%;
+          border-radius: 4px;
+          transition: width 0.3s ease;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .stats-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .stat-card {
+            padding: 16px;
+          }
+
+          .stat-value {
+            font-size: 1.5rem;
+          }
+
+          .page-header__toolbar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .page-header__toolbar .btn,
+          .page-header__toolbar .input,
+          .page-header__toolbar label.btn {
+            width: 100%;
+            justify-content: center;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .dashboard-legend {
+            font-size: 12px;
+          }
+
+          .hours-item__name {
+            font-size: 14px;
+          }
+
+          .hours-item__details {
+            flex-direction: column;
+            gap: 4px;
+          }
+        }
+      `}</style>
     </>
   );
 }
