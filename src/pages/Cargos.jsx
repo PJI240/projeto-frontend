@@ -1,27 +1,48 @@
 // src/pages/Cargos.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import {
+  PlusIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  XMarkIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 
+const EMPTY_FORM = {
+  id: null,
+  nome: "",
+  descricao: "",
+  ativo: 1,
+};
+
 export default function Cargos() {
   const [itens, setItens] = useState([]);
-  const [filtro, setFiltro] = useState("");
+  const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [success, setSuccess] = useState("");
 
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ nome: "", descricao: "", ativo: 1 });
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const liveRef = useRef(null);
+  const nomeRef = useRef(null);
+
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const listaFiltrada = useMemo(() => {
-    const f = filtro.trim().toLowerCase();
+    const f = filter.trim().toLowerCase();
     if (!f) return itens;
     return itens.filter((c) =>
       [c.nome, c.descricao].filter(Boolean).some((v) => String(v).toLowerCase().includes(f))
     );
-  }, [filtro, itens]);
+  }, [filter, itens]);
 
-  async function carregar() {
+  async function carregarLista() {
     setLoading(true);
     setErr("");
     try {
@@ -29,179 +50,495 @@ export default function Cargos() {
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao listar cargos.");
       setItens(data.cargos || []);
+      if (liveRef.current) liveRef.current.textContent = "Lista de cargos atualizada.";
     } catch (e) {
       setErr(e.message || "Erro ao carregar.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar cargos.";
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => { carregarLista(); }, []);
 
-  function abrirNovo() {
-    setEditId(null);
-    setForm({ nome: "", descricao: "", ativo: 1 });
+  useEffect(() => {
+    if (showForm && nomeRef.current) nomeRef.current.focus();
+  }, [showForm]);
+
+  function novo() {
+    setErr("");
+    setSuccess("");
+    setForm(EMPTY_FORM);
     setShowForm(true);
   }
 
-  function abrirEdicao(c) {
-    setEditId(c.id);
-    setForm({ nome: c.nome || "", descricao: c.descricao || "", ativo: c.ativo ? 1 : 0 });
+  function editar(item) {
+    setErr("");
+    setSuccess("");
+    setForm({
+      id: item.id,
+      nome: item.nome || "",
+      descricao: item.descricao || "",
+      ativo: item.ativo ? 1 : 0,
+    });
     setShowForm(true);
+  }
+
+  function cancelarInline() {
+    setForm(EMPTY_FORM);
+    setShowForm(false);
   }
 
   async function salvar(e) {
     e?.preventDefault();
     setErr("");
+    setSuccess("");
+    setLoading(true);
+    
     try {
       if (!form.nome.trim()) {
-        setErr("Nome do cargo é obrigatório.");
-        return;
+        throw new Error("Nome do cargo é obrigatório.");
       }
 
-      const method = editId ? "PUT" : "POST";
-      const url = editId ? `${API_BASE}/api/cargos/${editId}` : `${API_BASE}/api/cargos`;
+      const payload = {
+        nome: form.nome.trim(),
+        descricao: form.descricao.trim(),
+        ativo: form.ativo ? 1 : 0,
+      };
 
-      const r = await fetch(url, {
-        method,
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao salvar.");
+      if (form.id) {
+        await fetch(`${API_BASE}/api/cargos/${form.id}`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch(`${API_BASE}/api/cargos`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
+      setSuccess(form.id ? "Cargo atualizado com sucesso." : "Cargo criado com sucesso.");
       setShowForm(false);
-      await carregar();
+      await carregarLista();
+      if (liveRef.current) liveRef.current.textContent = "Cargo salvo com sucesso.";
     } catch (e) {
       setErr(e.message || "Erro ao salvar.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao salvar cargo.";
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function excluir(id) {
-    if (!confirm("Excluir este cargo? (Atenção: se houver funcionários vinculados, a exclusão pode falhar)")) return;
+  async function excluir(item) {
+    if (!window.confirm(`Excluir o cargo "${item.nome}"? (Atenção: se houver funcionários vinculados, a exclusão pode falhar)`)) return;
     setErr("");
+    setSuccess("");
     try {
-      const r = await fetch(`${API_BASE}/api/cargos/${id}`, {
+      const r = await fetch(`${API_BASE}/api/cargos/${item.id}`, {
         method: "DELETE",
         credentials: "include",
       });
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao excluir.");
-      await carregar();
+      
+      setSuccess("Cargo excluído com sucesso.");
+      await carregarLista();
+      if (liveRef.current) liveRef.current.textContent = "Cargo excluído.";
     } catch (e) {
       setErr(e.message || "Erro ao excluir.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao excluir cargo.";
     }
   }
 
+  const onOverlayKeyDown = (ev) => {
+    if (ev.key === "Escape") setShowForm(false);
+  };
+
   return (
     <>
-      <header className="main-header">
-        <div className="header-content">
-          <h1>Cargos</h1>
-          <p>Funções/cargos disponíveis na empresa.</p>
+      {/* região viva para leitores de tela */}
+      <div ref={liveRef} aria-live="polite" className="visually-hidden" />
+
+      {/* HEADER NO PADRÃO GLOBAL */}
+      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
+        <div>
+          <h1 id="titulo-pagina" className="page-title">Cargos</h1>
+          <p className="page-subtitle">Funções/cargos disponíveis na empresa.</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="toggle-btn" onClick={abrirNovo}>Novo Cargo</button>
-          <button className="toggle-btn" onClick={carregar} disabled={loading}>
-            {loading ? "Atualizando..." : "Atualizar"}
+
+        <div className="page-header__toolbar" aria-label="Ações da página">
+          <button className="btn btn--success" onClick={novo} aria-label="Criar novo cargo">
+            <PlusIcon className="icon" aria-hidden="true" />
+            <span>Novo Cargo</span>
+          </button>
+          <button
+            className="btn btn--neutral"
+            onClick={carregarLista}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+            aria-label="Atualizar lista de cargos"
+          >
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
         </div>
       </header>
 
-      {err && (
-        <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
+      {err && <div className="error-alert" role="alert">{err}</div>}
+      {success && <div className="success-alert" role="status">{success}</div>}
 
-      <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
-        <input
-          placeholder="Buscar por nome ou descrição…"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          style={{ flex: 1, padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border)" }}
-        />
-      </div>
-
-      <div className="stats-grid" style={{ gridTemplateColumns: "1fr" }}>
-        <div className="stat-card" style={{ padding: 0 }}>
-          {loading ? (
-            <div style={{ padding: 16, color: "var(--muted)" }}>Carregando…</div>
-          ) : listaFiltrada.length === 0 ? (
-            <div style={{ padding: 16, color: "var(--muted)" }}>
-              Nenhum cargo cadastrado.
-            </div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: 12 }}>Nome</th>
-                  <th style={{ padding: 12 }}>Descrição</th>
-                  <th style={{ padding: 12, width: 120 }}>Ativo</th>
-                  <th style={{ padding: 12, width: 200 }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listaFiltrada.map((c) => (
-                  <tr key={c.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <td style={{ padding: 12 }}>{c.nome}</td>
-                    <td style={{ padding: 12 }}>{c.descricao || "—"}</td>
-                    <td style={{ padding: 12 }}>{c.ativo ? "Sim" : "Não"}</td>
-                    <td style={{ padding: 12, display: "flex", gap: 8 }}>
-                      <button className="toggle-btn" onClick={() => abrirEdicao(c)}>Editar</button>
-                      <button className="toggle-btn" onClick={() => excluir(c.id)}>Excluir</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Busca */}
+      <div className="search-container">
+        <div className="search-bar" role="search" aria-label="Buscar cargos">
+          <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+          <label htmlFor="busca" className="visually-hidden">Buscar por nome ou descrição</label>
+          <input
+            id="busca"
+            type="search"
+            className="input input--lg"
+            placeholder="Buscar por nome ou descrição…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            autoComplete="off"
+          />
+          {Boolean(filter) && (
+            <button
+              type="button"
+              className="btn btn--neutral btn--icon-only"
+              onClick={() => setFilter("")}
+              aria-label="Limpar busca"
+              title="Limpar"
+            >
+              <XMarkIcon className="icon" aria-hidden="true" />
+            </button>
           )}
         </div>
       </div>
 
+      {/* LISTAGEM: Tabela (desktop) + Cards (mobile) */}
+      <div className="listagem-container">
+        {/* Desktop/tablet: Tabela */}
+        <div className="table-wrapper table-only" role="region" aria-label="Tabela de cargos">
+          {loading ? (
+            <div className="loading-message" role="status">Carregando…</div>
+          ) : listaFiltrada.length === 0 ? (
+            <div className="empty-message">Nenhum cargo encontrado.</div>
+          ) : (
+            <div className="stat-card" style={{ overflow: "hidden" }}>
+              <table className="cargos-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Descrição</th>
+                    <th scope="col">Ativo</th>
+                    <th scope="col" className="actions-column">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listaFiltrada.map((c) => (
+                    <tr key={c.id}>
+                      <td>{c.nome}</td>
+                      <td>{c.descricao || "—"}</td>
+                      <td>
+                        <span className={`badge ${c.ativo ? "ok" : "muted"}`}>
+                          {c.ativo ? "Sim" : "Não"}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="actions-buttons">
+                          <button
+                            className="btn btn--neutral btn--sm"
+                            onClick={() => editar(c)}
+                            aria-label={`Editar ${c.nome}`}
+                          >
+                            <PencilSquareIcon className="icon" aria-hidden="true" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            className="btn btn--danger btn--sm"
+                            onClick={() => excluir(c)}
+                            aria-label={`Excluir ${c.nome}`}
+                          >
+                            <TrashIcon className="icon" aria-hidden="true" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile: Cards */}
+        <div className="cards-wrapper cards-only" role="region" aria-label="Lista de cargos (versão cartões)">
+          {loading ? (
+            <div className="loading-message" role="status">Carregando…</div>
+          ) : listaFiltrada.length === 0 ? (
+            <div className="empty-message">Nenhum cargo encontrado.</div>
+          ) : (
+            <ul className="cards-grid" aria-label="Cartões de cargos">
+              {listaFiltrada.map((c) => (
+                <li key={c.id} className="cargo-card" aria-label={`Cargo: ${c.nome}`}>
+                  <div className="cargo-card__head">
+                    <h3 className="cargo-card__title">{c.nome}</h3>
+                    <span className={`badge ${c.ativo ? "ok" : "muted"}`}>
+                      {c.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
+                  <div className="cargo-card__body">
+                    <dl className="cargo-dl">
+                      <div className="cargo-dl__row">
+                        <dt>Descrição</dt>
+                        <dd>{c.descricao || "—"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div className="cargo-card__actions">
+                    <button
+                      className="btn btn--neutral btn--sm"
+                      onClick={() => editar(c)}
+                      aria-label={`Editar ${c.nome}`}
+                      title="Editar"
+                    >
+                      <PencilSquareIcon className="icon" aria-hidden="true" />
+                      <span>Editar</span>
+                    </button>
+                    <button
+                      className="btn btn--danger btn--sm"
+                      onClick={() => excluir(c)}
+                      aria-label={`Excluir ${c.nome}`}
+                      title="Excluir"
+                    >
+                      <TrashIcon className="icon" aria-hidden="true" />
+                      <span>Excluir</span>
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* FORMULÁRIO COMO DIALOG OVERLAY */}
       {showForm && (
-        <div className="stat-card" style={{ marginTop: 16 }}>
-          <h2 className="title" style={{ margin: 0, marginBottom: 12 }}>
-            {editId ? "Editar Cargo" : "Novo Cargo"}
-          </h2>
-          <form className="form" onSubmit={salvar}>
-            <label htmlFor="nome">Nome</label>
-            <input
-              id="nome"
-              value={form.nome}
-              onChange={(e) => setForm({ ...form, nome: e.target.value })}
-              required
-            />
-
-            <label htmlFor="descricao">Descrição</label>
-            <input
-              id="descricao"
-              value={form.descricao}
-              onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-            />
-
-            <label htmlFor="ativo" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                id="ativo"
-                type="checkbox"
-                checked={!!form.ativo}
-                onChange={(e) => setForm({ ...form, ativo: e.target.checked ? 1 : 0 })}
-              />
-              Ativo
-            </label>
-
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button type="button" className="toggle-btn" onClick={() => setShowForm(false)}>
-                Cancelar
-              </button>
-              <button type="submit" className="toggle-btn">
-                {editId ? "Salvar alterações" : "Criar cargo"}
+        <div
+          className="form-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-form"
+          onKeyDown={onOverlayKeyDown}
+        >
+          <div className="form-container">
+            <div className="form-header">
+              <h2 id="titulo-form">{form.id ? "Editar Cargo" : "Novo Cargo"}</h2>
+              <button
+                className="btn btn--neutral btn--icon-only"
+                onClick={cancelarInline}
+                aria-label="Fechar formulário"
+                title="Fechar"
+              >
+                <XMarkIcon className="icon" aria-hidden="true" />
               </button>
             </div>
-          </form>
+
+            <form className="form" onSubmit={salvar}>
+              <div className="form-grid">
+                <div className="form-field span-2">
+                  <label htmlFor="c_nome">Nome *</label>
+                  <input
+                    id="c_nome"
+                    ref={nomeRef}
+                    value={form.nome}
+                    onChange={(e) => setField("nome", e.target.value)}
+                    required
+                    autoComplete="off"
+                  />
+                </div>
+
+                <div className="form-field span-2">
+                  <label htmlFor="c_descricao">Descrição</label>
+                  <textarea
+                    id="c_descricao"
+                    rows={3}
+                    value={form.descricao}
+                    onChange={(e) => setField("descricao", e.target.value)}
+                    placeholder="Descrição opcional do cargo..."
+                  />
+                </div>
+
+                <div className="form-field span-2" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    id="c_ativo"
+                    type="checkbox"
+                    checked={!!form.ativo}
+                    onChange={(e) => setField("ativo", e.target.checked ? 1 : 0)}
+                  />
+                  <label htmlFor="c_ativo" className="checkbox-label">Cargo ativo</label>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn btn--neutral" onClick={cancelarInline}>
+                  <XMarkIcon className="icon" aria-hidden="true" />
+                  <span>Cancelar</span>
+                </button>
+                <button type="submit" className="btn btn--success" disabled={loading}>
+                  <CheckIcon className="icon" aria-hidden="true" />
+                  <span>{loading ? "Salvando..." : form.id ? "Salvar alterações" : "Criar cargo"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
+
+      {/* Estilos seguindo o padrão */}
+      <style jsx>{`
+        .listagem-container { width: 100%; }
+        .search-container { margin-bottom: 16px; }
+
+        .table-only { display: block; }
+        .cards-only { display: none; }
+        @media (max-width: 768px) {
+          .table-only { display: none; }
+          .cards-only { display: block; }
+        }
+
+        /* Tabela */
+        .cargos-table th,
+        .cargos-table td { white-space: nowrap; }
+        .cargos-table td:first-child,
+        .cargos-table th:first-child { white-space: normal; }
+        .actions-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* Cards grid (mobile) */
+        .cards-grid {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        .cargo-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          box-shadow: var(--shadow);
+          overflow: hidden;
+          position: relative;
+        }
+        .cargo-card::before {
+          content: "";
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 4px;
+          background: var(--accent-bg);
+        }
+        .cargo-card__head {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 8px; padding: 14px 14px 0 14px;
+        }
+        .cargo-card__title {
+          margin: 0; font-size: 1rem; font-weight: 700; color: var(--fg);
+        }
+        .badge {
+          font-size: 0.75rem; padding: 2px 8px; border-radius: 999px;
+          border: 1px solid var(--border);
+        }
+        .badge.ok { 
+          background: rgba(16,185,129,.12); 
+          color: var(--success-strong); 
+          border-color: rgba(16,185,129,.35); 
+        }
+        .badge.muted { 
+          background: var(--panel-muted); 
+          color: var(--muted); 
+        }
+
+        .cargo-card__body { padding: 12px 14px 14px 14px; }
+        .cargo-dl { margin: 0; display: grid; gap: 8px; }
+        .cargo-dl__row {
+          display: grid;
+          grid-template-columns: 100px 1fr;
+          gap: 8px; align-items: baseline;
+        }
+        .cargo-dl__row dt { color: var(--muted); font-weight: 600; font-size: var(--fs-12); }
+        .cargo-dl__row dd { margin: 0; color: var(--fg); font-weight: 500; }
+
+        .cargo-card__actions {
+          display: flex; gap: 6px; flex-wrap: wrap; padding: 0 14px 14px 14px;
+        }
+
+        /* Form grid responsivo */
+        .form-grid { 
+          display: grid; 
+          grid-template-columns: 1fr; 
+          gap: 12px; 
+        }
+        .form-field { 
+          display: flex; 
+          flex-direction: column; 
+          gap: 6px; 
+        }
+        .form-field input, 
+        .form-field select, 
+        .form-field textarea {
+          min-height: 44px; 
+          padding: 10px 12px; 
+          border: 1px solid var(--border);
+          border-radius: 12px; 
+          background: #fff; 
+          color: #111; 
+          font-size: var(--fs-16);
+        }
+        .form-field textarea {
+          min-height: 80px;
+          resize: vertical;
+        }
+        .form-field input:focus-visible, 
+        .form-field select:focus-visible,
+        .form-field textarea:focus-visible {
+          outline: 3px solid var(--focus); 
+          outline-offset: 2px;
+        }
+        .form-field.span-2 { grid-column: span 1; }
+        @media (min-width: 640px) {
+          .form-grid { grid-template-columns: 1fr 1fr; }
+          .form-field.span-2 { grid-column: span 2; }
+        }
+
+        /* Success alert */
+        .success-alert {
+          background: rgba(16,185,129,.12);
+          border: 1px solid rgba(16,185,129,.35);
+          color: var(--success-strong);
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+        }
+
+        /* Checkbox label para modo HC */
+        .checkbox-label {
+          color: var(--fg);
+          font-weight: 500;
+        }
+
+        /* Ajustes menores */
+        @media (max-width: 480px) {
+          .cargo-dl__row { grid-template-columns: 90px 1fr; }
+          .cargo-card__title { font-size: 0.95rem; }
+        }
+      `}</style>
     </>
   );
 }
