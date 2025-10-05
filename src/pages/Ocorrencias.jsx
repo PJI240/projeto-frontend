@@ -398,66 +398,73 @@ export default function Ocorrencias() {
           <p className="page-subtitle">Registre e acompanhe ausências, horas extras, atestados e outras ocorrências</p>
         </div>
 
-        <div className="page-header__toolbar" aria-label="Ações da página">
-          {/* período rápido */}
-          <div className="btn-group" role="group" aria-label="Atalhos de período">
-            <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
-              <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
-              <span>Semana</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
-              <span>Mês</span>
-            </button>
-          </div>
+       <div className="page-header__toolbar">
+  <div className="toolbar-grid">
+    {/* ESQUERDA: filtros/atalhos */}
+    <div className="filters-wrap">
+      {/* período rápido */}
+      <div className="btn-group" role="group" aria-label="Atalhos de período">
+        <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
+          <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
+        </button>
+        <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
+          <span>Semana</span>
+        </button>
+        <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
+          <span>Mês</span>
+        </button>
+      </div>
 
-          {/* intervalo custom */}
-          <div className="range-inline" role="group" aria-label="Intervalo customizado">
-            <input type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-            <span className="range-sep">—</span>
-            <input type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
-          </div>
+      {/* intervalo custom */}
+      <div className="range-inline" role="group" aria-label="Intervalo customizado">
+        <input type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+        <span className="range-sep">—</span>
+        <input type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
+      </div>
 
-          {/* filtros */}
-          <div className="filters-inline">
-            <FunnelIcon className="icon" aria-hidden="true" />
-            <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)}>
-              <option value="todos">Todos os funcionários</option>
-              {funcionarios.map(f => (
-                <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
-              ))}
-            </select>
-            <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)}>
-              <option value="todos">Todos os tipos</option>
-              {tiposSugeridos.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input
-              className="input input--sm"
-              placeholder="Buscar por nome, tipo ou observação…"
-              value={busca}
-              onChange={(e)=>setBusca(e.target.value)}
-            />
-          </div>
+      {/* filtros */}
+      <div className="filters-inline">
+        <FunnelIcon className="icon" aria-hidden="true" />
+        <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)}>
+          <option value="todos">Todos os funcionários</option>
+          {funcionarios.map(f => (
+            <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
+          ))}
+        </select>
+        <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)}>
+          <option value="todos">Todos os tipos</option>
+          {tiposSugeridos.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <input
+          className="input input--sm"
+          placeholder="Buscar por nome, tipo ou observação…"
+          value={busca}
+          onChange={(e)=>setBusca(e.target.value)}
+        />
+      </div>
+    </div>
 
-          {/* ações */}
-          <button className="btn" data-accent="success" onClick={abrirNovo}>
-            <PlusCircleIcon className="icon" aria-hidden="true" /><span>Novo</span>
-          </button>
-          <button className="btn" data-accent="info" onClick={exportarCSV}>
-            <ArrowDownTrayIcon className="icon" aria-hidden="true" /><span>Exportar</span>
-          </button>
-          <button
-            className="btn btn--neutral"
-            onClick={carregarOcorrencias}
-            disabled={loading}
-            aria-busy={loading ? "true" : "false"}
-            aria-label="Atualizar dados"
-          >
-            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
-          </button>
-        </div>
+    {/* DIREITA: ações — sempre agrupadas e alinhadas */}
+    <div className="actions-wrap">
+      <button className="btn" data-accent="success" onClick={abrirNovo}>
+        <PlusCircleIcon className="icon" aria-hidden="true" /><span>Novo</span>
+      </button>
+      <button className="btn" data-accent="info" onClick={exportarCSV}>
+        <ArrowDownTrayIcon className="icon" aria-hidden="true" /><span>Exportar</span>
+      </button>
+      <button
+        className="btn btn--neutral"
+        onClick={carregarOcorrencias}
+        disabled={loading}
+        aria-busy={loading ? "true" : "false"}
+        aria-label="Atualizar dados"
+      >
+        {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+        <span>{loading ? "Atualizando…" : "Atualizar"}</span>
+      </button>
+    </div>
+  </div>
+</div>
       </header>
 
       {/* Alerts */}
@@ -686,7 +693,41 @@ export default function Ocorrencias() {
 
         .filters-inline{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
         .filters-inline .icon{ width:18px; height:18px; color: var(--muted) }
+/* Grid do header: 2 colunas no desktop, 1 no mobile */
+.toolbar-grid{
+  width:100%;
+  display:grid;
+  grid-template-columns: 1fr auto;
+  gap:12px;
+  align-items:center;
+}
 
+.filters-wrap{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px 12px;
+  min-width:0; /* evita “estouro” */
+}
+
+.actions-wrap{
+  display:flex;
+  gap:8px;
+  justify-self:end;
+}
+
+/* Opcional: deixa os botões um pouco mais compactos no header */
+.page-header__toolbar .btn .icon{ width:18px; height:18px }
+
+/* Responsivo: empilha e expande botões de ação */
+@media (max-width: 1100px){
+  .toolbar-grid{ grid-template-columns: 1fr }
+  .actions-wrap{ justify-self:stretch }
+  .actions-wrap .btn{ width:100%; justify-content:center }
+}
+
+/* Já herdamos os comportamentos do seu global.css:
+   - .btn, .input, .btn-group etc. */
         @media (max-width: 900px){
           .page-header__toolbar{ flex-direction:column; align-items:stretch }
           .page-header__toolbar .btn, .page-header__toolbar .input{ width:100%; justify-content:center }
