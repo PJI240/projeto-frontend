@@ -363,7 +363,7 @@ export default function FolhasItensPage() {
 
                 <input
                   className="input input--sm"
-                  placeholder="Buscar por referência/observação/funcionário…"
+                  placeholder="Buscar por referência/funcionário…"
                   value={busca}
                   onChange={(e)=>setBusca(e.target.value)}
                 />
