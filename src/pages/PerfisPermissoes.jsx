@@ -8,6 +8,9 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   ShieldCheckIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/24/solid";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
@@ -20,6 +23,12 @@ const API = {
   syncPerms: `${API_BASE}/api/permissoes/sync`,
 };
 
+const EMPTY_FORM = {
+  id: null,
+  nome: "",
+  ativo: 1,
+};
+
 export default function PerfisPermissoes() {
   const [perfis, setPerfis] = useState([]);
   const [permissoes, setPermissoes] = useState([]);
@@ -27,10 +36,10 @@ export default function PerfisPermissoes() {
   const [syncing, setSyncing] = useState(false);
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
+  const [filter, setFilter] = useState("");
 
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ nome: "", ativo: 1 });
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const [perfilExpandido, setPerfilExpandido] = useState(null);
   const [permissoesCarregando, setPermissoesCarregando] = useState(new Set());
@@ -38,16 +47,14 @@ export default function PerfisPermissoes() {
   const [permissoesSalvando, setPermissoesSalvando] = useState(new Set());
 
   const liveRef = useRef(null);
+  const nomeRef = useRef(null);
 
-  const fetchJson = useCallback(async (url, init) => {
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const fetchJson = useCallback(async (url, init = {}) => {
     const r = await fetch(url, { credentials: "include", ...init });
-    let data = null;
-    try { data = await r.json(); } catch {}
-    if (!r.ok || !data?.ok) {
-      const e = new Error(data?.error || `HTTP ${r.status}`);
-      e.status = r.status;
-      throw e;
-    }
+    const data = await r.json().catch(() => null);
+    if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
     return data;
   }, []);
 
@@ -161,11 +168,46 @@ export default function PerfisPermissoes() {
     }
   }
 
-  async function excluirPerfil(perfil) {
-    if (!confirm(`Deseja realmente excluir o perfil "${perfil.nome}"?`)) return;
+  // Filtro
+  const filtrados = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return perfis;
+    return (perfis || []).filter((p) => {
+      const nome = (p.nome || "").toLowerCase();
+      const status = (p.ativo ? "ativo" : "inativo");
+      return nome.includes(q) || status.includes(q);
+    });
+  }, [filter, perfis]);
+
+  // CRUD Perfil
+  function novo() { 
+    setErr(""); 
+    setSuccess("");
+    setForm(EMPTY_FORM);
+    setShowForm(true);
+  }
+
+  function editar(item) { 
+    setErr(""); 
+    setSuccess("");
+    setForm({
+      id: item.id,
+      nome: item.nome || "",
+      ativo: item.ativo ? 1 : 0,
+    });
+    setShowForm(true);
+  }
+
+  function cancelarInline() {
+    setForm(EMPTY_FORM);
+    setShowForm(false);
+  }
+
+  async function excluir(item) {
+    if (!window.confirm(`Excluir o perfil "${item.nome}"?`)) return;
     setErr("");
     try {
-      await fetchJson(`${API_BASE}/api/perfis/${perfil.id}`, { method: "DELETE" });
+      await fetchJson(`${API_BASE}/api/perfis/${item.id}`, { method: "DELETE" });
       setSuccess("Perfil excluído com sucesso.");
       await carregarPerfis();
       if (liveRef.current) liveRef.current.textContent = "Perfil excluído.";
@@ -175,38 +217,39 @@ export default function PerfisPermissoes() {
     }
   }
 
-  // CRUD Perfil
-  function abrirNovo() { setErr(""); setSuccess(""); setEditId(null); setForm({ nome: "", ativo: 1 }); setShowForm(true); }
-  function abrirEdicao(p) { setErr(""); setSuccess(""); setEditId(p.id); setForm({ nome: p.nome || "", ativo: p.ativo ? 1 : 0 }); setShowForm(true); }
-  function fecharForm() { setShowForm(false); }
-
-  async function salvarPerfil(e) {
+  async function salvar(e) {
     e?.preventDefault?.();
+    setErr("");
+    setSuccess("");
     setLoading(true);
-    setErr(""); setSuccess("");
+    
     try {
-      const body = { nome: form.nome?.trim(), ativo: form.ativo ? 1 : 0 };
-      if (!body.nome) throw new Error("Informe o nome do perfil.");
+      if (!String(form.nome || "").trim()) throw new Error("Informe o nome do perfil.");
 
-      const r = editId
-        ? await fetch(`${API_BASE}/api/perfis/${editId}`, {
-            method: "PUT", credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          })
-        : await fetch(API.perfis, {
-            method: "POST", credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
+      const payload = {
+        nome: form.nome.trim(),
+        ativo: form.ativo ? 1 : 0,
+      };
 
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data?.ok) throw new Error(data?.error || "Falha ao salvar.");
+      if (form.id) {
+        await fetchJson(`${API_BASE}/api/perfis/${form.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetchJson(API.perfis, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
-      setSuccess(editId ? "Perfil atualizado." : "Perfil criado.");
-      setShowForm(false);
+      setSuccess(form.id ? "Perfil atualizado." : "Perfil criado.");
       await carregarPerfis();
-      if (liveRef.current) liveRef.current.textContent = "Perfil salvo.";
+      setForm(EMPTY_FORM);
+      setShowForm(false);
+      if (liveRef.current) liveRef.current.textContent = "Perfil salvo com sucesso.";
     } catch (e) {
       setErr(e.message || "Falha ao salvar perfil.");
       if (liveRef.current) liveRef.current.textContent = "Erro ao salvar perfil.";
@@ -226,23 +269,33 @@ export default function PerfisPermissoes() {
     return map;
   }, [permissoes]);
 
-  useEffect(() => { carregarPerfis(); carregarPermissoes(); }, []);
+  useEffect(() => { 
+    carregarPerfis(); 
+    carregarPermissoes(); 
+  }, []);
 
-  const onOverlayKeyDown = (ev) => { if (ev.key === "Escape") setShowForm(false); };
+  useEffect(() => {
+    if (showForm && nomeRef.current) nomeRef.current.focus();
+  }, [showForm]);
+
+  const onOverlayKeyDown = (ev) => { 
+    if (ev.key === "Escape") setShowForm(false); 
+  };
 
   return (
     <>
-      {/* região viva */}
+      {/* região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER - Padrão */}
+      {/* HEADER NO PADRÃO GLOBAL */}
       <header className="page-header" role="region" aria-labelledby="titulo-pagina">
         <div>
           <h1 id="titulo-pagina" className="page-title">Perfis e Permissões</h1>
           <p className="page-subtitle">Gerencie perfis de acesso e suas permissões no sistema.</p>
         </div>
+
         <div className="page-header__toolbar" aria-label="Ações da página">
-          <button className="btn btn--success" onClick={abrirNovo} aria-label="Criar novo perfil">
+          <button className="btn btn--success" onClick={novo} aria-label="Criar novo perfil">
             <PlusIcon className="icon" aria-hidden="true" />
             <span>Novo Perfil</span>
           </button>
@@ -270,206 +323,478 @@ export default function PerfisPermissoes() {
       </header>
 
       {err && <div className="error-alert" role="alert">{err}</div>}
-      {Boolean(success) && (
-        <div className="stat-card" data-accent="success" role="status" style={{ marginBottom: '16px' }}>
-          {success}
+      {success && <div className="success-alert" role="status">{success}</div>}
+
+      {/* Busca (padrão igual Usuários) */}
+      <div className="search-container">
+        <div className="search-bar" role="search" aria-label="Buscar perfis">
+          <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+          <label htmlFor="busca" className="visually-hidden">Buscar por nome ou status</label>
+          <input
+            id="busca"
+            type="search"
+            className="input input--lg"
+            placeholder="Buscar por nome ou status…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            autoComplete="off"
+          />
+          {Boolean(filter) && (
+            <button
+              type="button"
+              className="btn btn--neutral btn--icon-only"
+              onClick={() => setFilter("")}
+              aria-label="Limpar busca"
+              title="Limpar"
+            >
+              <XMarkIcon className="icon" aria-hidden="true" />
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* LISTA DE PERFIS */}
-      <div className="stats-grid" style={{ gridTemplateColumns: "1fr", gap: '16px' }}>
+      {/* LISTAGEM: Cards responsivos */}
+      <div className="listagem-container">
         {loading ? (
-          <div className="stat-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <span className="spinner" aria-hidden="true" /> Carregando…
-          </div>
-        ) : perfis.length === 0 ? (
-          <div className="stat-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            Nenhum perfil encontrado.
-          </div>
+          <div className="loading-message" role="status">Carregando…</div>
+        ) : filtrados.length === 0 ? (
+          <div className="empty-message">Nenhum perfil encontrado.</div>
         ) : (
-          perfis.map((p) => {
-            const isAdmin = String(p.nome || "").trim().toLowerCase() === "administrador";
-            const expandido = perfilExpandido === p.id;
-            const permissoesPerfil = permissoesPorPerfil.get(p.id) || new Set();
-            const carregandoPerms = permissoesCarregando.has(p.id);
-            const salvandoPerms = permissoesSalvando.has(p.id);
+          <ul className="cards-grid" aria-label="Lista de perfis">
+            {filtrados.map((p) => {
+              const isAdmin = String(p.nome || "").trim().toLowerCase() === "administrador";
+              const expandido = perfilExpandido === p.id;
+              const permissoesPerfil = permissoesPorPerfil.get(p.id) || new Set();
+              const carregandoPerms = permissoesCarregando.has(p.id);
+              const salvandoPerms = permissoesSalvando.has(p.id);
 
-            return (
-              <section key={p.id} className="stat-card" aria-label={`Perfil ${p.nome}`}>
-                {/* Cabeçalho do card */}
-                <div className="stat-header" style={{ alignItems: "center", cursor: 'pointer' }} onClick={() => toggleExpansaoPerfil(p.id)}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
-                    <h3 style={{ margin: 0, fontSize: "1.25rem", color: 'var(--fg)' }}>{p.nome}</h3>
-                    {isAdmin && (
-                      <span className="btn btn--ghost btn--sm" style={{ pointerEvents: 'none' }}>
-                        <ShieldCheckIcon className="icon" aria-hidden="true" />
-                        Administrador
-                      </span>
-                    )}
-                    <span className="btn btn--ghost btn--sm" style={{ pointerEvents: 'none' }}>
-                      {p.ativo ? "Ativo" : "Inativo"}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <button 
-                      className="btn btn--neutral btn--sm" 
-                      onClick={(e) => { e.stopPropagation(); abrirEdicao(p); }}
-                      aria-label={`Editar ${p.nome}`}
-                    >
-                      <CheckIcon className="icon" aria-hidden="true" />
-                      <span>Editar</span>
-                    </button>
-
-                    <button
-                      className="btn btn--neutral btn--sm"
-                      onClick={(e) => { e.stopPropagation(); toggleExpansaoPerfil(p.id); }}
-                      aria-label={expandido ? `Ocultar permissões de ${p.nome}` : `Mostrar permissões de ${p.nome}`}
-                      disabled={carregandoPerms}
-                    >
-                      {expandido ? <ChevronUpIcon className="icon" aria-hidden="true" /> : <ChevronDownIcon className="icon" aria-hidden="true" />}
-                      <span>Permissões</span>
-                    </button>
-
-                    {!isAdmin && (
-                      <button
-                        className="btn btn--danger btn--sm"
-                        onClick={(e) => { e.stopPropagation(); excluirPerfil(p); }}
-                        aria-label={`Excluir perfil ${p.nome}`}
-                      >
-                        <XMarkIcon className="icon" aria-hidden="true" />
-                        <span>Excluir</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Painel expandido (permissões) */}
-                {expandido && (
-                  <div style={{ marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-                    {isAdmin ? (
-                      <div className="action-card" style={{ textAlign: 'left', alignItems: 'flex-start' }}>
-                        <strong>Administrador:</strong> possui todas as permissões automaticamente.
-                      </div>
-                    ) : (
-                      <>
-                        <div className="page-header__toolbar" style={{ marginBottom: '16px' }}>
-                          <button className="btn btn--neutral btn--sm" onClick={() => marcarTodasPermissoes(p.id, true)} disabled={salvandoPerms}>
-                            Marcar Todas
-                          </button>
-                          <button className="btn btn--neutral btn--sm" onClick={() => marcarTodasPermissoes(p.id, false)} disabled={salvandoPerms}>
-                            Limpar Todas
-                          </button>
-                          <button className="btn btn--success btn--sm" onClick={() => salvarPermissoes(p.id)} disabled={salvandoPerms}>
-                            {salvandoPerms ? <span className="spinner" aria-hidden="true" /> : <CheckIcon className="icon" aria-hidden="true" />}
-                            <span>{salvandoPerms ? "Salvando…" : "Salvar Permissões"}</span>
-                          </button>
-                        </div>
-
-                        {carregandoPerms ? (
-                          <div style={{ textAlign: 'center', padding: '2rem' }}>
-                            <span className="spinner" aria-hidden="true" /> Carregando permissões…
-                          </div>
-                        ) : (
-                          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: '12px' }}>
-                            {Array.from(gruposPermissoes.keys()).map((escopo) => {
-                              const itens = gruposPermissoes.get(escopo) || [];
-                              const total = itens.length;
-                              const marcadas = itens.filter(perm => permissoesPerfil.has(perm.id)).length;
-
-                              return (
-                                <div key={escopo} className="stat-card" data-accent="info" style={{ padding: '16px' }}>
-                                  <div className="stat-header" style={{ marginBottom: '12px' }}>
-                                    <h4 style={{ margin: 0, textTransform: "capitalize" }}>
-                                      {escopo} <small>({marcadas}/{total})</small>
-                                    </h4>
-                                  </div>
-
-                                  <div style={{ display: 'grid', gap: '8px' }}>
-                                    {itens.map((perm) => {
-                                      const checked = permissoesPerfil.has(perm.id);
-                                      return (
-                                        <label key={perm.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: 8, borderRadius: 6, cursor: 'pointer' }}>
-                                          <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            onChange={() => togglePermissao(p.id, perm.id)}
-                                            style={{ marginTop: 2 }}
-                                          />
-                                          <div>
-                                            <div style={{ fontWeight: 600, color: 'var(--fg)' }}>{perm.codigo}</div>
-                                            <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-14)' }}>{perm.descricao || ""}</div>
-                                          </div>
-                                        </label>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+              return (
+                <li key={p.id} className="perfil-card" aria-label={`Perfil: ${p.nome}`}>
+                  <div className="perfil-card__head">
+                    <div className="perfil-card__title-section">
+                      <h3 className="perfil-card__title">{p.nome}</h3>
+                      <div className="perfil-card__badges">
+                        {isAdmin && (
+                          <span className="badge badge--admin">
+                            <ShieldCheckIcon className="icon" aria-hidden="true" />
+                            Administrador
+                          </span>
                         )}
-                      </>
-                    )}
+                        <span className={`badge ${p.ativo ? "ok" : "muted"}`}>
+                          {p.ativo ? "Ativo" : "Inativo"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="perfil-card__actions">
+                      <button
+                        className="btn btn--neutral btn--sm"
+                        onClick={() => editar(p)}
+                        aria-label={`Editar ${p.nome}`}
+                        title="Editar"
+                      >
+                        <PencilSquareIcon className="icon" aria-hidden="true" />
+                        <span>Editar</span>
+                      </button>
+                      <button
+                        className="btn btn--neutral btn--sm"
+                        onClick={() => toggleExpansaoPerfil(p.id)}
+                        aria-label={expandido ? `Ocultar permissões de ${p.nome}` : `Mostrar permissões de ${p.nome}`}
+                        disabled={carregandoPerms}
+                        title="Permissões"
+                      >
+                        {expandido ? <ChevronUpIcon className="icon" aria-hidden="true" /> : <ChevronDownIcon className="icon" aria-hidden="true" />}
+                        <span>Permissões</span>
+                      </button>
+                      {!isAdmin && (
+                        <button
+                          className="btn btn--danger btn--sm"
+                          onClick={() => excluir(p)}
+                          aria-label={`Excluir perfil ${p.nome}`}
+                          title="Excluir"
+                        >
+                          <TrashIcon className="icon" aria-hidden="true" />
+                          <span>Excluir</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                )}
-              </section>
-            );
-          })
+
+                  {/* Painel expandido (permissões) */}
+                  {expandido && (
+                    <div className="perfil-card__expanded">
+                      {isAdmin ? (
+                        <div className="perfil-card__admin-notice">
+                          <strong>Administrador:</strong> possui todas as permissões automaticamente.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="perfil-card__permissions-toolbar">
+                            <button 
+                              className="btn btn--neutral btn--sm" 
+                              onClick={() => marcarTodasPermissoes(p.id, true)} 
+                              disabled={salvandoPerms}
+                            >
+                              Marcar Todas
+                            </button>
+                            <button 
+                              className="btn btn--neutral btn--sm" 
+                              onClick={() => marcarTodasPermissoes(p.id, false)} 
+                              disabled={salvandoPerms}
+                            >
+                              Limpar Todas
+                            </button>
+                            <button 
+                              className="btn btn--success btn--sm" 
+                              onClick={() => salvarPermissoes(p.id)} 
+                              disabled={salvandoPerms}
+                            >
+                              {salvandoPerms ? <span className="spinner" aria-hidden="true" /> : <CheckIcon className="icon" aria-hidden="true" />}
+                              <span>{salvandoPerms ? "Salvando…" : "Salvar Permissões"}</span>
+                            </button>
+                          </div>
+
+                          {carregandoPerms ? (
+                            <div className="perfil-card__loading">
+                              <span className="spinner" aria-hidden="true" /> Carregando permissões…
+                            </div>
+                          ) : (
+                            <div className="permissoes-grid">
+                              {Array.from(gruposPermissoes.keys()).map((escopo) => {
+                                const itens = gruposPermissoes.get(escopo) || [];
+                                const total = itens.length;
+                                const marcadas = itens.filter(perm => permissoesPerfil.has(perm.id)).length;
+
+                                return (
+                                  <div key={escopo} className="permissao-grupo">
+                                    <div className="permissao-grupo__header">
+                                      <h4 className="permissao-grupo__title">
+                                        {escopo} <small>({marcadas}/{total})</small>
+                                      </h4>
+                                    </div>
+                                    <div className="permissao-grupo__list">
+                                      {itens.map((perm) => {
+                                        const checked = permissoesPerfil.has(perm.id);
+                                        return (
+                                          <label key={perm.id} className="permissao-item">
+                                            <input
+                                              type="checkbox"
+                                              checked={checked}
+                                              onChange={() => togglePermissao(p.id, perm.id)}
+                                              className="permissao-item__checkbox"
+                                            />
+                                            <div className="permissao-item__content">
+                                              <div className="permissao-item__codigo">{perm.codigo}</div>
+                                              <div className="permissao-item__descricao">{perm.descricao || ""}</div>
+                                            </div>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
-      {/* DIALOG: CRIAR/EDITAR PERFIL */}
+      {/* FORMULÁRIO COMO DIALOG OVERLAY (padrão Usuários) */}
       {showForm && (
-        <div className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-form" onKeyDown={onOverlayKeyDown}>
+        <div
+          className="form-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="titulo-form"
+          onKeyDown={onOverlayKeyDown}
+        >
           <div className="form-container">
             <div className="form-header">
-              <h2 id="titulo-form">{editId ? "Editar Perfil" : "Novo Perfil"}</h2>
-              <button className="btn btn--neutral btn--icon-only" onClick={() => setShowForm(false)} aria-label="Fechar formulário">
+              <h2 id="titulo-form">{form.id ? "Editar Perfil" : "Novo Perfil"}</h2>
+              <button
+                className="btn btn--neutral btn--icon-only"
+                onClick={cancelarInline}
+                aria-label="Fechar formulário"
+                title="Fechar"
+              >
                 <XMarkIcon className="icon" aria-hidden="true" />
               </button>
             </div>
 
-            <form className="form" onSubmit={salvarPerfil}>
+            <form className="form" onSubmit={salvar}>
               <div className="form-grid">
                 <div className="form-field span-2">
                   <label htmlFor="pf_nome">Nome do Perfil</label>
                   <input
                     id="pf_nome"
-                    className="input"
+                    ref={nomeRef}
                     value={form.nome}
-                    onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+                    onChange={(e) => setField("nome", e.target.value)}
                     required
                     autoComplete="off"
                   />
                 </div>
 
-                <div className="form-field" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}>
+                <div className="form-field span-2" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input
                     id="pf_ativo"
                     type="checkbox"
                     checked={!!form.ativo}
-                    onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked ? 1 : 0 }))}
-                    style={{ width: 16, height: 16 }}
+                    onChange={(e) => setField("ativo", e.target.checked ? 1 : 0)}
                   />
-                  <label htmlFor="pf_ativo" style={{ margin: 0 }}>Perfil ativo</label>
+                  <label htmlFor="pf_ativo">Perfil ativo</label>
                 </div>
               </div>
 
               <div className="form-actions">
-                <button type="button" className="btn btn--neutral" onClick={fecharForm}>
+                <button type="button" className="btn btn--neutral" onClick={cancelarInline}>
                   <XMarkIcon className="icon" aria-hidden="true" />
                   <span>Cancelar</span>
                 </button>
                 <button type="submit" className="btn btn--success" disabled={loading}>
-                  {loading ? <span className="spinner" aria-hidden="true" /> : <CheckIcon className="icon" aria-hidden="true" />}
-                  <span>{loading ? "Salvando…" : "Salvar"}</span>
+                  <CheckIcon className="icon" aria-hidden="true" />
+                  <span>{loading ? "Salvando..." : form.id ? "Salvar alterações" : "Criar perfil"}</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Estilos seguindo o padrão do Usuários */}
+      <style jsx>{`
+        .listagem-container { width: 100%; }
+        .search-container { margin-bottom: 16px; }
+
+        /* Cards grid */
+        .cards-grid {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .perfil-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          box-shadow: var(--shadow);
+          overflow: hidden;
+          position: relative;
+        }
+
+        .perfil-card::before {
+          content: "";
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 4px;
+          background: var(--accent-bg);
+        }
+
+        .perfil-card__head {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 14px 14px 0 14px;
+        }
+
+        @media (min-width: 768px) {
+          .perfil-card__head {
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: space-between;
+          }
+        }
+
+        .perfil-card__title-section {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          min-width: 0;
+          flex: 1;
+        }
+
+        .perfil-card__title {
+          margin: 0;
+          font-size: 1rem;
+          font-weight: 700;
+          color: var(--fg);
+        }
+
+        .perfil-card__badges {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .badge {
+          font-size: 0.75rem;
+          padding: 4px 8px;
+          border-radius: 999px;
+          border: 1px solid var(--border);
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .badge.ok { 
+          background: rgba(16,185,129,.12); 
+          color: var(--success-strong); 
+          border-color: rgba(16,185,129,.35); 
+        }
+
+        .badge.muted { 
+          background: var(--panel-muted); 
+          color: var(--muted); 
+        }
+
+        .badge--admin {
+          background: rgba(139, 92, 246, 0.12);
+          color: #8b5cf6;
+          border-color: rgba(139, 92, 246, 0.35);
+        }
+
+        .perfil-card__actions {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .perfil-card__expanded {
+          margin-top: 16px;
+          border-top: 1px solid var(--border);
+          padding: 16px 14px 14px 14px;
+        }
+
+        .perfil-card__admin-notice {
+          background: var(--panel-muted);
+          padding: 12px;
+          border-radius: 8px;
+          color: var(--muted);
+          text-align: center;
+        }
+
+        .perfil-card__permissions-toolbar {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-bottom: 16px;
+        }
+
+        .perfil-card__loading {
+          text-align: center;
+          padding: 2rem;
+          color: var(--muted);
+        }
+
+        .permissoes-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        @media (min-width: 640px) {
+          .permissoes-grid {
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          }
+        }
+
+        .permissao-grupo {
+          background: var(--panel-muted);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px;
+        }
+
+        .permissao-grupo__header {
+          margin-bottom: 12px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .permissao-grupo__title {
+          margin: 0;
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: var(--fg);
+          text-transform: capitalize;
+        }
+
+        .permissao-grupo__title small {
+          color: var(--muted);
+          font-weight: normal;
+        }
+
+        .permissao-grupo__list {
+          display: grid;
+          gap: 8px;
+        }
+
+        .permissao-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          padding: 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+
+        .permissao-item:hover {
+          background: rgba(0,0,0,0.05);
+        }
+
+        .permissao-item__checkbox {
+          margin-top: 2px;
+        }
+
+        .permissao-item__content {
+          flex: 1;
+        }
+
+        .permissao-item__codigo {
+          font-weight: 600;
+          color: var(--fg);
+          font-size: 0.85rem;
+        }
+
+        .permissao-item__descricao {
+          color: var(--muted);
+          font-size: 0.75rem;
+          line-height: 1.3;
+        }
+
+        /* Success alert */
+        .success-alert {
+          background: rgba(16,185,129,.12);
+          border: 1px solid rgba(16,185,129,.35);
+          color: var(--success-strong);
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+        }
+
+        /* Ajustes menores */
+        @media (max-width: 480px) {
+          .perfil-card__actions {
+            width: 100%;
+          }
+          
+          .perfil-card__actions .btn {
+            flex: 1;
+            justify-content: center;
+          }
+        }
+      `}</style>
     </>
   );
 }
