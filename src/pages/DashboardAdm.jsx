@@ -1067,6 +1067,7 @@ export default function DashboardAdm() {
               style={{ marginRight: 8 }}
               aria-label="Ativar atualização automática"
             />
+
             <span>Atualizar Automático</span>
           </label>
         </div>
