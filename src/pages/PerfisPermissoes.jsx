@@ -386,15 +386,18 @@ export default function PerfisPermissoes() {
                       </div>
                     </div>
                     <div className="perfil-card__actions">
-                      <button
-                        className="btn btn--neutral btn--sm"
-                        onClick={() => editar(p)}
-                        aria-label={`Editar ${p.nome}`}
-                        title="Editar"
-                      >
-                        <PencilSquareIcon className="icon" aria-hidden="true" />
-                        <span>Editar</span>
-                      </button>
+                      {/* Omitir botão Editar para perfil Administrador */}
+                      {!isAdmin && (
+                        <button
+                          className="btn btn--neutral btn--sm"
+                          onClick={() => editar(p)}
+                          aria-label={`Editar ${p.nome}`}
+                          title="Editar"
+                        >
+                          <PencilSquareIcon className="icon" aria-hidden="true" />
+                          <span>Editar</span>
+                        </button>
+                      )}
                       <button
                         className="btn btn--neutral btn--sm"
                         onClick={() => toggleExpansaoPerfil(p.id)}
@@ -549,7 +552,7 @@ export default function PerfisPermissoes() {
                     checked={!!form.ativo}
                     onChange={(e) => setField("ativo", e.target.checked ? 1 : 0)}
                   />
-                  <label htmlFor="pf_ativo">Perfil ativo</label>
+                  <label htmlFor="pf_ativo" className="checkbox-label">Perfil ativo</label>
                 </div>
               </div>
 
@@ -604,7 +607,7 @@ export default function PerfisPermissoes() {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          padding: 14px 14px 0 14px;
+          padding: 14px 14px 16px 14px; /* Aumentado padding inferior */
         }
 
         @media (min-width: 768px) {
@@ -644,33 +647,38 @@ export default function PerfisPermissoes() {
           display: inline-flex;
           align-items: center;
           gap: 4px;
+          background: var(--badge-bg, var(--panel-muted));
+          color: var(--badge-fg, var(--muted));
+          border-color: var(--badge-border, var(--border));
         }
 
         .badge.ok { 
-          background: rgba(16,185,129,.12); 
-          color: var(--success-strong); 
-          border-color: rgba(16,185,129,.35); 
+          --badge-bg: rgba(16,185,129,.12);
+          --badge-fg: var(--success-strong);
+          --badge-border: rgba(16,185,129,.35);
         }
 
         .badge.muted { 
-          background: var(--panel-muted); 
-          color: var(--muted); 
+          --badge-bg: var(--panel-muted);
+          --badge-fg: var(--muted);
+          --badge-border: var(--border);
         }
 
         .badge--admin {
-          background: rgba(139, 92, 246, 0.12);
-          color: #8b5cf6;
-          border-color: rgba(139, 92, 246, 0.35);
+          --badge-bg: rgba(139, 92, 246, 0.12);
+          --badge-fg: var(--admin-color, #8b5cf6);
+          --badge-border: rgba(139, 92, 246, 0.35);
         }
 
         .perfil-card__actions {
           display: flex;
           gap: 6px;
           flex-wrap: wrap;
+          margin-top: 4px; /* Espaço adicional para separar dos badges */
         }
 
         .perfil-card__expanded {
-          margin-top: 16px;
+          margin-top: 0;
           border-top: 1px solid var(--border);
           padding: 16px 14px 14px 14px;
         }
@@ -750,7 +758,7 @@ export default function PerfisPermissoes() {
         }
 
         .permissao-item:hover {
-          background: rgba(0,0,0,0.05);
+          background: var(--hover-bg, rgba(0,0,0,0.05));
         }
 
         .permissao-item__checkbox {
@@ -783,6 +791,18 @@ export default function PerfisPermissoes() {
           margin-bottom: 16px;
         }
 
+        /* Checkbox label para modo HC */
+        .checkbox-label {
+          color: var(--fg);
+          font-weight: 500;
+        }
+
+        /* Botão placeholder para manter consistência */
+        .btn--placeholder {
+          visibility: hidden;
+          pointer-events: none;
+        }
+
         /* Ajustes menores */
         @media (max-width: 480px) {
           .perfil-card__actions {
@@ -792,6 +812,10 @@ export default function PerfisPermissoes() {
           .perfil-card__actions .btn {
             flex: 1;
             justify-content: center;
+          }
+
+          .perfil-card__head {
+            padding: 14px 14px 18px 14px; /* Mais espaço no mobile */
           }
         }
       `}</style>
