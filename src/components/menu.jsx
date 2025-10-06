@@ -44,8 +44,8 @@ const PERM = {
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
   const [isMobile, setIsMobile] = useState(false);
-  const [open, setOpen] = useState(false);          // apenas mobile
-  const [collapsed, setCollapsed] = useState(false); // apenas desktop
+  const [collapsed, setCollapsed] = useState(false); // desktop
+  const [openMobile, setOpenMobile] = useState(false); // mobile full-screen
 
   const [perms, setPerms] = useState(() => new Set());
   const [permsLoaded, setPermsLoaded] = useState(false);
@@ -56,7 +56,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 
   const FIRST = useRef(null);
 
-  /* ====== Permissões ====== */
+  /* ===== Permissões ===== */
   useEffect(() => {
     let alive = true;
     async function fetchPerms() {
@@ -86,12 +86,11 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
     return () => { alive = false; };
   }, [isDev, isAdm]);
 
-  /* ====== Responsivo ====== */
+  /* ===== Responsivo ===== */
   useEffect(() => {
     const onResize = () => {
       const w = window.innerWidth;
       setIsMobile(w <= 900);
-      // no desktop, auto-colapsa se estreito
       if (w < 1200 && !isMobile) setCollapsed(true);
     };
     onResize();
@@ -99,113 +98,144 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
     return () => window.removeEventListener("resize", onResize);
   }, [isMobile]);
 
-  /* ====== Mobile: acessibilidade + push do conteúdo ====== */
+  /* ===== Mobile: a11y e scroll lock enquanto o menu ocupa a tela ===== */
   useEffect(() => {
-    if (!isMobile) {
-      document.body.classList.remove("menu-open");
-      return;
-    }
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    if (!isMobile) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpenMobile(false); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isMobile]);
 
   useEffect(() => {
     if (!isMobile) return;
-    // empurra o conteúdo do app sem sobrepor
-    if (open) document.body.classList.add("menu-open");
-    else document.body.classList.remove("menu-open");
-    // foco inicial no 1º item do menu
-    if (open && FIRST.current) FIRST.current.focus();
-    return () => document.body.classList.remove("menu-open");
-  }, [isMobile, open]);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = openMobile ? "hidden" : prev || "";
+    if (openMobile && FIRST.current) FIRST.current.focus();
+    return () => { document.body.style.overflow = prev; };
+  }, [isMobile, openMobile]);
 
   const canRender = permsLoaded || isAdm || isDev;
 
   return (
     <>
-      {/* ========= MOBILE ========= */}
+      {/* ===== MOBILE: Header fixo e menu em tela cheia ===== */}
       {isMobile && (
         <>
-          <header role="banner" aria-label="Barra superior" className="mobile-header">
+          <header className="mobile-header" role="banner" aria-label="Barra superior">
             <div className="mobile-header__row">
               <button
-                onClick={() => setOpen((v) => !v)}
-                aria-expanded={open}
-                aria-controls="mobile-sidebar"
-                aria-label={open ? "Fechar menu" : "Abrir menu"}
-                title={open ? "Fechar menu" : "Abrir menu"}
                 className="btn-ghost"
+                onClick={() => setOpenMobile((v) => !v)}
+                aria-expanded={openMobile}
+                aria-controls="mobile-menu"
+                aria-label={openMobile ? "Fechar menu" : "Abrir menu"}
+                title={openMobile ? "Fechar menu" : "Abrir menu"}
               >
                 <Bars3Icon className="icon" aria-hidden="true" />
                 <span className="btn-text">Menu</span>
               </button>
-
               <h1 className="brand">Projeto Integrador</h1>
-              {/* nada aqui — logout fica por último dentro do menu */}
               <span aria-hidden="true" />
             </div>
           </header>
-
-          {/* Spacer do header para não sobrepor o conteúdo */}
+          {/* Spacer do header para não sobrepor conteúdo */}
           <div className="mobile-header-spacer" aria-hidden="true" />
 
-          {/* Sidebar Mobile que EMPURRA o conteúdo (body.menu-open -> margin-left) */}
-          <aside
-            id="mobile-sidebar"
-            className={`mobile-sidebar ${open ? "open" : ""}`}
-            aria-label="Menu principal"
-          >
-            {canRender && (
-              <nav className="sidebar-nav" aria-label="Navegação principal">
-                <MenuGroup title="Geral" expanded>
-                  {has(PERM.DASHBOARD_FUNC) && (
-                    <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} refProp={!FIRST.current ? FIRST : null} onClick={() => setOpen(false)} />
-                  )}
-                  {has(PERM.DASHBOARD_ADM) && (
-                    <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} onClick={() => setOpen(false)} />
-                  )}
-                </MenuGroup>
+          {/* Menu MOBILE em tela cheia (abaixo do header) */}
+          {openMobile && (
+            <div
+              id="mobile-menu"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu principal"
+              className="mobile-menu-fullscreen"
+            >
+              {canRender && (
+                <nav className="sidebar-nav" aria-label="Navegação principal">
+                  <MenuGroup title="Geral" expanded>
+                    {has(PERM.DASHBOARD_FUNC) && (
+                      <MenuItem
+                        to="/dashboard_func"
+                        label="Meu Painel"
+                        icon={<UserIcon />}
+                        refProp={!FIRST.current ? FIRST : null}
+                        onClick={() => setOpenMobile(false)}
+                      />
+                    )}
+                    {has(PERM.DASHBOARD_ADM) && (
+                      <MenuItem
+                        to="/dashboard_adm"
+                        label="Painel do Administrador"
+                        icon={<ShieldCheckIcon />}
+                        onClick={() => setOpenMobile(false)}
+                      />
+                    )}
+                  </MenuGroup>
 
-                <MenuGroup title="Cadastros" expanded>
-                  {has(PERM.PESSOAS) && <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.EMPRESAS) && <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={() => setOpen(false)} />}
-                </MenuGroup>
+                  <MenuGroup title="Cadastros" expanded>
+                    {has(PERM.PESSOAS) && (
+                      <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.EMPRESAS) && (
+                      <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                  </MenuGroup>
 
-                <MenuGroup title="Segurança" expanded>
-                  {has(PERM.USUARIOS) && <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.PERFIS_PERMISSOES) && <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={() => setOpen(false)} />}
-                </MenuGroup>
+                  <MenuGroup title="Segurança" expanded>
+                    {has(PERM.USUARIOS) && (
+                      <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.PERFIS_PERMISSOES) && (
+                      <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                  </MenuGroup>
 
-                <MenuGroup title="Operação" expanded>
-                  {has(PERM.ESCALAS) && <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.APONTAMENTOS) && <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} onClick={() => setOpen(false)} />}
-                </MenuGroup>
+                  <MenuGroup title="Operação" expanded>
+                    {has(PERM.ESCALAS) && (
+                      <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.APONTAMENTOS) && (
+                      <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.OCORRENCIAS) && (
+                      <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                  </MenuGroup>
 
-                <MenuGroup title="Folha" expanded>
-                  {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.FOLHAS_FUNC) && <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={() => setOpen(false)} />}
-                  {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={() => setOpen(false)} />}
-                </MenuGroup>
+                  <MenuGroup title="Folha" expanded>
+                    {has(PERM.CARGOS) && (
+                      <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.FUNCIONARIOS) && (
+                      <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.FOLHAS) && (
+                      <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.FOLHAS_FUNC) && (
+                      <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                    {has(PERM.FOLHAS_ITENS) && (
+                      <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={() => setOpenMobile(false)} />
+                    )}
+                  </MenuGroup>
 
-                {/* Por último: SAIR */}
-                <MenuGroup title="Conta" expanded>
-                  <MenuItem
-                    label="Sair"
-                    icon={<ArrowRightOnRectangleIcon />}
-                    onClick={() => { setOpen(false); onLogout?.(); }}
-                  />
-                </MenuGroup>
-              </nav>
-            )}
-          </aside>
+                  {/* Último item: Sair */}
+                  <MenuGroup title="Conta" expanded>
+                    <MenuItem
+                      label="Sair"
+                      icon={<ArrowRightOnRectangleIcon />}
+                      onClick={() => { setOpenMobile(false); onLogout?.(); }}
+                    />
+                  </MenuGroup>
+                </nav>
+              )}
+            </div>
+          )}
         </>
       )}
 
-      {/* ========= DESKTOP ========= */}
+      {/* ===== DESKTOP: Sidebar colapsável ===== */}
       {!isMobile && (
         <>
           <aside
@@ -231,8 +261,12 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
             {canRender && (
               <nav className="sidebar-nav" aria-label="Navegação principal">
                 <MenuGroup title="Geral" collapsed={collapsed}>
-                  {has(PERM.DASHBOARD_FUNC) && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} collapsed={collapsed} />}
-                  {has(PERM.DASHBOARD_ADM) && <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} collapsed={collapsed} />}
+                  {has(PERM.DASHBOARD_FUNC) && (
+                    <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.DASHBOARD_ADM) && (
+                    <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} collapsed={collapsed} />
+                  )}
                 </MenuGroup>
 
                 <MenuGroup title="Cadastros" collapsed={collapsed}>
@@ -272,23 +306,22 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
             )}
           </aside>
 
-          {/* Spacer para o conteúdo não sobrepor no desktop */}
+          {/* Spacer para o conteúdo não sobrepor a sidebar no desktop */}
           <div className={`sidebar-spacer ${collapsed ? "collapsed" : ""}`} aria-hidden="true" />
         </>
       )}
 
       <style jsx>{`
-        /* ===== Variáveis úteis ===== */
-        :root {
+        :root{
           --sidebar-desktop-w: 260px;
           --sidebar-desktop-w-collapsed: 70px;
-          --sidebar-mobile-w: 280px;
           --mobile-header-h: 56px;
         }
 
         .icon { width: 18px; height: 18px; }
+        .brand { font-size: 16px; font-weight: 800; color: var(--fg); }
+        .subtitle { font-size: 12px; color: var(--muted); font-weight: 700; }
 
-        /* ===== Botões fantasma no padrão global */
         .btn-ghost {
           display: inline-flex;
           gap: 8px;
@@ -301,46 +334,34 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
         }
         .btn-text { font-size: 14px; }
 
-        .brand { font-size: 16px; font-weight: 800; color: var(--fg); }
-        .subtitle { font-size: 12px; color: var(--muted); font-weight: 700; }
-
         /* ===== MOBILE ===== */
         .mobile-header {
           position: sticky;
           top: 0;
-          z-index: 30;
+          z-index: 40;
           background: var(--panel);
           border-bottom: 1px solid var(--border);
           padding: 8px 12px;
         }
         .mobile-header__row {
-          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
         }
         .mobile-header-spacer { height: var(--mobile-header-h); }
 
-        /* Sidebar fixa que empurra body quando aberta */
-        .mobile-sidebar {
+        .mobile-menu-fullscreen {
           position: fixed;
           top: var(--mobile-header-h);
-          bottom: 0;
-          left: 0;
-          width: 0;
-          overflow: hidden;
+          left: 0; right: 0; bottom: 0;
           background: var(--panel);
-          border-right: 1px solid transparent;
-          transition: width .2s ease, border-color .2s ease;
-          z-index: 25;
-          box-shadow: none;
-        }
-        .mobile-sidebar.open {
-          width: var(--sidebar-mobile-w);
-          border-right: 1px solid var(--border);
-          box-shadow: var(--shadow);
-        }
-        /* Empurra o conteúdo do app inteiro quando menu abre */
-        :global(body.menu-open) {
-          margin-left: var(--sidebar-mobile-w);
-          transition: margin-left .2s ease;
+          z-index: 35;
+          border-top: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          padding: 12px;
+          overflow-y: auto;
         }
 
         /* ===== DESKTOP ===== */
@@ -357,17 +378,13 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           flex-direction: column;
         }
         .dashboard-sidebar.collapsed { width: var(--sidebar-desktop-w-collapsed); }
-
-        .sidebar-spacer {
-          width: var(--sidebar-desktop-w);
-          height: 1px;
-        }
+        .sidebar-spacer { width: var(--sidebar-desktop-w); height: 1px; }
         .sidebar-spacer.collapsed { width: var(--sidebar-desktop-w-collapsed); }
 
         .sidebar-header { display: flex; flex-direction: column; gap: 8px; }
         .sidebar-header__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
-        .sidebar-nav { margin-top: 12px; overflow-y: auto; }
+        .sidebar-nav { margin-top: 12px; }
         .menu-group { margin-bottom: 12px; }
         .menu-group-title {
           color: var(--muted);
@@ -391,10 +408,7 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           background: transparent;
           text-align: left;
         }
-        .nav-item:hover {
-          background: var(--panel-muted);
-          border-color: var(--border);
-        }
+        .nav-item:hover { background: var(--panel-muted); border-color: var(--border); }
         .nav-item.active {
           background: color-mix(in srgb, var(--accent) 12%, transparent);
           border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
@@ -412,19 +426,15 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
 }
 
 function MenuGroup({ title, children, collapsed = false, expanded = false }) {
-  // expanded = true força labels sempre visíveis (mobile funcional)
   return (
     <div className="menu-group">
       {!collapsed && <div className="menu-group-title" aria-hidden="true">{title}</div>}
-      <div className="nav-list">
-        {Array.isArray(children) ? children.map((c, i) => c && { ...c, key: c?.key ?? i }) : children}
-      </div>
+      <div className="nav-list">{children}</div>
     </div>
   );
 }
 
 function MenuItem({ to, label, icon, onClick, refProp, collapsed = false }) {
-  // Sem TO -> vira botão (ex.: Sair)
   if (!to) {
     return (
       <button
@@ -439,7 +449,6 @@ function MenuItem({ to, label, icon, onClick, refProp, collapsed = false }) {
       </button>
     );
   }
-
   return (
     <NavLink
       to={to}
