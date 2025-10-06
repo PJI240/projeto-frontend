@@ -18,12 +18,23 @@ export default function AccessibilityToggles() {
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "default");
   const [font, setFont] = useState(localStorage.getItem("font") || "md");
   const [open, setOpen] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   const isHC = theme === "hc";
   const isLG = font === "lg";
 
   const menuRef = useRef(null);
   const btnRef = useRef(null);
+
+  /* Detecta preferência por redução de movimento */
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduceMotion(mediaQuery.matches);
+    
+    const handler = (e) => setReduceMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
 
   /* aplica tema e fonte */
   useEffect(() => {
@@ -97,8 +108,10 @@ export default function AccessibilityToggles() {
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          animation: "pulse 2s infinite",
-          transition: "all .2s ease",
+          animation: reduceMotion ? "none" : "pulse 3s ease-in-out infinite",
+          transition: "all .3s ease",
+          willChange: "transform",
+          transform: "translateZ(0)",
         }}
       >
         <img
@@ -191,11 +204,31 @@ export default function AccessibilityToggles() {
         </div>
       )}
 
-      {/* Animação do botão */}
+      {/* Animação do botão otimizada */}
       <style>{`
         @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
+          0% {
+            transform: scale(1);
+            box-shadow: 0 6px 18px rgba(0,0,0,.25);
+          }
+          50% {
+            transform: scale(1.05);
+            box-shadow: 0 8px 24px rgba(0,0,0,.3);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 6px 18px rgba(0,0,0,.25);
+          }
+        }
+        
+        /* Fallback para navegadores mais antigos */
+        @keyframes pulse-simple {
+          0%, 100% { 
+            transform: scale(1); 
+          }
+          50% { 
+            transform: scale(1.05);
+          }
         }
       `}</style>
     </>
