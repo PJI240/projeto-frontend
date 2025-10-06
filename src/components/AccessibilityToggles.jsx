@@ -19,6 +19,7 @@ export default function AccessibilityToggles() {
   const [font, setFont] = useState(localStorage.getItem("font") || "md");
   const [open, setOpen] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const isHC = theme === "hc";
   const isLG = font === "lg";
@@ -86,6 +87,8 @@ export default function AccessibilityToggles() {
         ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="a11y-menu"
@@ -104,14 +107,17 @@ export default function AccessibilityToggles() {
           borderRadius: "50%",
           background: isHC ? "#00ffaa" : "var(--a11y-blue, #1e90ff)",
           border: isHC ? "2px solid #fff" : "none",
-          boxShadow: "0 6px 18px rgba(0,0,0,.25)",
+          boxShadow: isHovered 
+            ? "0 8px 25px rgba(0,0,0,.35)" 
+            : "0 6px 18px rgba(0,0,0,.25)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           animation: reduceMotion ? "none" : "pulse 3s ease-in-out infinite",
-          transition: "all .3s ease",
+          transition: "all 0.3s ease",
           willChange: "transform",
-          transform: "translateZ(0)",
+          transform: isHovered ? "scale(1.1)" : "translateZ(0)",
+          cursor: "pointer",
         }}
       >
         <img
@@ -124,6 +130,8 @@ export default function AccessibilityToggles() {
             objectFit: "contain",
             pointerEvents: "none",
             filter: isHC ? "brightness(1)" : "brightness(0) invert(1)",
+            transition: "transform 0.2s ease",
+            transform: isHovered ? "scale(1.1)" : "scale(1)",
           }}
         />
       </button>
@@ -157,6 +165,8 @@ export default function AccessibilityToggles() {
               role="menuitemcheckbox"
               aria-checked={isLG}
               onClick={toggleFont}
+              onMouseEnter={(e) => e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 8%, var(--panel))"}
+              onMouseLeave={(e) => e.currentTarget.style.background = isLG ? "color-mix(in srgb, var(--accent) 12%, var(--panel))" : "transparent"}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -170,6 +180,7 @@ export default function AccessibilityToggles() {
                 color: "var(--fg)",
                 fontWeight: isLG ? "700" : "600",
                 transition: "all .2s ease",
+                cursor: "pointer",
               }}
             >
               <AIcon />
@@ -182,6 +193,8 @@ export default function AccessibilityToggles() {
               role="menuitemcheckbox"
               aria-checked={isHC}
               onClick={toggleHC}
+              onMouseEnter={(e) => e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 8%, var(--panel))"}
+              onMouseLeave={(e) => e.currentTarget.style.background = isHC ? "color-mix(in srgb, var(--accent) 12%, var(--panel))" : "transparent"}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -195,6 +208,7 @@ export default function AccessibilityToggles() {
                 color: "var(--fg)",
                 fontWeight: isHC ? "700" : "600",
                 transition: "all .2s ease",
+                cursor: "pointer",
               }}
             >
               <EyeIcon width={20} height={20} />
@@ -204,7 +218,7 @@ export default function AccessibilityToggles() {
         </div>
       )}
 
-      {/* Animação do botão otimizada */}
+      {/* Animação do botão otimizada - SEMPRE ativa por padrão */}
       <style>{`
         @keyframes pulse {
           0% {
@@ -221,14 +235,22 @@ export default function AccessibilityToggles() {
           }
         }
         
-        /* Fallback para navegadores mais antigos */
-        @keyframes pulse-simple {
-          0%, 100% { 
-            transform: scale(1); 
+        /* Força a animação se não houver preferência por redução de movimento */
+        @media (prefers-reduced-motion: no-preference) {
+          button[aria-label*="acessibilidade"] {
+            animation: pulse 3s ease-in-out infinite !important;
           }
-          50% { 
-            transform: scale(1.05);
-          }
+        }
+        
+        /* Efeitos hover melhorados */
+        button[aria-label*="acessibilidade"]:hover {
+          transform: scale(1.1) !important;
+          box-shadow: 0 10px 30px rgba(0,0,0,.4) !important;
+        }
+        
+        /* Melhora a indicação visual que é clicável */
+        button[aria-label*="acessibilidade"] {
+          cursor: pointer !important;
         }
       `}</style>
     </>
