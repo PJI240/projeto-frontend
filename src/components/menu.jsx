@@ -44,8 +44,9 @@ const PERM = {
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
   const [isMobile, setIsMobile] = useState(false);
-  const [collapsed, setCollapsed] = useState(false); // desktop
-  const [openMobile, setOpenMobile] = useState(false); // mobile full-screen
+  const [isNarrow, setIsNarrow] = useState(false); // <=360px
+  const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false); // Novo estado para menu recolhido no desktop
 
   const [perms, setPerms] = useState(() => new Set());
   const [permsLoaded, setPermsLoaded] = useState(false);
@@ -55,8 +56,9 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   const has = useCallback((code) => perms.has(code), [perms]);
 
   const FIRST = useRef(null);
+  const TOPBAR_H = 56;
 
-  /* ===== Permissões ===== */
+  /* ====== Permissões ====== */
   useEffect(() => {
     let alive = true;
     async function fetchPerms() {
@@ -86,22 +88,26 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
     return () => { alive = false; };
   }, [isDev, isAdm]);
 
-  /* ===== Responsivo ===== */
+  /* ====== Responsivo ====== */
   useEffect(() => {
     const onResize = () => {
       const w = window.innerWidth;
       setIsMobile(w <= 900);
-      if (w < 1200 && !isMobile) setCollapsed(true);
+      setIsNarrow(w <= 360);
+      // No desktop, recolher automaticamente em telas menores
+      if (w < 1200 && w > 900) {
+        setCollapsed(true);
+      }
     };
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [isMobile]);
+  }, []);
 
-  /* ===== Mobile: a11y e scroll lock enquanto o menu ocupa a tela ===== */
+  /* ====== A11y: esc, foco, scroll lock ====== */
   useEffect(() => {
     if (!isMobile) return;
-    const onKey = (e) => { if (e.key === "Escape") setOpenMobile(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isMobile]);
@@ -109,125 +115,189 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
   useEffect(() => {
     if (!isMobile) return;
     const prev = document.body.style.overflow;
-    document.body.style.overflow = openMobile ? "hidden" : prev || "";
-    if (openMobile && FIRST.current) FIRST.current.focus();
+    document.body.style.overflow = open ? "hidden" : prev || "";
+    if (open && FIRST.current) FIRST.current.focus();
     return () => { document.body.style.overflow = prev; };
-  }, [isMobile, openMobile]);
+  }, [isMobile, open]);
+
+  const Section = ({ title, items }) => {
+    const visible = useMemo(() => items.some((i) => has(i.perm)), [items, has]);
+    if (!visible) return null;
+    return (
+      <div className="menu-group">
+        <div className="menu-group-title" aria-hidden="true">{title}</div>
+        <div className="menu-group-items">
+          {items.map((i, idx) =>
+            has(i.perm) ? (
+              <MenuItem
+                key={i.to}
+                to={i.to}
+                label={i.label}
+                icon={i.icon}
+                onClick={() => setOpen(false)}
+                refProp={!FIRST.current ? FIRST : null}
+              />
+            ) : null
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const canRender = permsLoaded || isAdm || isDev;
 
   return (
     <>
-      {/* ===== MOBILE: Header fixo e menu em tela cheia ===== */}
+      {/* ===== MOBILE: AppBar fixa + Sheet (MANTIDO ORIGINAL) ===== */}
       {isMobile && (
         <>
-          <header className="mobile-header" role="banner" aria-label="Barra superior">
-            <div className="mobile-header__row">
+          <header
+            role="banner"
+            aria-label="Barra superior"
+            style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0,
+              height: `${TOPBAR_H}px`,
+              background: "var(--bg)",
+              borderBottom: "1px solid var(--border)",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              className="sidebar-header"
+              style={{
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "8px 12px",
+              }}
+            >
+              {/* Botão "neutro": sem pílula/flutuante */}
               <button
-                className="btn-ghost"
-                onClick={() => setOpenMobile((v) => !v)}
-                aria-expanded={openMobile}
-                aria-controls="mobile-menu"
-                aria-label={openMobile ? "Fechar menu" : "Abrir menu"}
-                title={openMobile ? "Fechar menu" : "Abrir menu"}
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+                aria-controls="mobile-menu-sheet"
+                aria-label={open ? "Fechar menu" : "Abrir menu"}
+                title={open ? "Fechar menu" : "Abrir menu"}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--fg)",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 40,
+                  minHeight: 40,
+                }}
               >
-                <Bars3Icon className="icon" aria-hidden="true" />
-                <span className="btn-text">Menu</span>
+                <Bars3Icon className="menu-toggle-icon" />
+                {!isNarrow && <span style={{ marginLeft: 6 }}>Menu</span>}
               </button>
-              <h1 className="brand">Projeto Integrador</h1>
-              <span aria-hidden="true" />
+
+              <h1
+                className="brand"
+                style={{
+                  margin: 0,
+                  lineHeight: 1,
+                  flex: 1,
+                  minWidth: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                Projeto Integrador
+              </h1>
+
+              <button
+                className="logout-btn"
+                onClick={onLogout}
+                title="Sair"
+                aria-label="Sair do sistema"
+              >
+                <ArrowRightOnRectangleIcon className="logout-icon" />
+              </button>
             </div>
           </header>
-          {/* Spacer do header para não sobrepor conteúdo */}
-          <div className="mobile-header-spacer" aria-hidden="true" />
 
-          {/* Menu MOBILE em tela cheia (abaixo do header) */}
-          {openMobile && (
+          {/* spacer pro conteúdo */}
+          <div aria-hidden="true" style={{ height: `${TOPBAR_H}px` }} />
+
+          {/* SHEET abaixo da AppBar */}
+          {open && (
             <div
-              id="mobile-menu"
+              id="mobile-menu-sheet"
               role="dialog"
               aria-modal="true"
               aria-label="Menu principal"
-              className="mobile-menu-fullscreen"
+              style={{
+                position: "fixed",
+                top: `${TOPBAR_H}px`,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "var(--panel)",
+                borderTop: "1px solid var(--panel-muted)",
+                overflowY: "auto",
+                zIndex: 999,
+              }}
             >
+              <div className="user-info" role="group" aria-label="Usuário" style={{ padding: "12px" }}>
+                <div className="user-details">
+                  <div className="user-name">{me?.nome || "Usuário"}</div>
+                  <div className="user-email">{me?.email}</div>
+                  {empresaAtiva && (
+                    <div className="empresa-info">
+                      Empresa: <strong>{empresaAtiva.nome_fantasia || empresaAtiva.razao_social}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {canRender && (
-                <nav className="sidebar-nav" aria-label="Navegação principal">
-                  <MenuGroup title="Geral" expanded>
-                    {has(PERM.DASHBOARD_FUNC) && (
-                      <MenuItem
-                        to="/dashboard_func"
-                        label="Meu Painel"
-                        icon={<UserIcon />}
-                        refProp={!FIRST.current ? FIRST : null}
-                        onClick={() => setOpenMobile(false)}
-                      />
-                    )}
-                    {has(PERM.DASHBOARD_ADM) && (
-                      <MenuItem
-                        to="/dashboard_adm"
-                        label="Painel do Administrador"
-                        icon={<ShieldCheckIcon />}
-                        onClick={() => setOpenMobile(false)}
-                      />
-                    )}
-                  </MenuGroup>
-
-                  <MenuGroup title="Cadastros" expanded>
-                    {has(PERM.PESSOAS) && (
-                      <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.EMPRESAS) && (
-                      <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                  </MenuGroup>
-
-                  <MenuGroup title="Segurança" expanded>
-                    {has(PERM.USUARIOS) && (
-                      <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.PERFIS_PERMISSOES) && (
-                      <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                  </MenuGroup>
-
-                  <MenuGroup title="Operação" expanded>
-                    {has(PERM.ESCALAS) && (
-                      <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.APONTAMENTOS) && (
-                      <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.OCORRENCIAS) && (
-                      <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                  </MenuGroup>
-
-                  <MenuGroup title="Folha" expanded>
-                    {has(PERM.CARGOS) && (
-                      <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.FUNCIONARIOS) && (
-                      <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.FOLHAS) && (
-                      <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.FOLHAS_FUNC) && (
-                      <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                    {has(PERM.FOLHAS_ITENS) && (
-                      <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={() => setOpenMobile(false)} />
-                    )}
-                  </MenuGroup>
-
-                  {/* Último item: Sair */}
-                  <MenuGroup title="Conta" expanded>
-                    <MenuItem
-                      label="Sair"
-                      icon={<ArrowRightOnRectangleIcon />}
-                      onClick={() => { setOpenMobile(false); onLogout?.(); }}
-                    />
-                  </MenuGroup>
+                <nav className="sidebar-nav" aria-label="Navegação principal" style={{ paddingBottom: 12 }}>
+                  <Section
+                    title="Geral"
+                    items={[
+                      { perm: PERM.DASHBOARD_FUNC, to: "/dashboard_func", label: "Meu Painel", icon: <UserIcon /> },
+                      { perm: PERM.DASHBOARD_ADM, to: "/dashboard_adm", label: "Painel do Administrador", icon: <ShieldCheckIcon /> },
+                    ]}
+                  />
+                  <Section
+                    title="Cadastros"
+                    items={[
+                      { perm: PERM.PESSOAS, to: "/pessoas", label: "Pessoas", icon: <UserIcon /> },
+                      { perm: PERM.EMPRESAS, to: "/empresas", label: "Minha Empresa", icon: <BuildingOfficeIcon /> },
+                    ]}
+                  />
+                  <Section
+                    title="Segurança"
+                    items={[
+                      { perm: PERM.USUARIOS, to: "/usuarios", label: "Usuários", icon: <UserGroupIcon /> },
+                      { perm: PERM.PERFIS_PERMISSOES, to: "/perfis-permissoes", label: "Permissões", icon: <KeyIcon /> },
+                    ]}
+                  />
+                  <Section
+                    title="Operação"
+                    items={[
+                      { perm: PERM.ESCALAS, to: "/escalas", label: "Escalas", icon: <ClockIcon /> },
+                      { perm: PERM.APONTAMENTOS, to: "/apontamentos", label: "Apontamentos", icon: <ClipboardDocumentListIcon /> },
+                      { perm: PERM.OCORRENCIAS, to: "/ocorrencias", label: "Ocorrências", icon: <ExclamationTriangleIcon /> },
+                    ]}
+                  />
+                  <Section
+                    title="Folha"
+                    items={[
+                      { perm: PERM.CARGOS, to: "/cargos", label: "Cargos", icon: <BriefcaseIcon /> },
+                      { perm: PERM.FUNCIONARIOS, to: "/funcionarios", label: "Funcionários x Salários", icon: <UserGroupIcon /> },
+                      { perm: PERM.FOLHAS, to: "/folhas", label: "Folhas", icon: <DocumentChartBarIcon /> },
+                      { perm: PERM.FOLHAS_FUNC, to: "/folhas-funcionarios", label: "Folhas × Funcionários", icon: <UserGroupIcon /> },
+                      { perm: PERM.FOLHAS_ITENS, to: "/folhas-itens", label: "Itens de Folha", icon: <DocumentTextIcon /> },
+                    ]}
+                  />
                 </nav>
               )}
             </div>
@@ -235,228 +305,145 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
         </>
       )}
 
-      {/* ===== DESKTOP: Sidebar colapsável ===== */}
+      {/* ===== DESKTOP: sidebar com opção de recolher ===== */}
       {!isMobile && (
         <>
-          <aside
-            id="dashboard-sidebar"
-            className={`dashboard-sidebar ${collapsed ? "collapsed" : ""}`}
+          <aside 
+            id="dashboard-sidebar" 
+            className={`dashboard-sidebar ${collapsed ? 'collapsed' : ''}`}
             aria-label="Menu lateral"
           >
             <div className="sidebar-header">
               {!collapsed && <h1 className="brand">Projeto Integrador</h1>}
-              <div className="sidebar-header__row">
+              <div className="sidebar-header-content">
                 {!collapsed && <h2 className="subtitle">Menu</h2>}
                 <button
                   onClick={() => setCollapsed(!collapsed)}
-                  className="btn-ghost"
+                  className="toggle-collapse-btn"
                   aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
                   title={collapsed ? "Expandir menu" : "Recolher menu"}
                 >
-                  {collapsed ? <ChevronRightIcon className="icon" /> : <ChevronLeftIcon className="icon" />}
+                  {collapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
+            <div className="user-info" role="group" aria-label="Usuário">
+              {!collapsed && (
+                <div className="user-details">
+                  <div className="user-name">{me?.nome || "Usuário"}</div>
+                  <div className="user-email">{me?.email}</div>
+                  {empresaAtiva && (
+                    <div className="empresa-info">
+                      Empresa: <strong>{empresaAtiva.nome_fantasia || empresaAtiva.razao_social}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button 
+                className="logout-btn" 
+                onClick={onLogout} 
+                title="Sair" 
+                aria-label="Sair do sistema"
+              >
+                <ArrowRightOnRectangleIcon className="logout-icon" />
+              </button>
+            </div>
+
             {canRender && (
               <nav className="sidebar-nav" aria-label="Navegação principal">
-                <MenuGroup title="Geral" collapsed={collapsed}>
+                <MenuBlock title="Geral" collapsed={collapsed}>
                   {has(PERM.DASHBOARD_FUNC) && (
                     <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} collapsed={collapsed} />
                   )}
                   {has(PERM.DASHBOARD_ADM) && (
                     <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} collapsed={collapsed} />
                   )}
-                </MenuGroup>
+                </MenuBlock>
 
-                <MenuGroup title="Cadastros" collapsed={collapsed}>
-                  {has(PERM.PESSOAS) && <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} collapsed={collapsed} />}
-                  {has(PERM.EMPRESAS) && <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} collapsed={collapsed} />}
-                </MenuGroup>
+                <MenuBlock title="Cadastros" collapsed={collapsed}>
+                  {has(PERM.PESSOAS) && (
+                    <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.EMPRESAS) && (
+                    <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} collapsed={collapsed} />
+                  )}
+                </MenuBlock>
 
-                <MenuGroup title="Segurança" collapsed={collapsed}>
-                  {has(PERM.USUARIOS) && <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} collapsed={collapsed} />}
-                  {has(PERM.PERFIS_PERMISSOES) && <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} collapsed={collapsed} />}
-                </MenuGroup>
+                <MenuBlock title="Segurança" collapsed={collapsed}>
+                  {has(PERM.USUARIOS) && (
+                    <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.PERFIS_PERMISSOES) && (
+                    <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} collapsed={collapsed} />
+                  )}
+                </MenuBlock>
 
-                <MenuGroup title="Operação" collapsed={collapsed}>
-                  {has(PERM.ESCALAS) && <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} collapsed={collapsed} />}
-                  {has(PERM.APONTAMENTOS) && <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} collapsed={collapsed} />}
-                  {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} collapsed={collapsed} />}
-                </MenuGroup>
+                <MenuBlock title="Operação" collapsed={collapsed}>
+                  {has(PERM.ESCALAS) && (
+                    <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.APONTAMENTOS) && (
+                    <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.OCORRENCIAS) && (
+                    <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} collapsed={collapsed} />
+                  )}
+                </MenuBlock>
 
-                <MenuGroup title="Folha" collapsed={collapsed}>
-                  {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} collapsed={collapsed} />}
-                  {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} collapsed={collapsed} />}
-                  {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} collapsed={collapsed} />}
-                  {has(PERM.FOLHAS_FUNC) && <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} collapsed={collapsed} />}
-                  {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} collapsed={collapsed} />}
-                </MenuGroup>
-
-                {/* Último bloco: SAIR */}
-                <MenuGroup title="Conta" collapsed={collapsed}>
-                  <MenuItem
-                    label="Sair"
-                    icon={<ArrowRightOnRectangleIcon />}
-                    collapsed={collapsed}
-                    onClick={onLogout}
-                  />
-                </MenuGroup>
+                <MenuBlock title="Folha" collapsed={collapsed}>
+                  {has(PERM.CARGOS) && (
+                    <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.FUNCIONARIOS) && (
+                    <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.FOLHAS) && (
+                    <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.FOLHAS_FUNC) && (
+                    <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} collapsed={collapsed} />
+                  )}
+                  {has(PERM.FOLHAS_ITENS) && (
+                    <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} collapsed={collapsed} />
+                  )}
+                </MenuBlock>
               </nav>
+            )}
+
+            {!collapsed && (
+              <div className="sidebar-footer">
+                <small>v1.0 • Acessível</small>
+              </div>
             )}
           </aside>
 
-          {/* Spacer para o conteúdo não sobrepor a sidebar no desktop */}
-          <div className={`sidebar-spacer ${collapsed ? "collapsed" : ""}`} aria-hidden="true" />
+          {/* Espaço para o conteúdo não sobrepor */}
+          <div className={`sidebar-spacer ${collapsed ? 'collapsed' : ''}`} />
         </>
       )}
-
-      <style jsx>{`
-        :root{
-          --sidebar-desktop-w: 260px;
-          --sidebar-desktop-w-collapsed: 70px;
-          --mobile-header-h: 56px;
-        }
-
-        .icon { width: 18px; height: 18px; }
-        .brand { font-size: 16px; font-weight: 800; color: var(--fg); }
-        .subtitle { font-size: 12px; color: var(--muted); font-weight: 700; }
-
-        .btn-ghost {
-          display: inline-flex;
-          gap: 8px;
-          align-items: center;
-          background: var(--panel-muted);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          padding: 8px 10px;
-          font-weight: 600;
-        }
-        .btn-text { font-size: 14px; }
-
-        /* ===== MOBILE ===== */
-        .mobile-header {
-          position: sticky;
-          top: 0;
-          z-index: 40;
-          background: var(--panel);
-          border-bottom: 1px solid var(--border);
-          padding: 8px 12px;
-        }
-        .mobile-header__row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
-        .mobile-header-spacer { height: var(--mobile-header-h); }
-
-        .mobile-menu-fullscreen {
-          position: fixed;
-          top: var(--mobile-header-h);
-          left: 0; right: 0; bottom: 0;
-          background: var(--panel);
-          z-index: 35;
-          border-top: 1px solid var(--border);
-          display: flex;
-          flex-direction: column;
-          padding: 12px;
-          overflow-y: auto;
-        }
-
-        /* ===== DESKTOP ===== */
-        .dashboard-sidebar {
-          position: fixed;
-          left: 0; top: 0; bottom: 0;
-          width: var(--sidebar-desktop-w);
-          background: var(--panel);
-          border-right: 1px solid var(--border);
-          padding: 12px;
-          box-shadow: var(--shadow);
-          z-index: 20;
-          display: flex;
-          flex-direction: column;
-        }
-        .dashboard-sidebar.collapsed { width: var(--sidebar-desktop-w-collapsed); }
-        .sidebar-spacer { width: var(--sidebar-desktop-w); height: 1px; }
-        .sidebar-spacer.collapsed { width: var(--sidebar-desktop-w-collapsed); }
-
-        .sidebar-header { display: flex; flex-direction: column; gap: 8px; }
-        .sidebar-header__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-
-        .sidebar-nav { margin-top: 12px; }
-        .menu-group { margin-bottom: 12px; }
-        .menu-group-title {
-          color: var(--muted);
-          font-weight: 800;
-          font-size: 11px;
-          letter-spacing: .04em;
-          padding: 8px 6px;
-          text-transform: uppercase;
-        }
-
-        .nav-list { display: flex; flex-direction: column; gap: 4px; }
-
-        .nav-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 10px;
-          border-radius: 8px;
-          color: var(--fg);
-          border: 1px solid transparent;
-          background: transparent;
-          text-align: left;
-        }
-        .nav-item:hover { background: var(--panel-muted); border-color: var(--border); }
-        .nav-item.active {
-          background: color-mix(in srgb, var(--accent) 12%, transparent);
-          border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
-        }
-        .nav-item.collapsed { justify-content: center; }
-        .nav-item-icon { width: 20px; height: 20px; display: inline-flex; }
-        .nav-item-label { font-size: 14px; font-weight: 700; }
-
-        @media (max-width: 900px) {
-          .dashboard-sidebar, .sidebar-spacer { display: none; }
-        }
-      `}</style>
     </>
   );
 }
 
-function MenuGroup({ title, children, collapsed = false, expanded = false }) {
+function MenuBlock({ title, children, collapsed }) {
   return (
     <div className="menu-group">
-      {!collapsed && <div className="menu-group-title" aria-hidden="true">{title}</div>}
-      <div className="nav-list">{children}</div>
+      {!collapsed && (
+        <div className="menu-group-title" aria-hidden="true">{title}</div>
+      )}
+      <div className="menu-group-items">{children}</div>
     </div>
   );
 }
 
-function MenuItem({ to, label, icon, onClick, refProp, collapsed = false }) {
-  if (!to) {
-    return (
-      <button
-        type="button"
-        className={`nav-item ${collapsed ? "collapsed" : ""}`}
-        onClick={onClick}
-        ref={refProp ?? null}
-        title={collapsed ? label : undefined}
-      >
-        <span className="nav-item-icon">{icon}</span>
-        {!collapsed && <span className="nav-item-label">{label}</span>}
-      </button>
-    );
-  }
+function MenuItem({ to, label, icon, onClick, refProp, collapsed }) {
   return (
     <NavLink
       to={to}
-      end
-      className={({ isActive }) =>
-        `nav-item ${isActive ? "active" : ""} ${collapsed ? "collapsed" : ""}`
-      }
+      className={({ isActive }) => `nav-item ${isActive ? "active" : ""} ${collapsed ? "collapsed" : ""}`}
       onClick={onClick}
+      end
       ref={refProp ?? null}
       title={collapsed ? label : undefined}
     >
