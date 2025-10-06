@@ -1,3 +1,4 @@
+// src/components/menu.jsx
 import { NavLink } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
@@ -43,9 +44,8 @@ const PERM = {
 
 export default function Menu({ me, onLogout, empresaAtiva }) {
   const [isMobile, setIsMobile] = useState(false);
-  const [isNarrow, setIsNarrow] = useState(false); // <=360px
-  const [open, setOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState(false);          // apenas mobile
+  const [collapsed, setCollapsed] = useState(false); // apenas desktop
 
   const [perms, setPerms] = useState(() => new Set());
   const [permsLoaded, setPermsLoaded] = useState(false);
@@ -91,306 +91,294 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
     const onResize = () => {
       const w = window.innerWidth;
       setIsMobile(w <= 900);
-      setIsNarrow(w <= 360);
-      if (w < 1200 && !isMobile) {
-        setCollapsed(true);
-      }
+      // no desktop, auto-colapsa se estreito
+      if (w < 1200 && !isMobile) setCollapsed(true);
     };
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [isMobile]);
 
-  /* ====== A11y + comportamento de push no mobile ====== */
-  useEffect(() => {
-    if (isMobile) {
-      const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-      window.addEventListener("keydown", onKey);
-      return () => window.removeEventListener("keydown", onKey);
-    }
-  }, [isMobile]);
-
-  // Empurra conteúdo quando o menu mobile está aberto (sem sobrepor)
+  /* ====== Mobile: acessibilidade + push do conteúdo ====== */
   useEffect(() => {
     if (!isMobile) {
-      document.documentElement.style.removeProperty("--sidebar-mobile-offset");
+      document.body.classList.remove("menu-open");
       return;
     }
-    document.documentElement.style.setProperty("--sidebar-mobile-offset", open ? "280px" : "0px");
-    return () => document.documentElement.style.removeProperty("--sidebar-mobile-offset");
-  }, [isMobile, open]);
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMobile]);
 
-  const Section = ({ title, items, forceExpanded = false }) => {
-    const visible = useMemo(() => items.some((i) => has(i.perm)), [items, has]);
-    if (!visible) return null;
-    const isCollapsed = forceExpanded ? false : collapsed;
-    return (
-      <div className="menu-group">
-        {!isCollapsed && (
-          <div className="menu-group-title" aria-hidden="true">{title}</div>
-        )}
-        <div className="menu-group-items">
-          {items.map((i) =>
-            has(i.perm) ? (
-              <MenuItem
-                key={i.to || i.key || i.label}
-                to={i.to}
-                label={i.label}
-                icon={i.icon}
-                collapsed={isCollapsed}
-                onClick={() => setOpen(false)}
-                refProp={!FIRST.current ? FIRST : null}
-                action={i.action}
-              />
-            ) : null
-          )}
-        </div>
-      </div>
-    );
-  };
+  useEffect(() => {
+    if (!isMobile) return;
+    // empurra o conteúdo do app sem sobrepor
+    if (open) document.body.classList.add("menu-open");
+    else document.body.classList.remove("menu-open");
+    // foco inicial no 1º item do menu
+    if (open && FIRST.current) FIRST.current.focus();
+    return () => document.body.classList.remove("menu-open");
+  }, [isMobile, open]);
 
   const canRender = permsLoaded || isAdm || isDev;
 
   return (
     <>
-      {/* ===== MOBILE ===== */}
+      {/* ========= MOBILE ========= */}
       {isMobile && (
         <>
           <header role="banner" aria-label="Barra superior" className="mobile-header">
-            <div className="sidebar-header">
+            <div className="mobile-header__row">
               <button
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
                 aria-controls="mobile-sidebar"
                 aria-label={open ? "Fechar menu" : "Abrir menu"}
                 title={open ? "Fechar menu" : "Abrir menu"}
-                className="mobile-menu-toggle"
+                className="btn-ghost"
               >
-                <Bars3Icon className="menu-toggle-icon" />
-                {/* Mostrar texto sempre no mobile (mesmo estreito) */}
-                <span style={{ marginLeft: 6 }}>Menu</span>
+                <Bars3Icon className="icon" aria-hidden="true" />
+                <span className="btn-text">Menu</span>
               </button>
 
               <h1 className="brand">Projeto Integrador</h1>
-              {/* Removemos o botão de logout do header no mobile — agora é o último item do menu */}
+              {/* nada aqui — logout fica por último dentro do menu */}
               <span aria-hidden="true" />
             </div>
           </header>
 
-          {/* Spacer vertical para não sobrepor o conteúdo ao header */}
-          <div aria-hidden="true" className="mobile-header-spacer" />
+          {/* Spacer do header para não sobrepor o conteúdo */}
+          <div className="mobile-header-spacer" aria-hidden="true" />
 
-          <div className="mobile-shell">
-            {/* Sidebar em fluxo que empurra o conteúdo (largura 0 → 280px) */}
-            <aside
-              id="mobile-sidebar"
-              className={`mobile-sidebar ${open ? "open" : ""}`}
-              aria-label="Menu principal"
-            >
-              {canRender && (
-                <nav className="sidebar-nav" aria-label="Navegação principal">
-                  <Section
-                    title="Geral"
-                    forceExpanded
-                    items={[
-                      { perm: PERM.DASHBOARD_FUNC, to: "/dashboard_func", label: "Meu Painel", icon: <UserIcon /> },
-                      { perm: PERM.DASHBOARD_ADM, to: "/dashboard_adm", label: "Painel do Administrador", icon: <ShieldCheckIcon /> },
-                    ]}
-                  />
-                  <Section
-                    title="Cadastros"
-                    forceExpanded
-                    items={[
-                      { perm: PERM.PESSOAS, to: "/pessoas", label: "Pessoas", icon: <UserIcon /> },
-                      { perm: PERM.EMPRESAS, to: "/empresas", label: "Minha Empresa", icon: <BuildingOfficeIcon /> },
-                    ]}
-                  />
-                  <Section
-                    title="Segurança"
-                    forceExpanded
-                    items={[
-                      { perm: PERM.USUARIOS, to: "/usuarios", label: "Usuários", icon: <UserGroupIcon /> },
-                      { perm: PERM.PERFIS_PERMISSOES, to: "/perfis-permissoes", label: "Permissões", icon: <KeyIcon /> },
-                    ]}
-                  />
-                  <Section
-                    title="Operação"
-                    forceExpanded
-                    items={[
-                      { perm: PERM.ESCALAS, to: "/escalas", label: "Escalas", icon: <ClockIcon /> },
-                      { perm: PERM.APONTAMENTOS, to: "/apontamentos", label: "Apontamentos", icon: <ClipboardDocumentListIcon /> },
-                      { perm: PERM.OCORRENCIAS, to: "/ocorrencias", label: "Ocorrências", icon: <ExclamationTriangleIcon /> },
-                    ]}
-                  />
-                  <Section
-                    title="Folha"
-                    forceExpanded
-                    items={[
-                      { perm: PERM.CARGOS, to: "/cargos", label: "Cargos", icon: <BriefcaseIcon /> },
-                      { perm: PERM.FUNCIONARIOS, to: "/funcionarios", label: "Funcionários x Salários", icon: <UserGroupIcon /> },
-                      { perm: PERM.FOLHAS, to: "/folhas", label: "Folhas", icon: <DocumentChartBarIcon /> },
-                      { perm: PERM.FOLHAS_FUNC, to: "/folhas-funcionarios", label: "Folhas × Funcionários", icon: <UserGroupIcon /> },
-                      { perm: PERM.FOLHAS_ITENS, to: "/folhas-itens", label: "Itens de Folha", icon: <DocumentTextIcon /> },
-                    ]}
-                  />
+          {/* Sidebar Mobile que EMPURRA o conteúdo (body.menu-open -> margin-left) */}
+          <aside
+            id="mobile-sidebar"
+            className={`mobile-sidebar ${open ? "open" : ""}`}
+            aria-label="Menu principal"
+          >
+            {canRender && (
+              <nav className="sidebar-nav" aria-label="Navegação principal">
+                <MenuGroup title="Geral" expanded>
+                  {has(PERM.DASHBOARD_FUNC) && (
+                    <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} refProp={!FIRST.current ? FIRST : null} onClick={() => setOpen(false)} />
+                  )}
+                  {has(PERM.DASHBOARD_ADM) && (
+                    <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} onClick={() => setOpen(false)} />
+                  )}
+                </MenuGroup>
 
-                  {/* Último item do menu: Sair */}
-                  <Section
-                    title="Conta"
-                    forceExpanded
-                    items={[
-                      {
-                        key: "logout",
-                        perm: PERM.DASHBOARD, // qualquer perm real já carrega o menu; aqui só para exibir
-                        label: "Sair",
-                        icon: <ArrowRightOnRectangleIcon />,
-                        action: onLogout,
-                      },
-                    ]}
+                <MenuGroup title="Cadastros" expanded>
+                  {has(PERM.PESSOAS) && <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.EMPRESAS) && <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} onClick={() => setOpen(false)} />}
+                </MenuGroup>
+
+                <MenuGroup title="Segurança" expanded>
+                  {has(PERM.USUARIOS) && <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.PERFIS_PERMISSOES) && <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} onClick={() => setOpen(false)} />}
+                </MenuGroup>
+
+                <MenuGroup title="Operação" expanded>
+                  {has(PERM.ESCALAS) && <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.APONTAMENTOS) && <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} onClick={() => setOpen(false)} />}
+                </MenuGroup>
+
+                <MenuGroup title="Folha" expanded>
+                  {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.FOLHAS_FUNC) && <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} onClick={() => setOpen(false)} />}
+                  {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} onClick={() => setOpen(false)} />}
+                </MenuGroup>
+
+                {/* Por último: SAIR */}
+                <MenuGroup title="Conta" expanded>
+                  <MenuItem
+                    label="Sair"
+                    icon={<ArrowRightOnRectangleIcon />}
+                    onClick={() => { setOpen(false); onLogout?.(); }}
                   />
-                </nav>
-              )}
-            </aside>
-
-            {/* Spacer horizontal em fluxo para empurrar o conteúdo quando aberto */}
-            <div className={`mobile-sidebar-spacer ${open ? "open" : ""}`} aria-hidden="true" />
-
-            {/* OBS: removido rodapé de versão no menu (economia de espaço) */}
-          </div>
+                </MenuGroup>
+              </nav>
+            )}
+          </aside>
         </>
       )}
 
-      {/* ===== DESKTOP ===== */}
+      {/* ========= DESKTOP ========= */}
       {!isMobile && (
         <>
-          <aside 
-            id="dashboard-sidebar" 
-            className={`dashboard-sidebar ${collapsed ? 'collapsed' : ''}`}
+          <aside
+            id="dashboard-sidebar"
+            className={`dashboard-sidebar ${collapsed ? "collapsed" : ""}`}
             aria-label="Menu lateral"
           >
             <div className="sidebar-header">
               {!collapsed && <h1 className="brand">Projeto Integrador</h1>}
-              <div className="sidebar-header-content">
+              <div className="sidebar-header__row">
                 {!collapsed && <h2 className="subtitle">Menu</h2>}
                 <button
                   onClick={() => setCollapsed(!collapsed)}
-                  className="toggle-collapse-btn"
+                  className="btn-ghost"
                   aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
                   title={collapsed ? "Expandir menu" : "Recolher menu"}
                 >
-                  {collapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
+                  {collapsed ? <ChevronRightIcon className="icon" /> : <ChevronLeftIcon className="icon" />}
                 </button>
               </div>
             </div>
 
-            {/* Removido bloco com nome do usuário/empresa no topo do menu desktop */}
-            {/* Também removemos o logout daqui — ele vai como último item do menu */}
-
             {canRender && (
               <nav className="sidebar-nav" aria-label="Navegação principal">
-                <MenuBlock title="Geral" collapsed={collapsed}>
+                <MenuGroup title="Geral" collapsed={collapsed}>
                   {has(PERM.DASHBOARD_FUNC) && <MenuItem to="/dashboard_func" label="Meu Painel" icon={<UserIcon />} collapsed={collapsed} />}
                   {has(PERM.DASHBOARD_ADM) && <MenuItem to="/dashboard_adm" label="Painel do Administrador" icon={<ShieldCheckIcon />} collapsed={collapsed} />}
-                </MenuBlock>
+                </MenuGroup>
 
-                <MenuBlock title="Cadastros" collapsed={collapsed}>
+                <MenuGroup title="Cadastros" collapsed={collapsed}>
                   {has(PERM.PESSOAS) && <MenuItem to="/pessoas" label="Pessoas" icon={<UserIcon />} collapsed={collapsed} />}
                   {has(PERM.EMPRESAS) && <MenuItem to="/empresas" label="Minha Empresa" icon={<BuildingOfficeIcon />} collapsed={collapsed} />}
-                </MenuBlock>
+                </MenuGroup>
 
-                <MenuBlock title="Segurança" collapsed={collapsed}>
+                <MenuGroup title="Segurança" collapsed={collapsed}>
                   {has(PERM.USUARIOS) && <MenuItem to="/usuarios" label="Usuários" icon={<UserGroupIcon />} collapsed={collapsed} />}
                   {has(PERM.PERFIS_PERMISSOES) && <MenuItem to="/perfis-permissoes" label="Permissões" icon={<KeyIcon />} collapsed={collapsed} />}
-                </MenuBlock>
+                </MenuGroup>
 
-                <MenuBlock title="Operação" collapsed={collapsed}>
+                <MenuGroup title="Operação" collapsed={collapsed}>
                   {has(PERM.ESCALAS) && <MenuItem to="/escalas" label="Escalas" icon={<ClockIcon />} collapsed={collapsed} />}
                   {has(PERM.APONTAMENTOS) && <MenuItem to="/apontamentos" label="Apontamentos" icon={<ClipboardDocumentListIcon />} collapsed={collapsed} />}
                   {has(PERM.OCORRENCIAS) && <MenuItem to="/ocorrencias" label="Ocorrências" icon={<ExclamationTriangleIcon />} collapsed={collapsed} />}
-                </MenuBlock>
+                </MenuGroup>
 
-                <MenuBlock title="Folha" collapsed={collapsed}>
+                <MenuGroup title="Folha" collapsed={collapsed}>
                   {has(PERM.CARGOS) && <MenuItem to="/cargos" label="Cargos" icon={<BriefcaseIcon />} collapsed={collapsed} />}
                   {has(PERM.FUNCIONARIOS) && <MenuItem to="/funcionarios" label="Funcionários x Salários" icon={<UserGroupIcon />} collapsed={collapsed} />}
                   {has(PERM.FOLHAS) && <MenuItem to="/folhas" label="Folhas" icon={<DocumentChartBarIcon />} collapsed={collapsed} />}
                   {has(PERM.FOLHAS_FUNC) && <MenuItem to="/folhas-funcionarios" label="Folhas × Funcionários" icon={<UserGroupIcon />} collapsed={collapsed} />}
                   {has(PERM.FOLHAS_ITENS) && <MenuItem to="/folhas-itens" label="Itens de Folha" icon={<DocumentTextIcon />} collapsed={collapsed} />}
-                </MenuBlock>
+                </MenuGroup>
 
-                {/* Último bloco: Sair */}
-                <MenuBlock title="Conta" collapsed={collapsed}>
+                {/* Último bloco: SAIR */}
+                <MenuGroup title="Conta" collapsed={collapsed}>
                   <MenuItem
                     label="Sair"
                     icon={<ArrowRightOnRectangleIcon />}
                     collapsed={collapsed}
-                    action={onLogout}
+                    onClick={onLogout}
                   />
-                </MenuBlock>
+                </MenuGroup>
               </nav>
             )}
-
-            {/* Removido rodapé com versão para economizar espaço */}
           </aside>
 
-          {/* Espaço para o conteúdo não sobrepor (desktop) */}
-          <div className={`sidebar-spacer ${collapsed ? 'collapsed' : ''}`} />
+          {/* Spacer para o conteúdo não sobrepor no desktop */}
+          <div className={`sidebar-spacer ${collapsed ? "collapsed" : ""}`} aria-hidden="true" />
         </>
       )}
 
       <style jsx>{`
-        /* ===== Estrutura base ===== */
-        .brand { font-size: 16px; font-weight: 700; color: var(--fg); }
-        .subtitle { font-size: 12px; color: var(--muted); font-weight: 600; }
-
-        .sidebar-header,
-        .sidebar-header-content {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
+        /* ===== Variáveis úteis ===== */
+        :root {
+          --sidebar-desktop-w: 260px;
+          --sidebar-desktop-w-collapsed: 70px;
+          --sidebar-mobile-w: 280px;
+          --mobile-header-h: 56px;
         }
 
-        .toggle-collapse-btn,
-        .mobile-menu-toggle {
+        .icon { width: 18px; height: 18px; }
+
+        /* ===== Botões fantasma no padrão global */
+        .btn-ghost {
+          display: inline-flex;
+          gap: 8px;
+          align-items: center;
           background: var(--panel-muted);
           border: 1px solid var(--border);
           border-radius: 8px;
           padding: 8px 10px;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
+          font-weight: 600;
         }
-        .menu-toggle-icon { width: 20px; height: 20px; }
+        .btn-text { font-size: 14px; }
 
-        /* ===== Desktop sidebar ===== */
+        .brand { font-size: 16px; font-weight: 800; color: var(--fg); }
+        .subtitle { font-size: 12px; color: var(--muted); font-weight: 700; }
+
+        /* ===== MOBILE ===== */
+        .mobile-header {
+          position: sticky;
+          top: 0;
+          z-index: 30;
+          background: var(--panel);
+          border-bottom: 1px solid var(--border);
+          padding: 8px 12px;
+        }
+        .mobile-header__row {
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .mobile-header-spacer { height: var(--mobile-header-h); }
+
+        /* Sidebar fixa que empurra body quando aberta */
+        .mobile-sidebar {
+          position: fixed;
+          top: var(--mobile-header-h);
+          bottom: 0;
+          left: 0;
+          width: 0;
+          overflow: hidden;
+          background: var(--panel);
+          border-right: 1px solid transparent;
+          transition: width .2s ease, border-color .2s ease;
+          z-index: 25;
+          box-shadow: none;
+        }
+        .mobile-sidebar.open {
+          width: var(--sidebar-mobile-w);
+          border-right: 1px solid var(--border);
+          box-shadow: var(--shadow);
+        }
+        /* Empurra o conteúdo do app inteiro quando menu abre */
+        :global(body.menu-open) {
+          margin-left: var(--sidebar-mobile-w);
+          transition: margin-left .2s ease;
+        }
+
+        /* ===== DESKTOP ===== */
         .dashboard-sidebar {
           position: fixed;
           left: 0; top: 0; bottom: 0;
-          width: 260px;
+          width: var(--sidebar-desktop-w);
           background: var(--panel);
           border-right: 1px solid var(--border);
           padding: 12px;
           box-shadow: var(--shadow);
           z-index: 20;
+          display: flex;
+          flex-direction: column;
         }
-        .dashboard-sidebar.collapsed { width: 70px; }
+        .dashboard-sidebar.collapsed { width: var(--sidebar-desktop-w-collapsed); }
 
         .sidebar-spacer {
-          width: 260px;
-          height: 1px; /* só para ocupar espaço em fluxo */
+          width: var(--sidebar-desktop-w);
+          height: 1px;
         }
-        .sidebar-spacer.collapsed { width: 70px; }
+        .sidebar-spacer.collapsed { width: var(--sidebar-desktop-w-collapsed); }
 
-        .sidebar-nav { margin-top: 12px; }
-        .menu-group { margin-bottom: 10px; }
+        .sidebar-header { display: flex; flex-direction: column; gap: 8px; }
+        .sidebar-header__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+        .sidebar-nav { margin-top: 12px; overflow-y: auto; }
+        .menu-group { margin-bottom: 12px; }
         .menu-group-title {
           color: var(--muted);
-          font-weight: 700;
-          font-size: 12px;
-          letter-spacing: .02em;
+          font-weight: 800;
+          font-size: 11px;
+          letter-spacing: .04em;
           padding: 8px 6px;
+          text-transform: uppercase;
         }
-        .menu-group-items { display: flex; flex-direction: column; gap: 4px; }
+
+        .nav-list { display: flex; flex-direction: column; gap: 4px; }
 
         .nav-item {
           display: flex;
@@ -400,6 +388,8 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
           border-radius: 8px;
           color: var(--fg);
           border: 1px solid transparent;
+          background: transparent;
+          text-align: left;
         }
         .nav-item:hover {
           background: var(--panel-muted);
@@ -411,86 +401,37 @@ export default function Menu({ me, onLogout, empresaAtiva }) {
         }
         .nav-item.collapsed { justify-content: center; }
         .nav-item-icon { width: 20px; height: 20px; display: inline-flex; }
-        .nav-item-label { font-size: 14px; font-weight: 600; }
-
-        /* ===== Mobile header + layout push ===== */
-        .mobile-header {
-          position: sticky;
-          top: 0;
-          z-index: 30;
-          background: var(--panel);
-          border-bottom: 1px solid var(--border);
-          padding: 8px 12px;
-        }
-        .mobile-header-spacer { height: 56px; } /* altura do header fixo */
-
-        .mobile-shell {
-          display: flex;
-          flex-direction: row;
-          width: 100%;
-        }
-
-        /* Sidebar mobile empurrando conteúdo */
-        .mobile-sidebar {
-          width: 0;
-          overflow: hidden;
-          transition: width .2s ease;
-          border-right: 1px solid transparent;
-          background: var(--panel);
-        }
-        .mobile-sidebar.open {
-          width: 280px;
-          border-right: 1px solid var(--border);
-          box-shadow: var(--shadow);
-        }
-
-        /* Spacer horizontal que ocupa o mesmo espaço da sidebar */
-        .mobile-sidebar-spacer {
-          width: 0;
-          transition: width .2s ease;
-          height: 1px;
-        }
-        .mobile-sidebar-spacer.open { width: 280px; }
-
-        /* Você também pode usar a var global para empurrar do lado do app:
-           :root { --sidebar-mobile-offset: 0; }
-           .app-content { margin-left: var(--sidebar-mobile-offset); }
-         */
-
-        /* Botão sair uniforme */
-        .logout-btn { display: inline-flex; align-items: center; gap: 6px; }
-        .logout-icon { width: 20px; height: 20px; }
+        .nav-item-label { font-size: 14px; font-weight: 700; }
 
         @media (max-width: 900px) {
-          .dashboard-sidebar, .sidebar-spacer {
-            display: none;
-          }
+          .dashboard-sidebar, .sidebar-spacer { display: none; }
         }
       `}</style>
     </>
   );
 }
 
-function MenuBlock({ title, children, collapsed }) {
+function MenuGroup({ title, children, collapsed = false, expanded = false }) {
+  // expanded = true força labels sempre visíveis (mobile funcional)
   return (
     <div className="menu-group">
-      {!collapsed && (
-        <div className="menu-group-title" aria-hidden="true">{title}</div>
-      )}
-      <div className="menu-group-items">{children}</div>
+      {!collapsed && <div className="menu-group-title" aria-hidden="true">{title}</div>}
+      <div className="nav-list">
+        {Array.isArray(children) ? children.map((c, i) => c && { ...c, key: c?.key ?? i }) : children}
+      </div>
     </div>
   );
 }
 
-function MenuItem({ to, label, icon, onClick, refProp, collapsed, action }) {
-  // Se for ação (ex.: logout), renderiza como botão estilizado igual link
-  if (!to && typeof action === "function") {
+function MenuItem({ to, label, icon, onClick, refProp, collapsed = false }) {
+  // Sem TO -> vira botão (ex.: Sair)
+  if (!to) {
     return (
       <button
-        className={`nav-item ${collapsed ? "collapsed" : ""}`}
-        onClick={action}
-        ref={refProp ?? null}
         type="button"
+        className={`nav-item ${collapsed ? "collapsed" : ""}`}
+        onClick={onClick}
+        ref={refProp ?? null}
         title={collapsed ? label : undefined}
       >
         <span className="nav-item-icon">{icon}</span>
@@ -502,9 +443,11 @@ function MenuItem({ to, label, icon, onClick, refProp, collapsed, action }) {
   return (
     <NavLink
       to={to}
-      className={({ isActive }) => `nav-item ${isActive ? "active" : ""} ${collapsed ? "collapsed" : ""}`}
-      onClick={onClick}
       end
+      className={({ isActive }) =>
+        `nav-item ${isActive ? "active" : ""} ${collapsed ? "collapsed" : ""}`
+      }
+      onClick={onClick}
       ref={refProp ?? null}
       title={collapsed ? label : undefined}
     >
