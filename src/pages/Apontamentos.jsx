@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react"; import { PlusIcon, ArrowPathIcon, CheckIcon, XMarkIcon, WrenchScrewdriverIcon, DocumentArrowDownIcon, } from "@heroicons/react/24/solid";
 
-const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(//+$/, "");
 
 /* ===================== helpers de data e hora ===================== */ function toISO(d) { const yy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, "0"); const dd = String(d.getDate()).padStart(2, "0"); return ${yy}-${mm}-${dd}; } function fromISO(s) { const [y, m, d] = String(s).split("-").map(Number); return new Date(y, m - 1, d); } function firstDayOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), 1); } function lastDayOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth() + 1, 0); } function minutes(hhmm) { if (!hhmm) return 0; const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; } function fmtHHMM(min) { const h = Math.floor(min / 60); const m = min % 60; return ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}; } function duracao(entrada, saida) { const a = minutes(entrada); const b = minutes(saida); if (!entrada || !saida) return 0; // não consideramos virada de dia aqui (UI orienta dividir em 2 registros) return Math.max(0, b - a); } function isHHMM(v) { return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v || "")); }
 
