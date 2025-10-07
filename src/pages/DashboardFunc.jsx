@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react"; import { ArrowPathIcon } from "@heroicons/react/24/outline"; import { ArrowRightOnRectangleIcon, // Entrar ArrowLeftOnRectangleIcon,  // Sair } from "@heroicons/react/24/solid";
 
-// Usa padrão seguro para limpar barras finais da base URL const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(//+$/, "");
-
-/* ========================================== Helpers utilitários ========================================== */ const weekdayPt = (d) => d .toLocaleDateString("pt-BR", { weekday: "long" }) .replace(/^\w/, (c) => c.toUpperCase());
+const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(//+$/, "");
+const weekdayPt = (d) => d .toLocaleDateString("pt-BR", { weekday: "long" }) .replace(/^\w/, (c) => c.toUpperCase());
 
 function getTimeZone() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo"; } catch { return "America/Sao_Paulo"; } }
 
