@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
-import { ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/solid";
+import { ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon, XMarkIcon } from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
 const weekdayPt = (d) => d.toLocaleDateString("pt-BR", { weekday: "long" }).replace(/^\w/, (c) => c.toUpperCase());
@@ -61,12 +61,133 @@ const TratamentoBadge = ({ status }) => (
   </Chip>
 );
 
+// Componente Modal de Confirmação
+const ConfirmacaoModal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  tipoRegistro, 
+  loading 
+}) => {
+  if (!isOpen) return null;
+
+  const isEntrada = tipoRegistro === "entrada";
+  const titulo = isEntrada ? "Confirmar Registro de Entrada" : "Confirmar Registro de Saída";
+  const mensagem = isEntrada 
+    ? "Você está prestes a registrar sua ENTRADA. Este registro é definitivo e não poderá ser alterado posteriormente. Deseja continuar?"
+    : "Você está prestes a registrar sua SAÍDA. Este registro é definitivo e não poderá ser alterado posteriormente. Deseja continuar?";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "var(--panel)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          padding: 24,
+          maxWidth: 480,
+          width: "100%",
+          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: "var(--fs-18)", fontWeight: 600, color: "var(--fg)" }}>
+            {titulo}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 4,
+              borderRadius: 4,
+              color: "var(--muted)",
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+            aria-label="Fechar"
+          >
+            <XMarkIcon style={{ width: 20, height: 20 }} />
+          </button>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <p style={{ margin: 0, color: "var(--fg)", lineHeight: 1.5 }}>
+            {mensagem}
+          </p>
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              background: "var(--warning-muted)",
+              border: "1px solid var(--warning-border)",
+              borderRadius: 6,
+              fontSize: "var(--fs-12)",
+              color: "var(--warning-strong)",
+            }}
+          >
+            ⚠️ <strong>Atenção:</strong> Esta ação é irreversível após a confirmação.
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="btn btn--neutral"
+            style={{ minWidth: 100 }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className={isEntrada ? "btn btn--primary" : "btn btn--warning"}
+            style={{ minWidth: 100 }}
+            aria-busy={loading ? "true" : "false"}
+          >
+            {loading ? (
+              <>
+                <span className="spinner" aria-hidden="true" />
+                <span>Confirmando...</span>
+              </>
+            ) : (
+              "Confirmar"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function DashboardFunc() {
   const [tick, setTick] = useState(0);
   const [loading, setLoading] = useState(true);
   const [registrando, setRegistrando] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [showConfirmacao, setShowConfirmacao] = useState(false);
+  const [tipoRegistroPendente, setTipoRegistroPendente] = useState(null);
 
   const [empresaId, setEmpresaId] = useState(null);
   const [func, setFunc] = useState(null);
@@ -129,15 +250,22 @@ export default function DashboardFunc() {
 
   const estadoPonto = useMemo(() => {
     const aberto = apontsHoje.find((a) => a.entrada && !a.saida);
-    if (aberto) return { status: "TRABALHANDO", label: "Registrar saída", aberto };
-    return { status: "FORA", label: "Registrar entrada", aberto: null };
+    if (aberto) return { status: "TRABALHANDO", label: "Registrar saída", aberto, tipo: "saida" };
+    return { status: "FORA", label: "Registrar entrada", aberto: null, tipo: "entrada" };
   }, [apontsHoje]);
 
-  const acaoRegistrarPonto = async () => {
+  const iniciarRegistroPonto = () => {
+    if (!func || registrando) return;
+    setTipoRegistroPendente(estadoPonto.tipo);
+    setShowConfirmacao(true);
+  };
+
+  const confirmarRegistroPonto = async () => {
     if (!func || registrando) return;
     setRegistrando(true);
     setErr("");
     setMsg("");
+    setShowConfirmacao(false);
 
     try {
       const payload = {
@@ -162,7 +290,13 @@ export default function DashboardFunc() {
       if (liveRef.current) liveRef.current.textContent = "Erro ao registrar ponto.";
     } finally {
       setRegistrando(false);
+      setTipoRegistroPendente(null);
     }
+  };
+
+  const cancelarRegistroPonto = () => {
+    setShowConfirmacao(false);
+    setTipoRegistroPendente(null);
   };
 
   const agoraTexto = useMemo(() => {
@@ -180,6 +314,14 @@ export default function DashboardFunc() {
 
   return (
     <div className="container" role="main" aria-labelledby="titulo-pagina" style={{ paddingBlock: 16 }}>
+      <ConfirmacaoModal
+        isOpen={showConfirmacao}
+        onClose={cancelarRegistroPonto}
+        onConfirm={confirmarRegistroPonto}
+        tipoRegistro={tipoRegistroPendente}
+        loading={registrando}
+      />
+
       <header className="page-header">
         <div>
           <h1 id="titulo-pagina" className="page-title">Meu Painel</h1>
@@ -279,7 +421,7 @@ export default function DashboardFunc() {
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
               <button
                 type="button"
-                onClick={acaoRegistrarPonto}
+                onClick={iniciarRegistroPonto}
                 disabled={loading || !func || registrando}
                 aria-disabled={loading || !func || registrando ? "true" : "false"}
                 aria-label={estadoPonto.label}
