@@ -513,7 +513,7 @@ export default function Apontamentos() {
     const titulo = funcionarioId
       ? `Relatório de Apontamentos — ${getFuncionarioRotulo(Number(funcionarioId))}`
       : "Relatório de Apontamentos (Todos)";
-    const win = window.open("", "_blank", "noopener,noreferrer");
+    const win = window.open("", "_blank");
     if (!win) return;
 
     const style = `
