@@ -96,15 +96,51 @@ const useApi = () => useCallback(async (path, init = {}) => {
 function consolidateApontamentos(items, dataISO) {
   if (!items?.length) return null;
 
-  // prioridade por origem (empate)
   const pri = { AJUSTE: 3, IMPORTADO: 2, APONTADO: 1 };
+
+  const hasConsolidado = items.some(it => it.entrada != null || it.saida != null);
+  if (hasConsolidado) {
+    let entMin = null;
+    let saiMax = null;
+    let origemBest = null;
+    let origemScore = -1;
+
+    for (const it of items) {
+      const o = String(it.origem || "APONTADO").toUpperCase();
+      const oScore = pri[o] ?? 0;
+
+      if (it.entrada) {
+        const m = hhmmToMinutes(String(it.entrada).slice(0,5));
+        if (m != null && (entMin == null || m < entMin)) entMin = m;
+      }
+      if (it.saida) {
+        const m = hhmmToMinutes(String(it.saida).slice(0,5));
+        if (m != null && (saiMax == null || m > saiMax)) saiMax = m;
+      }
+      if (oScore > origemScore) { origemScore = oScore; origemBest = o; }
+    }
+
+    const now = new Date();
+    const isHoje = toISO(now) === dataISO;
+    const nowMin = isHoje ? now.getHours() * 60 + now.getMinutes() : null;
+
+    const parcial = entMin != null && saiMax == null;
+    const fim = parcial ? nowMin : saiMax;
+
+    return {
+      entradaMin: entMin ?? null,
+      saidaMin: fim ?? null,
+      parcial,
+      origem: origemBest || "APONTADO",
+    };
+  }
 
   let bestEntrada = null, bestEntradaOrigem = null;
   let bestSaida   = null, bestSaidaOrigem   = null;
 
   for (const it of items) {
-    const ev = String(it.evento || "").toUpperCase();     // ENTRADA | SAIDA
-    const hh = String(it.horario || "").slice(0,5);       // "HH:MM[:SS]" -> "HH:MM"
+    const ev = String(it.evento || "").toUpperCase();
+    const hh = String(it.horario || "").slice(0,5);
     const mm = hhmmToMinutes(hh);
     const origem = String(it.origem || "APONTADO").toUpperCase();
     if (mm == null) continue;
@@ -124,7 +160,6 @@ function consolidateApontamentos(items, dataISO) {
     }
   }
 
-  // se só tem entrada e o dia é hoje, fica parcial até "agora"
   const now = new Date();
   const isHoje = toISO(now) === dataISO;
   const nowMin = isHoje ? now.getHours()*60 + now.getMinutes() : null;
