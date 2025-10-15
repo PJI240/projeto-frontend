@@ -166,7 +166,7 @@ function consolidateApontamentos(items, dataISO) {
         ? bestEntradaOrigem
         : bestSaidaOrigem,
   };
-}
+
 
 
   const now = new Date();
