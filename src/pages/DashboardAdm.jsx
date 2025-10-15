@@ -94,12 +94,10 @@ const useApi = () => {
     const r = await fetch(url, options);
     let data = null;
     try { data = await r.json(); } catch {}
+    
     if (!r.ok || data?.ok === false) {
-      // Se for erro de autenticação, redirecionar para login
-      if (r.status === 401) {
-        window.location.href = "/login";
-        throw new Error("Não autenticado. Redirecionando...");
-      }
+      // Se for erro de autenticação, não redireciona automaticamente
+      // Apenas lança o erro para ser tratado pelo componente
       throw new Error(data?.error || `HTTP ${r.status}`);
     }
     return data;
@@ -291,6 +289,31 @@ function PresentesAgora({ funcionarios, apontamentos, isMobile, diaAtual }) {
   );
 }
 
+function LoginRedirect() {
+  useEffect(() => {
+    // Usar setTimeout para evitar loops de renderização
+    const timer = setTimeout(() => {
+      window.location.href = "/login";
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  return (
+    <div className="login-redirect" style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      height: '50vh',
+      textAlign: 'center'
+    }}>
+      <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <p style={{ marginTop: '16px', color: 'var(--muted)' }}>Redirecionando para login...</p>
+    </div>
+  );
+}
+
 export default function DashboardAdm() {
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 900 : false);
   const [dataRef, setDataRef] = useState(() => startOfWeek(new Date()));
@@ -304,6 +327,7 @@ export default function DashboardAdm() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [needsLogin, setNeedsLogin] = useState(false);
   const refreshRef = useRef(null);
   const liveRef = useRef(null);
 
@@ -323,6 +347,8 @@ export default function DashboardAdm() {
   const carregarTudo = useCallback(async () => {
     setLoading(true);
     setErr("");
+    setNeedsLogin(false);
+    
     try {
       const de = isMobile ? toISO(addDays(diaAtual, -1)) : toISO(dias[0]);
       const ate = isMobile ? toISO(addDays(diaAtual, 1)) : toISO(dias[6]);
@@ -338,11 +364,14 @@ export default function DashboardAdm() {
       
       if (liveRef.current) liveRef.current.textContent = "Dados do dashboard atualizados.";
     } catch (e) {
-      // Não mostrar erro se for redirecionamento para login
-      if (!e.message.includes("Redirecionando")) {
+      // Verificar se é erro de autenticação
+      if (e.message.includes("Não autenticado") || e.message.includes("401")) {
+        setNeedsLogin(true);
+      } else {
         setErr(e.message || "Falha ao carregar dados.");
       }
-      if (liveRef.current && !e.message.includes("Redirecionando")) {
+      
+      if (liveRef.current) {
         liveRef.current.textContent = "Erro ao carregar dados do dashboard.";
       }
     } finally {
@@ -350,13 +379,23 @@ export default function DashboardAdm() {
     }
   }, [api, dias, diaAtual, isMobile]);
 
-  useEffect(() => { carregarTudo(); }, [carregarTudo]);
+  useEffect(() => { 
+    carregarTudo(); 
+  }, [carregarTudo]);
 
   useEffect(() => {
-    if (autoRefresh) refreshRef.current = setInterval(() => carregarTudo(), 60000);
-    else if (refreshRef.current) clearInterval(refreshRef.current);
+    if (autoRefresh && !needsLogin) {
+      refreshRef.current = setInterval(() => carregarTudo(), 60000);
+    } else if (refreshRef.current) {
+      clearInterval(refreshRef.current);
+    }
     return () => refreshRef.current && clearInterval(refreshRef.current);
-  }, [autoRefresh, carregarTudo]);
+  }, [autoRefresh, carregarTudo, needsLogin]);
+
+  // Se precisa fazer login, mostrar componente de redirecionamento
+  if (needsLogin) {
+    return <LoginRedirect />;
+  }
 
   const mapFunc = useMemo(() => {
     const m = new Map();
@@ -1006,6 +1045,11 @@ export default function DashboardAdm() {
         .stat-card--section { display: block; }
         .stat-header--row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
         @media (max-width: 480px) { .stat-header--row { flex-wrap: wrap; gap: 8px; } }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
 
         @media (max-width: 768px) {
           .stats-grid { grid-template-columns: 1fr 1fr; }
