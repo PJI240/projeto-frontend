@@ -232,32 +232,35 @@ function HorasTrabalhadas({ funcionarios, escalasByDia, apontByKey, apontByFuncD
   );
 }
 
-function PresentesAgora({ funcionarios, escalasByDia, apontByKey, apontByFuncDia, isMobile, diaAtual }) {
+function PresentesAgora({ funcionarios, apontamentos, isMobile, diaAtual }) {
   const hoje = new Date();
-  const alvoISO = isMobile ? toISO(diaAtual) : toISO(hoje);
-  const nowMin = hoje.getHours() * 60 + hoje.getMinutes();
+  const hojeISO = toISO(hoje);
+  const alvoISO = isMobile ? toISO(diaAtual) : hojeISO;
+  
   const presentes = useMemo(() => {
+    // Se não for hoje, não mostrar presentes
+    if (alvoISO !== hojeISO) return [];
+    
     const arr = [];
-    const escalasDia = escalasByDia.get(alvoISO) || [];
-    const setComEscala = new Set(escalasDia.map(e => e.funcionario_id));
-    for (const e of escalasDia) {
-      const key = `${alvoISO}|${e.funcionario_id}|${e.turno_ordem ?? 1}`;
-      const cons = consolidateApontamentos(apontByKey.get(key) || [], alvoISO);
-      if (!cons?.entradaMin) continue;
-      const estaNoPeriodo = cons.saidaMin == null || nowMin < cons.saidaMin;
-      if (estaNoPeriodo && cons.entradaMin <= nowMin) arr.push(e.funcionario_id);
+    const nowMin = hoje.getHours() * 60 + hoje.getMinutes();
+    
+    // Buscar apontamentos do dia atual onde funcionário está presente
+    // (tem entrada mas não tem saída no mesmo turno)
+    for (const ap of apontamentos) {
+      const dataISO = normDateStr(ap.data);
+      if (dataISO === hojeISO && ap.entrada && !ap.saida) {
+        const entradaMin = hhmmToMinutes(ap.entrada);
+        if (entradaMin <= nowMin) {
+          arr.push(ap.funcionario_id);
+        }
+      }
     }
-    for (const f of funcionarios) {
-      if (setComEscala.has(f.id)) continue;
-      const lista = apontByFuncDia.get(`${alvoISO}|${f.id}`) || [];
-      const cons = consolidateApontamentos(lista, alvoISO);
-      if (!cons?.entradaMin) continue;
-      const estaNoPeriodo = cons.saidaMin == null || nowMin < cons.saidaMin;
-      if (estaNoPeriodo && cons.entradaMin <= nowMin) arr.push(f.id);
-    }
+    
     return Array.from(new Set(arr));
-  }, [funcionarios, escalasByDia, apontByKey, apontByFuncDia, alvoISO, nowMin]);
+  }, [apontamentos, diaAtual, isMobile, hojeISO]);
+
   if (!presentes.length) return null;
+  
   return (
     <div className="stat-card" data-accent="success" style={{ width: "100%" }}>
       <div className="stat-card__icon"><CheckCircleIcon className="icon" aria-hidden="true" /></div>
@@ -308,14 +311,15 @@ export default function DashboardAdm() {
       const de = isMobile ? toISO(addDays(diaAtual, -1)) : toISO(dias[0]);
       const ate = isMobile ? toISO(addDays(diaAtual, 1)) : toISO(dias[6]);
       const q = (s) => encodeURIComponent(s);
-      const [f, e, a] = await Promise.all([
-        api(`/api/funcionarios?ativos=1`),
-        api(`/api/escalas?from=${q(de)}&to=${q(ate)}&ativos=1`),
-        api(`/api/apontamentos?from=${q(de)}&to=${q(ate)}&ativos=1`),
-      ]);
-      setFuncionarios(f.funcionarios || []);
-      setEscalas(e.escalas || []);
-      setApontamentos(Array.isArray(a) ? a : (a.apontamentos || []));
+      
+      // Usar o endpoint unificado do dashboard
+      const data = await api(`/api/dashboard/adm?from=${q(de)}&to=${q(ate)}&ativos=1`);
+      
+      // A API retorna { funcionarios: [], escalas: [], apontamentos: [], period: {} }
+      setFuncionarios(data.funcionarios || []);
+      setEscalas(data.escalas || []);
+      setApontamentos(data.apontamentos || []);
+      
       if (liveRef.current) liveRef.current.textContent = "Dados do dashboard atualizados.";
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
@@ -851,9 +855,7 @@ export default function DashboardAdm() {
 
       <PresentesAgora
         funcionarios={funcionariosFiltrados}
-        escalasByDia={escalasByDiaFiltrado}
-        apontByKey={apontByKeyFiltrado}
-        apontByFuncDia={apontByFuncDiaFiltrado}
+        apontamentos={apontamentosFiltrados}
         isMobile={isMobile}
         diaAtual={diaAtual}
       />
