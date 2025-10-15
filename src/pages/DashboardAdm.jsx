@@ -82,10 +82,26 @@ const getCorFuncionario = (id) => {
 const useApi = () => {
   return useCallback(async (path, init = {}) => {
     const url = `${API_BASE}${path}`;
-    const r = await fetch(url, { credentials: "include", ...init });
+    const options = {
+      credentials: "include", // IMPORTANTE: envia cookies de sessão
+      headers: {
+        "Content-Type": "application/json",
+        ...init.headers,
+      },
+      ...init,
+    };
+    
+    const r = await fetch(url, options);
     let data = null;
     try { data = await r.json(); } catch {}
-    if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
+    if (!r.ok || data?.ok === false) {
+      // Se for erro de autenticação, redirecionar para login
+      if (r.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Não autenticado. Redirecionando...");
+      }
+      throw new Error(data?.error || `HTTP ${r.status}`);
+    }
     return data;
   }, []);
 };
@@ -322,8 +338,13 @@ export default function DashboardAdm() {
       
       if (liveRef.current) liveRef.current.textContent = "Dados do dashboard atualizados.";
     } catch (e) {
-      setErr(e.message || "Falha ao carregar dados.");
-      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar dados do dashboard.";
+      // Não mostrar erro se for redirecionamento para login
+      if (!e.message.includes("Redirecionando")) {
+        setErr(e.message || "Falha ao carregar dados.");
+      }
+      if (liveRef.current && !e.message.includes("Redirecionando")) {
+        liveRef.current.textContent = "Erro ao carregar dados do dashboard.";
+      }
     } finally {
       setLoading(false);
     }
