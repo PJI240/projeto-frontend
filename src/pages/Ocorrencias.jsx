@@ -125,16 +125,8 @@ export default function Ocorrencias() {
   /* ------------ Filtros ------------ */
   const HOJE = new Date();
   const [periodo, setPeriodo] = useState("semana"); // 'hoje' | 'semana' | 'mes' | 'custom'
-  const [de, setDe] = useState(() => {
-    if (periodo === "semana") return toISO(startOfWeek(HOJE));
-    if (periodo === "mes") return toISO(new Date(HOJE.getFullYear(), HOJE.getMonth(), 1));
-    return toISO(HOJE);
-  });
-  const [ate, setAte] = useState(() => {
-    if (periodo === "semana") return toISO(addDays(startOfWeek(HOJE), 6));
-    if (periodo === "mes") return toISO(new Date(HOJE.getFullYear(), HOJE.getMonth() + 1, 0));
-    return toISO(HOJE);
-  });
+  const [de, setDe] = useState(() => toISO(startOfWeek(HOJE)));
+  const [ate, setAte] = useState(() => toISO(addDays(startOfWeek(HOJE), 6)));
   const [filtroFuncionario, setFiltroFuncionario] = useState("todos");
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [busca, setBusca] = useState("");
@@ -142,6 +134,7 @@ export default function Ocorrencias() {
   /* ------------ Dados ------------ */
   const [funcionarios, setFuncionarios] = useState([]);
   const [ocorrencias, setOcorrencias] = useState([]);
+  const [tiposPermitidos, setTiposPermitidos] = useState(["FERIADO","ATESTADO","FALTA","FOLGA","OUTRO"]); // fallback
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [sucesso, setSucesso] = useState("");
@@ -152,7 +145,7 @@ export default function Ocorrencias() {
   const [form, setForm] = useState({
     funcionario_id: "",
     data: toISO(HOJE),
-    tipo: "AUSENCIA", // sugestão default
+    tipo: "FALTA",
     horas: "",
     obs: "",
   });
@@ -180,6 +173,20 @@ export default function Ocorrencias() {
     setFuncionarios(d.funcionarios || []);
   }, [api]);
 
+  const carregarTipos = useCallback(async () => {
+    try {
+      const r = await api(`/api/ocorrencias/tipos`);
+      const lista = Array.isArray(r?.tipos) && r.tipos.length ? r.tipos.map(String) : null;
+      if (lista) {
+        setTiposPermitidos(lista);
+        // se o tipo atual não é permitido, ajusta
+        setForm((prev) => ({ ...prev, tipo: lista.includes(prev.tipo) ? prev.tipo : lista[0] }));
+      }
+    } catch {
+      // fallback já definido
+    }
+  }, [api]);
+
   const carregarOcorrencias = useCallback(async () => {
     setLoading(true);
     setErr(""); setSucesso("");
@@ -190,7 +197,6 @@ export default function Ocorrencias() {
         + (filtroTipo !== "todos" ? `&tipo=${q(filtroTipo)}` : "")
         + (busca ? `&q=${q(busca)}` : "");
       const r = await api(qs);
-      // a API pode retornar {ocorrencias: []} ou []
       const items = Array.isArray(r) ? r : (r.ocorrencias || []);
       setOcorrencias(items);
       if (liveRef.current) liveRef.current.textContent = "Ocorrências atualizadas.";
@@ -203,8 +209,8 @@ export default function Ocorrencias() {
   }, [api, de, ate, filtroFuncionario, filtroTipo, busca]);
 
   const recarregar = useCallback(async () => {
-    await Promise.all([carregarFuncionarios(), carregarOcorrencias()]);
-  }, [carregarFuncionarios, carregarOcorrencias]);
+    await Promise.all([carregarFuncionarios(), carregarTipos(), carregarOcorrencias()]);
+  }, [carregarFuncionarios, carregarTipos, carregarOcorrencias]);
 
   useEffect(() => { recarregar(); }, []); // mount
   useEffect(() => { carregarOcorrencias(); }, [de, ate, filtroFuncionario, filtroTipo]); // filtros mudam
@@ -228,12 +234,11 @@ export default function Ocorrencias() {
     const total = ocorrencias.length;
     const porTipo = new Map();
     let horasTotal = 0;
-    const presentesSet = new Set(); // presença por evento que envolva HORA_EXTRA ou APONTO (depende da sua regra)
+    const presentesSet = new Set();
     for (const o of ocorrencias) {
       const t = (o.tipo || "OUTRO").toUpperCase();
       porTipo.set(t, (porTipo.get(t) || 0) + 1);
       horasTotal += parseNumber(o.horas);
-      // Heurística simples: qualquer ocorrência com 'HORAS' > 0 conta como presença pontual (ajuste se quiser)
       if (parseNumber(o.horas) > 0) presentesSet.add(o.funcionario_id ?? o.funcionarioId ?? o.funcionario);
     }
     return {
@@ -275,7 +280,13 @@ export default function Ocorrencias() {
   /* ------------ CRUD ------------ */
   const abrirNovo = () => {
     setEditando(null);
-    setForm({ funcionario_id: "", data: toISO(new Date()), tipo: "AUSENCIA", horas: "", obs: "" });
+    setForm(f => ({
+      funcionario_id: "",
+      data: toISO(new Date()),
+      tipo: tiposPermitidos[0] || "FALTA",
+      horas: "",
+      obs: "",
+    }));
     setModalAberto(true);
   };
   const abrirEdicao = (o) => {
@@ -283,7 +294,7 @@ export default function Ocorrencias() {
     setForm({
       funcionario_id: o.funcionario_id,
       data: o.data,
-      tipo: o.tipo || "",
+      tipo: tiposPermitidos.includes(o.tipo) ? o.tipo : (tiposPermitidos[0] || "FALTA"),
       horas: o.horas ?? "",
       obs: o.obs ?? "",
     });
@@ -292,14 +303,17 @@ export default function Ocorrencias() {
   const salvar = async () => {
     setErr(""); setSucesso("");
     try {
+      // força o tipo a ser um permitido
+      const tipoVal = tiposPermitidos.includes(form.tipo) ? form.tipo : tiposPermitidos[0];
       const payload = {
         funcionario_id: Number(form.funcionario_id),
         data: form.data,
-        tipo: form.tipo || null,
+        tipo: tipoVal,
         horas: form.horas === "" ? null : Number(form.horas),
         obs: form.obs || null,
       };
       if (!payload.funcionario_id || !payload.data) throw new Error("Selecione funcionário e data.");
+      if (!tiposPermitidos.includes(tipoVal)) throw new Error(`Tipo inválido. Use um dos valores permitidos: ${tiposPermitidos.join(", ")}.`);
       if (editando) {
         await api(`/api/ocorrencias/${editando.id}`, {
           method: "PUT",
@@ -356,8 +370,6 @@ export default function Ocorrencias() {
   };
 
   /* ------------ UI helpers ------------ */
-  const tiposSugeridos = ["AUSENCIA", "ATESTADO", "FERIAS", "FOLGA", "HORA_EXTRA", "ATRASO", "ABONO", "OUTRO"];
-
   const badgeTone = (tipo) => {
     const t = String(tipo || "").toUpperCase();
     if (t.includes("HORA")) return "success";
@@ -390,12 +402,12 @@ export default function Ocorrencias() {
       {/* Região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER no padrão global - CORRIGIDO */}
+      {/* HEADER e Ações */}
       <header className="page-header" role="region" aria-labelledby="titulo-oc">
         <div className="page-header__content">
           <div className="page-header__info">
             <h1 id="titulo-oc" className="page-title">Ocorrências</h1>
-            <p className="page-subtitle">Registre e acompanhe ausências, horas extras, atestados e outras ocorrências</p>
+            <p className="page-subtitle">Registre e acompanhe ausências, atestados, feriados e outras ocorrências</p>
           </div>
 
           <div className="page-header__toolbar" aria-label="Ações da página">
@@ -420,10 +432,10 @@ export default function Ocorrencias() {
           </div>
         </div>
 
-        {/* Filtros abaixo do header principal */}
-        <div className="filters-section">
-          <div className="filters-group">
-            {/* período rápido */}
+        {/* ===== Filtros ===== */}
+        <div className="filters">
+          {/* Linha 1: atalhos de período */}
+          <div className="filters__row">
             <div className="btn-group" role="group" aria-label="Atalhos de período">
               <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
                 <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
@@ -435,43 +447,48 @@ export default function Ocorrencias() {
                 <span>Mês</span>
               </button>
             </div>
+          </div>
 
-            {/* intervalo custom */}
-            <div className="range-inline" role="group" aria-label="Intervalo customizado">
-              <input type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+          {/* Linha 2: intervalo de datas */}
+          <div className="filters__row">
+            <div className="range-inline" role="group" aria-label="Intervalo de datas">
+              <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
+              <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
               <span className="range-sep">—</span>
-              <input type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
+              <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
+              <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
             </div>
+          </div>
 
-            {/* filtros */}
-            <div className="filters-inline">
-              <FunnelIcon className="icon" aria-hidden="true" />
-              <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)}>
-                <option value="todos">Todos os funcionários</option>
-                {funcionarios.map(f => (
-                  <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
-                ))}
-              </select>
-              <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)}>
-                <option value="todos">Todos os tipos</option>
-                {tiposSugeridos.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <input
-                className="input input--sm"
-                placeholder="Buscar por nome, tipo ou observação…"
-                value={busca}
-                onChange={(e)=>setBusca(e.target.value)}
-              />
-            </div>
+          {/* Linha 3: demais filtros */}
+          <div className="filters__row filters__row--rest">
+            <FunnelIcon className="icon" aria-hidden="true" />
+            <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
+              <option value="todos">Todos os funcionários</option>
+              {funcionarios.map(f => (
+                <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
+              ))}
+            </select>
+            <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
+              <option value="todos">Todos os tipos</option>
+              {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <input
+              className="input input--sm"
+              placeholder="Buscar por nome, tipo ou observação…"
+              value={busca}
+              onChange={(e)=>setBusca(e.target.value)}
+              aria-label="Buscar"
+            />
           </div>
         </div>
       </header>
 
-      {/* Alerts - CORRIGIDOS */}
+      {/* Alerts */}
       {err && <div className="alert alert--error" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
       {sucesso && <div className="alert alert--success" role="status" style={{ marginBottom: 12 }}>{sucesso}</div>}
 
-      {/* KPIs - CORRIGIDOS */}
+      {/* KPIs */}
       <div className="stats-grid">
         <div className="stat-card stat-card--info">
           <div className="stat-card__icon"><ClipboardDocumentListIcon className="icon" aria-hidden="true" /></div>
@@ -510,7 +527,8 @@ export default function Ocorrencias() {
 
       {/* Tabela / Cards */}
       <div className="table-wrap">
-        <div className="table">
+        {/* Grid para desktop */}
+        <div className="table table--grid" aria-hidden={isMobile}>
           <div className="th th--date">Data</div>
           <div className="th th--func">Funcionário</div>
           <div className="th th--type">Tipo</div>
@@ -547,6 +565,49 @@ export default function Ocorrencias() {
             );
           })}
         </div>
+
+        {/* Cards para mobile */}
+        <div className="cards" aria-hidden={!isMobile}>
+          {pageItems.map((o) => {
+            const f = mapFunc.get(o.funcionario_id);
+            return (
+              <div key={o.id} className="card">
+                <div className="card__header">
+                  <div className="card__title">
+                    <span className="dot" style={{ ["--func-color"]: f?.cor || "#999" }} />
+                    <span className="card__name">{f?.nome || `#${o.funcionario_id}`}</span>
+                  </div>
+                  <div className="card__actions">
+                    <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
+                      <PencilSquareIcon className="icon" aria-hidden="true" />
+                    </button>
+                    <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
+                      <TrashIcon className="icon" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+                <div className="card__row">
+                  <span className="card__label">Data</span>
+                  <span className="card__value">{formatDateBR(fromISO(o.data))}</span>
+                </div>
+                <div className="card__row">
+                  <span className="card__label">Tipo</span>
+                  <span className="card__value"><StatusBadge tone={badgeTone(o.tipo)}>{o.tipo || "—"}</StatusBadge></span>
+                </div>
+                <div className="card__row">
+                  <span className="card__label">Horas</span>
+                  <span className="card__value">{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</span>
+                </div>
+                {o.obs && (
+                  <div className="card__row">
+                    <span className="card__label">Obs.</span>
+                    <span className="card__value">{o.obs}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Paginação */}
@@ -562,7 +623,7 @@ export default function Ocorrencias() {
         </div>
       )}
 
-      {/* Modal CRUD - CORRIGIDO */}
+      {/* Modal CRUD */}
       <Modal
         open={modalAberto}
         onClose={() => setModalAberto(false)}
@@ -601,10 +662,9 @@ export default function Ocorrencias() {
 
           <div className="form-2col">
             <div className="form-field">
-              <label>Tipo</label>
-              <select className="input" value={form.tipo} onChange={(e)=>setForm({ ...form, tipo: e.target.value })}>
-                {tiposSugeridos.map(t => <option key={t} value={t}>{t}</option>)}
-                <option value="">(Outro — preencha em Observação)</option>
+              <label>Tipo *</label>
+              <select className="input" value={form.tipo} onChange={(e)=>setForm({ ...form, tipo: e.target.value })} required>
+                {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="form-field">
@@ -634,9 +694,9 @@ export default function Ocorrencias() {
         </div>
       </Modal>
 
-      {/* Estilos locais - CORRIGIDOS */}
+      {/* Estilos locais */}
       <style jsx>{`
-        /* Alertas usando variáveis CSS */
+        /* Alertas */
         .alert{
           background: var(--panel);
           border: 1px solid var(--border);
@@ -646,7 +706,7 @@ export default function Ocorrencias() {
         .alert--success{ border-left-color: var(--success); }
         .alert--error{ border-left-color: var(--error); }
 
-        /* Stats grid usando classes semânticas */
+        /* Stats */
         .stats-grid{
           display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap:16px; margin-bottom:12px; width:100%;
@@ -669,7 +729,7 @@ export default function Ocorrencias() {
         .stat-value{ font-size:1.75rem; font-weight:800; line-height:1 }
         .stat-title{ font-size:.875rem; color:var(--muted); font-weight:600 }
 
-        /* Badges usando classes semânticas */
+        /* Badges */
         .badge{
           display: inline-flex;
           align-items: center;
@@ -694,58 +754,10 @@ export default function Ocorrencias() {
         }
         .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
 
-        .table-wrap{ 
-          width:100%; overflow:auto; border:1px solid var(--border); 
-          border-radius:8px; background:var(--panel); box-shadow:var(--shadow) 
-        }
-        .table{ 
-          display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; min-width:980px 
-        }
-        .th{ 
-          padding:12px; border-bottom:2px solid var(--border); 
-          background:var(--panel-muted); font-weight:700; font-size:14px 
-        }
-        .th--actions{ text-align:center }
-        .row{ display:contents }
-        .td{ 
-          padding:12px; border-bottom:1px solid var(--border); 
-          display:flex; align-items:center; gap:8px 
-        }
-        .td--func{ gap:10px }
-        .td__main{ font-weight:700 }
-        .td__sub{ font-size:12px; color:var(--muted) }
-        .dot{ 
-          width:10px; height:10px; border-radius:999px; 
-          background: var(--func-color); border:1px solid var(--border) 
-        }
-        .td--obs .obs{ 
-          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden 
-        }
-        .muted{ color: var(--muted) }
-        .td--actions{ justify-content:center; gap:6px }
-
-        .pagination{ 
-          display:flex; align-items:center; justify-content:center; gap:12px; padding:12px 
-        }
-        .pagination__status{ color:var(--muted); font-weight:600 }
-
-        .form-grid{ display:flex; flex-direction:column; gap:12px }
-        .form-2col{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
-        .form-field > label{ display:block; font-size:14px; font-weight:600; margin-bottom:6px }
-
-        /* Filtros section */
-        .filters-section{
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid var(--border);
-        }
-        .filters-group{
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          align-items: center;
-        }
-
+        /* Filters layout */
+        .filters{ width:100%; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display:flex; flex-direction:column; gap:10px }
+        .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap }
+        .filters__row--rest{ justify-content: space-between; }
         .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
         .btn-group .btn.is-active{ 
           outline: 2px solid var(--accent); 
@@ -753,17 +765,12 @@ export default function Ocorrencias() {
           background: var(--accent-bg);
           color: var(--accent-fg);
         }
-
         .range-inline{ display:flex; align-items:center; gap:6px; flex-wrap:wrap }
         .range-sep{ color: var(--muted) }
+        .filters__row--rest .icon{ width:18px; height:18px; color: var(--muted) }
+        .filters__row--rest select, .filters__row--rest input{ max-width: 280px }
 
-        .filters-inline{ 
-          display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-          margin-left: auto;
-        }
-        .filters-inline .icon{ width:18px; height:18px; color: var(--muted) }
-
-        /* Header layout corrigido */
+        /* Header layout */
         .page-header__content{
           display: flex;
           justify-content: space-between;
@@ -782,6 +789,54 @@ export default function Ocorrencias() {
           align-items: center;
         }
 
+        /* Table */
+        .table-wrap{ width:100%; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:var(--shadow) }
+        .table--grid{ 
+          display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; 
+          min-width:980px 
+        }
+        .th{ padding:12px; border-bottom:2px solid var(--border); background:var(--panel-muted); font-weight:700; font-size:14px }
+        .th--actions{ text-align:center }
+        .row{ display:contents }
+        .td{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px }
+        .td--func{ gap:10px }
+        .td__main{ font-weight:700 }
+        .td__sub{ font-size:12px; color:var(--muted) }
+        .dot{ width:10px; height:10px; border-radius:999px; background: var(--func-color); border:1px solid var(--border) }
+        .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+        .muted{ color: var(--muted) }
+        .td--actions{ justify-content:center; gap:6px }
+
+        /* Cards (mobile) */
+        .cards{ display:none }
+        .card{
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          box-shadow: var(--shadow);
+          padding: 12px;
+          display: grid;
+          gap: 8px;
+        }
+        .card + .card{ margin-top: 10px }
+        .card__header{ display:flex; align-items:center; justify-content:space-between; gap:10px }
+        .card__title{ display:flex; align-items:center; gap:8px; font-weight:700 }
+        .card__name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 60vw }
+        .card__actions{ display:flex; gap:6px }
+        .card__row{ display:flex; align-items:center; justify-content:space-between; gap:10px }
+        .card__label{ color: var(--muted); font-weight:600; font-size: 12px }
+        .card__value{ font-size: 14px }
+
+        .pagination{ display:flex; align-items:center; justify-content:center; gap:12px; padding:12px }
+        .pagination__status{ color:var(--muted); font-weight:600 }
+
+        .form-grid{ display:flex; flex-direction:column; gap:12px }
+        .form-2col{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
+        .form-field > label{ display:block; font-size:14px; font-weight:600; margin-bottom:6px }
+
+        @media (max-width: 1100px){
+          .filters__row--rest{ flex-wrap:wrap }
+        }
         @media (max-width: 900px){
           .page-header__content{
             flex-direction: column;
@@ -792,29 +847,15 @@ export default function Ocorrencias() {
             justify-content: flex-start;
             flex-wrap: wrap;
           }
-          .filters-group{
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .filters-inline{
-            margin-left: 0;
-            width: 100%;
-          }
+          .filters{ gap:8px }
+          .filters__row--rest{ justify-content: flex-start }
           .form-2col{ grid-template-columns:1fr }
-          .table{ 
-            grid-template-columns: 110px 1.3fr 120px 90px 1.4fr 110px; 
-            min-width:860px 
-          }
+          .table--grid{ display:none }
+          .cards{ display:block }
         }
         @media (max-width: 480px){
-          .table{ min-width:780px }
-          .page-header__toolbar{
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .page-header__toolbar .btn{
-            justify-content: center;
-          }
+          .page-header__toolbar{ flex-direction: column; align-items: stretch }
+          .page-header__toolbar .btn{ justify-content: center }
         }
       `}</style>
     </>
