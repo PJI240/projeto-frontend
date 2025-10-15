@@ -166,26 +166,8 @@ function consolidateApontamentos(items, dataISO) {
         ? bestEntradaOrigem
         : bestSaidaOrigem,
   };
-
-
-
-  const now = new Date();
-  const nowIsToday = toISO(now) === dataISO;
-  const nowMin = nowIsToday ? now.getHours() * 60 + now.getMinutes() : null;
-
-  const parcial = bestEntrada != null && bestSaida == null;
-  const fim = parcial ? nowMin : bestSaida;
-
-  return {
-    entradaMin: bestEntrada ?? null,
-    saidaMin: fim ?? null,
-    parcial,
-    origem:
-      (pri[bestEntradaOrigem] || 0) >= (pri[bestSaidaOrigem] || 0)
-        ? bestEntradaOrigem
-        : bestSaidaOrigem,
-  };
 }
+
 
 /* ====== Badge ====== */
 function StatusBadge({ children, tone = "gray" }) {
