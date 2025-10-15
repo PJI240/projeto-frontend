@@ -1,4 +1,3 @@
-// src/pages/ocorrencias.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeftIcon,
@@ -14,6 +13,7 @@ import {
   UserGroupIcon,
   ClipboardDocumentListIcon,
   ClockIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
@@ -51,15 +51,14 @@ function parseNumber(n) {
 }
 
 /* =================== Tipos (sanitização) =================== */
-const TIPOS_WHITELIST = ["FERIADO","ATESTADO","FALTA","FOLGA","OUTRO"];
+const TIPOS_WHITELIST = ["FERIADO", "ATESTADO", "FALTA", "FOLGA", "OUTRO"];
 
 function sanitizeTipo(t) {
   if (t == null) return "";
-  // remove barras e espaços, e normaliza para UPPER
-  const norm = String(t).replace(/\\+/g, "").replace(/\s+/g, "").toUpperCase();
+  // remove barras invertidas e espaços, normaliza para UPPER
+  const norm = String(t).replace(/\\+/g, "").trim().toUpperCase();
   return TIPOS_WHITELIST.includes(norm) ? norm : "";
 }
-
 function sanitizeTipos(arr) {
   if (!Array.isArray(arr)) return [];
   const out = [];
@@ -207,7 +206,6 @@ export default function Ocorrencias() {
         return { ...prev, tipo: tipoOk };
       });
     } catch {
-      // fallback
       setTiposPermitidos(TIPOS_WHITELIST.slice());
       setForm(prev => ({ ...prev, tipo: sanitizeTipo(prev.tipo) || TIPOS_WHITELIST[0] }));
     }
@@ -389,7 +387,7 @@ export default function Ocorrencias() {
       o.data,
       o.funcionario_id,
       mapFunc.get(o.funcionario_id)?.nome || "",
-      o.tipo || "",
+      sanitizeTipo(o.tipo) || "",
       (o.horas ?? ""),
       (o.obs ?? "").replace(/\n/g, " ").replace(/;/g, ","),
     ]);
@@ -401,6 +399,74 @@ export default function Ocorrencias() {
     a.download = `ocorrencias_${de}_a_${ate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  /* ------------ Export PDF (nova guia imprimível) ------------ */
+  const exportarPDF = () => {
+    const win = window.open("", "_blank");
+    if (!win) return;
+
+    const rowsHtml = filtradas.map((o) => {
+      const f = mapFunc.get(o.funcionario_id);
+      const nome = (f?.nome || `#${o.funcionario_id}`).replace(/</g, "&lt;");
+      const obs = (o.obs || "").replace(/</g, "&lt;");
+      const tipo = sanitizeTipo(o.tipo) || "—";
+      const horas = (o.horas != null && o.horas !== "") ? Number(o.horas).toFixed(2) : "—";
+      return `
+        <tr>
+          <td>${formatDateBR(fromISO(o.data))}</td>
+          <td>${nome}</td>
+          <td>${tipo}</td>
+          <td style="text-align:right">${horas}</td>
+          <td>${obs}</td>
+        </tr>`;
+    }).join("");
+
+    win.document.write(`
+      <!doctype html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8"/>
+        <title>Ocorrências ${de} a ${ate}</title>
+        <style>
+          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;padding:24px;color:#111827}
+          h1{font-size:20px;margin:0 0 4px 0}
+          p{margin:0 0 16px 0;color:#6b7280}
+          table{width:100%;border-collapse:collapse;font-size:12px}
+          th,td{border:1px solid #e5e7eb;padding:8px;vertical-align:top}
+          th{background:#f3f4f6;text-align:left}
+          tfoot td{font-weight:700}
+          .muted{color:#6b7280}
+          @media print{ @page{size: A4; margin: 14mm} }
+        </style>
+      </head>
+      <body>
+        <h1>Ocorrências</h1>
+        <p class="muted">Período: ${de} a ${ate}</p>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:90px">Data</th>
+              <th>Funcionário</th>
+              <th style="width:110px">Tipo</th>
+              <th style="width:80px;text-align:right">Horas</th>
+              <th>Observação</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || `<tr><td colspan="5" class="muted">Sem dados no período.</td></tr>`}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5">Total de ocorrências: ${filtradas.length} • Horas acumuladas: ${kpis.horasTotal.toFixed(2)}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <script>window.focus();</script>
+      </body>
+      </html>
+    `);
+    win.document.close();
   };
 
   /* ------------ UI helpers ------------ */
@@ -423,11 +489,7 @@ export default function Ocorrencias() {
       accent: "badge--accent",
     };
     const cls = map[tone] || map.neutral;
-    return (
-      <span className={`badge ${cls}`}>
-        {children}
-      </span>
-    );
+    return <span className={`badge ${cls}`}>{children}</span>;
   }
 
   /* =================== RENDER =================== */
@@ -436,82 +498,92 @@ export default function Ocorrencias() {
       {/* Região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER e Ações */}
+      {/* ===== Container (linhas) no padrão da página Pessoas ===== */}
       <header className="page-header" role="region" aria-labelledby="titulo-oc">
+        {/* Linha 1 — Título e descrição */}
         <div className="page-header__content">
           <div className="page-header__info">
             <h1 id="titulo-oc" className="page-title">Ocorrências</h1>
             <p className="page-subtitle">Registre e acompanhe ausências, atestados, feriados e outras ocorrências</p>
           </div>
+        </div>
 
-          <div className="page-header__toolbar" aria-label="Ações da página">
-            <button className="btn btn--success" onClick={abrirNovo} aria-label="Criar nova ocorrência">
-              <PlusCircleIcon className="icon" aria-hidden="true" />
-              <span>Nova Ocorrência</span>
+        {/* Linha 2 — Ações */}
+        <div className="actions-row">
+          <button className="btn btn--success" onClick={abrirNovo}>
+            <PlusCircleIcon className="icon" aria-hidden="true" />
+            <span>Nova Ocorrência</span>
+          </button>
+
+          <button className="btn btn--info" onClick={exportarCSV}>
+            <ArrowDownTrayIcon className="icon" aria-hidden="true" />
+            <span>Exportar CSV</span>
+          </button>
+
+          <button className="btn btn--neutral" onClick={exportarPDF}>
+            <PrinterIcon className="icon" aria-hidden="true" />
+            <span>Exportar PDF</span>
+          </button>
+
+          <button
+            className="btn btn--neutral"
+            onClick={carregarOcorrencias}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+          >
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
+          </button>
+        </div>
+
+        {/* Linha 3 — Período + datas (em linha no desktop) */}
+        <div className="filters__row filters__row--top">
+          <div className="btn-group" role="group" aria-label="Atalhos de período">
+            <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
+              <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
             </button>
-            <button className="btn btn--info" onClick={exportarCSV}>
-              <ArrowDownTrayIcon className="icon" aria-hidden="true" />
-              <span>Exportar</span>
+            <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
+              <span>Semana</span>
             </button>
-            <button
-              className="btn btn--neutral"
-              onClick={carregarOcorrencias}
-              disabled={loading}
-              aria-busy={loading ? "true" : "false"}
-              aria-label="Atualizar dados"
-            >
-              {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-              <span>{loading ? "Atualizando…" : "Atualizar"}</span>
+            <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
+              <span>Mês</span>
             </button>
+          </div>
+
+          <div className="range-inline" role="group" aria-label="Intervalo de datas">
+            <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
+            <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+            <span className="range-sep">—</span>
+            <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
+            <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
           </div>
         </div>
 
-        {/* ===== Filtros ===== */}
-        <div className="filters">
-          {/* Linha única no desktop: atalhos + datas */}
-          <div className="filters__row filters__row--top">
-            <div className="btn-group" role="group" aria-label="Atalhos de período">
-              <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
-                <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
-              </button>
-              <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
-                <span>Semana</span>
-              </button>
-              <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
-                <span>Mês</span>
-              </button>
-            </div>
+        {/* Linha 4 — Filtros */}
+        <div className="filters__row filters__row--rest">
+          <FunnelIcon className="icon" aria-hidden="true" />
+          <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
+            <option value="todos">Todos os funcionários</option>
+            {funcionarios.map(f => (
+              <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
+            ))}
+          </select>
+          <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
+            <option value="todos">Todos os tipos</option>
+            {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
 
-            <div className="range-inline" role="group" aria-label="Intervalo de datas">
-              <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
-              <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-              <span className="range-sep">—</span>
-              <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
-              <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
-            </div>
-          </div>
-
-          {/* Linha 2: demais filtros */}
-          <div className="filters__row filters__row--rest">
-            <FunnelIcon className="icon" aria-hidden="true" />
-            <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
-              <option value="todos">Todos os funcionários</option>
-              {funcionarios.map(f => (
-                <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
-              ))}
-            </select>
-            <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
-              <option value="todos">Todos os tipos</option>
-              {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <input
-              className="input input--sm"
-              placeholder="Buscar por nome, tipo ou observação…"
-              value={busca}
-              onChange={(e)=>setBusca(e.target.value)}
-              aria-label="Buscar"
-            />
-          </div>
+        {/* Linha 5 — Busca */}
+        <div className="filters__row">
+          <input
+            className="input input--sm"
+            placeholder="Buscar por nome, tipo ou observação…"
+            value={busca}
+            onChange={(e)=>setBusca(e.target.value)}
+            aria-label="Buscar"
+            style={{ width: "100%", maxWidth: 520 }}
+          />
         </div>
       </header>
 
@@ -578,7 +650,7 @@ export default function Ocorrencias() {
                   {f?.cargo && <span className="td__sub">{f.cargo}</span>}
                 </div>
                 <div className="td td--type">
-                  <StatusBadge tone={badgeTone(o.tipo)}>{o.tipo || "—"}</StatusBadge>
+                  <StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge>
                 </div>
                 <div className="td td--hours">{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</div>
                 <div className="td td--obs">
@@ -623,7 +695,7 @@ export default function Ocorrencias() {
                 </div>
                 <div className="card__row">
                   <span className="card__label">Tipo</span>
-                  <span className="card__value"><StatusBadge tone={badgeTone(o.tipo)}>{o.tipo || "—"}</StatusBadge></span>
+                  <span className="card__value"><StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge></span>
                 </div>
                 <div className="card__row">
                   <span className="card__label">Horas</span>
@@ -742,60 +814,13 @@ export default function Ocorrencias() {
         .alert--success{ border-left-color: var(--success); }
         .alert--error{ border-left-color: var(--error); }
 
-        /* Stats */
-        .stats-grid{
-          display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap:16px; margin-bottom:12px; width:100%;
+        /* Linha 2 (Ações) */
+        .actions-row{
+          display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;
         }
-        .stat-card{ 
-          background:var(--panel); border:1px solid var(--border); border-radius:12px;
-          padding:16px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow);
-          border-left: 4px solid var(--border);
-        }
-        .stat-card--info{ border-left-color: var(--info) }
-        .stat-card--success{ border-left-color: var(--success) }
-        .stat-card--warning{ border-left-color: var(--warning) }
-        .stat-card__icon{ 
-          width:44px;height:44px;border-radius:8px;
-          display:flex;align-items:center;justify-content:center;
-          background:var(--panel-muted);
-          color: var(--muted);
-        }
-        .stat-card__content{ flex:1 }
-        .stat-value{ font-size:1.75rem; font-weight:800; line-height:1 }
-        .stat-title{ font-size:.875rem; color:var(--muted); font-weight:600 }
 
-        /* Badges */
-        .badge{
-          display: inline-flex;
-          align-items: center;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          border: 1px solid;
-        }
-        .badge--neutral{ background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--neutral-border) }
-        .badge--success{ background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border) }
-        .badge--error{ background: var(--error-bg); color: var(--error-fg); border-color: var(--error-border) }
-        .badge--warning{ background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border) }
-        .badge--info{ background: var(--info-bg); color: var(--info-fg); border-color: var(--info-border) }
-        .badge--accent{ background: var(--accent-bg); color: var(--accent-fg); border-color: var(--accent-border) }
-
-        .chips-wrap{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px }
-        .chip{ 
-          display:inline-flex; align-items:center; gap:8px; 
-          padding:6px 8px; background:var(--panel); 
-          border:1px solid var(--border); border-radius:999px 
-        }
-        .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
-
-        /* Filters layout */
-        .filters{
-          width:100%; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);
-          display:flex; flex-direction:column; gap:10px
-        }
-        .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap }
+        /* Filters */
+        .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px }
         .filters__row--top{ justify-content:space-between; }
         .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
         .btn-group .btn.is-active{ 
@@ -809,38 +834,49 @@ export default function Ocorrencias() {
         .filters__row--rest .icon{ width:18px; height:18px; color: var(--muted) }
         .filters__row--rest select, .filters__row--rest input{ max-width: 280px }
 
-        /* Header layout */
-        .page-header__content{
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 16px;
-          width: 100%;
+        /* Stats */
+        .stats-grid{
+          display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap:16px; margin:12px 0; width:100%;
         }
-        .page-header__info{
-          flex: 1;
-          min-width: 0;
+        .stat-card{ 
+          background:var(--panel); border:1px solid var(--border); border-radius:12px;
+          padding:16px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow);
+          border-left: 4px solid var(--border);
         }
-        .page-header__toolbar{
-          display: flex;
-          gap: 8px;
-          flex-shrink: 0;
-          align-items: center;
+        .stat-card--info{ border-left-color: var(--info) }
+        .stat-card--success{ border-left-color: var(--success) }
+        .stat-card--warning{ border-left-color: var(--warning) }
+        .stat-card__icon{ width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--panel-muted);color: var(--muted) }
+        .stat-card__content{ flex:1 }
+        .stat-value{ font-size:1.75rem; font-weight:800; line-height:1 }
+        .stat-title{ font-size:.875rem; color:var(--muted); font-weight:600 }
+
+        /* Badges */
+        .badge{
+          display:inline-flex; align-items:center; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; border:1px solid;
         }
+        .badge--neutral{ background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--neutral-border) }
+        .badge--success{ background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border) }
+        .badge--error{ background: var(--error-bg); color: var(--error-fg); border-color: var(--error-border) }
+        .badge--warning{ background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border) }
+        .badge--info{ background: var(--info-bg); color: var(--info-fg); border-color: var(--info-border) }
+        .badge--accent{ background: var(--accent-bg); color: var(--accent-fg); border-color: var(--accent-border) }
+
+        .chips-wrap{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px }
+        .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:999px }
+        .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
 
         /* Table */
         .table-wrap{ width:100%; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:var(--shadow) }
-        .table--grid{ 
-          display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; 
-          min-width:980px 
-        }
+        .table--grid{ display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; min-width:980px }
         .th{ padding:12px; border-bottom:2px solid var(--border); background:var(--panel-muted); font-weight:700; font-size:14px }
         .th--actions{ text-align:center }
         .row{ display:contents }
         .td{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px }
         .td--func{ gap:10px }
         .td__main{ font-weight:700 }
-        .td__sub{ font-size:12px; color:var(--muted) }
+        .td__sub{ font-size:12px; color: var(--muted) }
         .dot{ width:10px; height:10px; border-radius:999px; background: var(--func-color); border:1px solid var(--border) }
         .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
         .muted{ color: var(--muted) }
@@ -848,15 +884,7 @@ export default function Ocorrencias() {
 
         /* Cards (mobile) */
         .cards{ display:none }
-        .card{
-          background: var(--panel);
-          border: 1px solid var(--border);
-          border-radius: 10px;
-          box-shadow: var(--shadow);
-          padding: 12px;
-          display: grid;
-          gap: 8px;
-        }
+        .card{ background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; display: grid; gap: 8px }
         .card + .card{ margin-top: 10px }
         .card__header{ display:flex; align-items:center; justify-content:space-between; gap:10px }
         .card__title{ display:flex; align-items:center; gap:8px; font-weight:700 }
@@ -877,29 +905,14 @@ export default function Ocorrencias() {
           .filters__row--rest{ flex-wrap:wrap }
         }
         @media (max-width: 900px){
-          .page-header__content{
-            flex-direction: column;
-            gap: 12px;
-          }
-          .page-header__toolbar{
-            width: 100%;
-            justify-content: flex-start;
-            flex-wrap: wrap;
-          }
-          .filters{ gap:8px }
-          .filters__row--top{
-            flex-direction:column;
-            align-items:flex-start;
-            gap:8px;
-          }
-          .filters__row--rest{ justify-content: flex-start }
+          .actions-row{ justify-content:flex-start }
+          .filters__row--top{ flex-direction:column; align-items:flex-start; gap:8px }
           .form-2col{ grid-template-columns:1fr }
           .table--grid{ display:none }
           .cards{ display:block }
         }
         @media (max-width: 480px){
-          .page-header__toolbar{ flex-direction: column; align-items: stretch }
-          .page-header__toolbar .btn{ justify-content: center }
+          .actions-row{ flex-direction:column; align-items:stretch }
         }
       `}</style>
     </>
