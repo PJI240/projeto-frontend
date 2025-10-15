@@ -426,7 +426,7 @@ export default function DashboardAdm() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Navegação
+  // Navegação (permanece igual)
   const semanaAnterior = () => setDataRef(addDays(dataRef, -7));
   const semanaSeguinte = () => setDataRef(addDays(dataRef, 7));
   const semanaAtual = () => { const hoje = new Date(); setDataRef(startOfWeek(hoje)); setDiaAtual(hoje); };
@@ -442,7 +442,7 @@ export default function DashboardAdm() {
       const ate = isMobile ? toISO(addDays(diaAtual,  1)) : toISO(dias[6]);
       const q = (s) => encodeURIComponent(s);
       
-      // Usar a nova rota do dashboard que retorna métricas
+      // CORREÇÃO: Usar a rota correta do dashboard
       const dashboardData = await api(`/api/dashboard/adm?from=${q(de)}&to=${q(ate)}&ativos=1`);
       
       setDadosDashboard({
@@ -455,6 +455,7 @@ export default function DashboardAdm() {
       
       if (liveRef.current) liveRef.current.textContent = "Dados do dashboard atualizados.";
     } catch (e) {
+      console.error('Erro ao carregar dashboard:', e);
       setErr(e.message || "Falha ao carregar dados.");
       if (liveRef.current) liveRef.current.textContent = "Erro ao carregar dados do dashboard.";
     } finally {
@@ -666,7 +667,7 @@ export default function DashboardAdm() {
     };
   }, [metricas, apontByKeyFiltrado, apontByFuncDiaFiltrado, escalasByDiaFiltrado, funcionariosFiltrados, dias, diaAtual, isMobile]);
 
-  // ... (resto do código permanece igual: DiasAgendaDesktop, DiaAgendaMobile, Legenda, etc.)
+  // ... (resto do código permanece igual: DiasAgendaDesktop, DiaAgendaMobile, Legenda, HorasTrabalhadas, etc.)
 
   return (
     <>
@@ -790,11 +791,35 @@ export default function DashboardAdm() {
       {/* Gráfico */}
       <GraficoDashboard metricas={metricas} isMobile={isMobile} />
 
-      {/* Grade agenda e outros componentes permanecem iguais */}
-      {/* ... */}
+      {/* Grade agenda */}
+      {isMobile ? <DiaAgendaMobile /> : <DiasAgendaDesktop />}
+
+      {/* Legenda */}
+      <div style={{ marginTop: 16 }}>
+        <Legenda />
+      </div>
+
+      {/* Notas */}
+      <div className="dashboard-notes">
+        <ul>
+          <li><strong>Escala</strong> (contorno) representa o planejado; <strong>Apontamento</strong> (preenchido) representa o realizado.</li>
+          <li><strong>Atraso</strong> é a diferença entre entrada apontada e entrada prevista na escala (tolerância de 5 minutos).</li>
+          <li><strong>Apontamento sem escala</strong> é exibido e contabilizado (sem atraso por não haver referência).</li>
+        </ul>
+      </div>
+
+      {/* Horas Trabalhadas */}
+      <HorasTrabalhadas 
+        funcionarios={funcionariosFiltrados}
+        escalasByDia={escalasByDiaFiltrado}
+        apontByKey={apontByKeyFiltrado}
+        apontByFuncDia={apontByFuncDiaFiltrado}
+        filtroFuncionario={filtroFuncionario}
+        isMobile={isMobile}
+      />
 
       <style jsx>{`
-        /* Estilos existentes permanecem iguais */
+        /* Estilos permanecem exatamente iguais */
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -815,7 +840,23 @@ export default function DashboardAdm() {
           width: 100%;
         }
 
-        /* Novos estilos para o gráfico */
+        .stat-card[data-accent="info"]    { border-left: 4px solid var(--info); }
+        .stat-card[data-accent="success"] { border-left: 4px solid var(--success); }
+        .stat-card[data-accent="error"]   { border-left: 4px solid var(--error); }
+        .stat-card[data-accent="warning"] { border-left: 4px solid var(--warning); }
+        
+        .stat-card__icon { width: 48px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--panel-muted); }
+        .stat-card__icon .icon { width: 24px; height: 24px; }
+        .stat-card[data-accent="info"]    .stat-card__icon { background: rgba(59,130,246,0.1); color: var(--info); }
+        .stat-card[data-accent="success"] .stat-card__icon { background: rgba(16,185,129,0.1); color: var(--success); }
+        .stat-card[data-accent="error"]   .stat-card__icon { background: rgba(239,68,68,0.1); color: var(--error); }
+        .stat-card[data-accent="warning"] .stat-card__icon { background: rgba(245,158,11,0.1); color: var(--warning); }
+        
+        .stat-card__content { flex: 1; }
+        .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+        .stat-title { font-size: 0.875rem; color: var(--muted); font-weight: 600; }
+
+        /* Estilos do gráfico */
         .grafico-container {
           padding: 16px 0;
           width: 100%;
