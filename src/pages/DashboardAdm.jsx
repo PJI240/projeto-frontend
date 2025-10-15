@@ -94,36 +94,80 @@ const useApi = () => {
   }, []);
 };
 
-/* ====== Consolidação de apontamentos por prioridade ====== */
+/* ====== Consolidação de apontamentos (suporta entrada/saida OU evento/horario) ====== */
 function consolidateApontamentos(items, dataISO) {
   if (!items?.length) return null;
+
+  // prioridade por origem (maior vence empates)
   const pri = { AJUSTE: 3, IMPORTADO: 2, APONTADO: 1 };
+
   let bestEntrada = null, bestEntradaOrigem = null;
-  let bestSaida = null, bestSaidaOrigem = null;
+  let bestSaida   = null, bestSaidaOrigem   = null;
 
   for (const it of items) {
-    const ent = it.entrada ? hhmmToMinutes(it.entrada) : null;
-    const sai = it.saida ? hhmmToMinutes(it.saida) : null;
+    const origem = (it.origem || "").toUpperCase().trim();
+    const evento = (it.evento || "").toUpperCase().trim(); // "ENTRADA" | "SAIDA" | ""
 
+    // 1) Campos diretos
+    let ent = it.entrada ? hhmmToMinutes(it.entrada) : null;
+    let sai = it.saida   ? hhmmToMinutes(it.saida)   : null;
+
+    // 2) Converter quando vier como evento/horario
+    if ((ent == null || sai == null) && it.horario) {
+      const evMin = hhmmToMinutes(it.horario);
+      if (evento === "ENTRADA" && ent == null) ent = evMin;
+      if (evento === "SAIDA"   && sai == null) sai = evMin;
+    }
+
+    // melhor ENTRADA (menor horário; desempata por prioridade)
     if (ent != null) {
       if (
         bestEntrada == null ||
         ent < bestEntrada ||
-        (ent === bestEntrada && (pri[it.origem] || 0) > (pri[bestEntradaOrigem] || 0))
+        (ent === bestEntrada && (pri[origem] || 0) > (pri[bestEntradaOrigem] || 0))
       ) {
-        bestEntrada = ent; bestEntradaOrigem = it.origem;
+        bestEntrada = ent;
+        bestEntradaOrigem = origem;
       }
     }
+
+    // melhor SAIDA (maior horário; desempata por prioridade)
     if (sai != null) {
       if (
         bestSaida == null ||
         sai > bestSaida ||
-        (sai === bestSaida && (pri[it.origem] || 0) > (pri[bestSaidaOrigem] || 0))
+        (sai === bestSaida && (pri[origem] || 0) > (pri[bestSaidaOrigem] || 0))
       ) {
-        bestSaida = sai; bestSaidaOrigem = it.origem;
+        bestSaida = sai;
+        bestSaidaOrigem = origem;
       }
     }
   }
+
+  // “em andamento” até agora quando for hoje e só há entrada
+  const now = new Date();
+  const nowIsToday = toISO(now) === dataISO;
+  const nowMin = nowIsToday ? now.getHours() * 60 + now.getMinutes() : null;
+
+  const parcial = bestEntrada != null && bestSaida == null;
+  const fim = parcial ? nowMin : bestSaida;
+
+  // evita duração negativa quando só há saída isolada
+  if (bestEntrada == null && fim != null) {
+    return { entradaMin: null, saidaMin: null, parcial: false, origem: null };
+  }
+
+  return {
+    entradaMin: bestEntrada ?? null,
+    saidaMin: fim ?? null,
+    parcial,
+    origem:
+      (pri[bestEntradaOrigem] || 0) >= (pri[bestSaidaOrigem] || 0)
+        ? bestEntradaOrigem
+        : bestSaidaOrigem,
+  };
+}
+
 
   const now = new Date();
   const nowIsToday = toISO(now) === dataISO;
@@ -365,7 +409,10 @@ export default function DashboardAdm() {
       ]);
       setFuncionarios(f.funcionarios || []);
       setEscalas(e.escalas || []);
-      setApontamentos(Array.isArray(a) ? a : (a.apontamentos || []));
+       setApontamentos(
+   (Array.isArray(a) ? a : (a.apontamentos || []))
+     .filter(x => (x.status_tratamento || "").toUpperCase() === "VALIDA")
+ );
       if (liveRef.current) liveRef.current.textContent = "Dados do dashboard atualizados.";
     } catch (e) {
       setErr(e.message || "Falha ao carregar dados.");
