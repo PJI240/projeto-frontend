@@ -50,6 +50,26 @@ function parseNumber(n) {
   return Number.isFinite(x) ? x : 0;
 }
 
+/* =================== Tipos (sanitização) =================== */
+const TIPOS_WHITELIST = ["FERIADO","ATESTADO","FALTA","FOLGA","OUTRO"];
+
+function sanitizeTipo(t) {
+  if (t == null) return "";
+  // remove barras e espaços, e normaliza para UPPER
+  const norm = String(t).replace(/\\+/g, "").replace(/\s+/g, "").toUpperCase();
+  return TIPOS_WHITELIST.includes(norm) ? norm : "";
+}
+
+function sanitizeTipos(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const x of arr) {
+    const s = sanitizeTipo(x);
+    if (s && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
 /* =================== API helper =================== */
 const useApi = () => {
   return useCallback(async (path, init = {}) => {
@@ -62,7 +82,7 @@ const useApi = () => {
   }, []);
 };
 
-/* =================== Cores por funcionário (via CSS var) =================== */
+/* =================== Cores por funcionário =================== */
 const CORES_FUNCIONARIOS = [
   "#3b82f6", "#ef4444", "#10b981", "#f59e0b",
   "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16",
@@ -134,7 +154,7 @@ export default function Ocorrencias() {
   /* ------------ Dados ------------ */
   const [funcionarios, setFuncionarios] = useState([]);
   const [ocorrencias, setOcorrencias] = useState([]);
-  const [tiposPermitidos, setTiposPermitidos] = useState(["FERIADO","ATESTADO","FALTA","FOLGA","OUTRO"]); // fallback
+  const [tiposPermitidos, setTiposPermitidos] = useState(TIPOS_WHITELIST);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [sucesso, setSucesso] = useState("");
@@ -176,14 +196,20 @@ export default function Ocorrencias() {
   const carregarTipos = useCallback(async () => {
     try {
       const r = await api(`/api/ocorrencias/tipos`);
-      const lista = Array.isArray(r?.tipos) && r.tipos.length ? r.tipos.map(String) : null;
-      if (lista) {
-        setTiposPermitidos(lista);
-        // se o tipo atual não é permitido, ajusta
-        setForm((prev) => ({ ...prev, tipo: lista.includes(prev.tipo) ? prev.tipo : lista[0] }));
-      }
+      // aceita array ou string "FERIADO,ATESTADO,..."
+      let lista = Array.isArray(r?.tipos) ? r.tipos : (typeof r?.tipos === "string" ? r.tipos.split(",") : []);
+      lista = sanitizeTipos(lista);
+      if (!lista.length) lista = TIPOS_WHITELIST.slice();
+
+      setTiposPermitidos(lista);
+      setForm(prev => {
+        const tipoOk = sanitizeTipo(prev.tipo) || lista[0];
+        return { ...prev, tipo: tipoOk };
+      });
     } catch {
-      // fallback já definido
+      // fallback
+      setTiposPermitidos(TIPOS_WHITELIST.slice());
+      setForm(prev => ({ ...prev, tipo: sanitizeTipo(prev.tipo) || TIPOS_WHITELIST[0] }));
     }
   }, [api]);
 
@@ -280,21 +306,22 @@ export default function Ocorrencias() {
   /* ------------ CRUD ------------ */
   const abrirNovo = () => {
     setEditando(null);
-    setForm(f => ({
+    setForm({
       funcionario_id: "",
       data: toISO(new Date()),
-      tipo: tiposPermitidos[0] || "FALTA",
+      tipo: tiposPermitidos[0] || TIPOS_WHITELIST[0],
       horas: "",
       obs: "",
-    }));
+    });
     setModalAberto(true);
   };
   const abrirEdicao = (o) => {
     setEditando(o);
+    const tipoOk = sanitizeTipo(o.tipo) || (tiposPermitidos[0] || TIPOS_WHITELIST[0]);
     setForm({
       funcionario_id: o.funcionario_id,
       data: o.data,
-      tipo: tiposPermitidos.includes(o.tipo) ? o.tipo : (tiposPermitidos[0] || "FALTA"),
+      tipo: tipoOk,
       horas: o.horas ?? "",
       obs: o.obs ?? "",
     });
@@ -303,8 +330,11 @@ export default function Ocorrencias() {
   const salvar = async () => {
     setErr(""); setSucesso("");
     try {
-      // força o tipo a ser um permitido
-      const tipoVal = tiposPermitidos.includes(form.tipo) ? form.tipo : tiposPermitidos[0];
+      const tipoVal = sanitizeTipo(form.tipo) || (tiposPermitidos[0] || TIPOS_WHITELIST[0]);
+      if (!tiposPermitidos.includes(tipoVal)) {
+        throw new Error(`Tipo inválido. Use um dos valores permitidos: ${tiposPermitidos.join(", ")}.`);
+      }
+
       const payload = {
         funcionario_id: Number(form.funcionario_id),
         data: form.data,
@@ -312,8 +342,11 @@ export default function Ocorrencias() {
         horas: form.horas === "" ? null : Number(form.horas),
         obs: form.obs || null,
       };
-      if (!payload.funcionario_id || !payload.data) throw new Error("Selecione funcionário e data.");
-      if (!tiposPermitidos.includes(tipoVal)) throw new Error(`Tipo inválido. Use um dos valores permitidos: ${tiposPermitidos.join(", ")}.`);
+
+      if (!payload.funcionario_id || !payload.data) {
+        throw new Error("Selecione funcionário e data.");
+      }
+
       if (editando) {
         await api(`/api/ocorrencias/${editando.id}`, {
           method: "PUT",
@@ -329,6 +362,7 @@ export default function Ocorrencias() {
         });
         setSucesso("Ocorrência adicionada com sucesso!");
       }
+
       setModalAberto(false);
       await carregarOcorrencias();
     } catch (e) {
@@ -434,8 +468,8 @@ export default function Ocorrencias() {
 
         {/* ===== Filtros ===== */}
         <div className="filters">
-          {/* Linha 1: atalhos de período */}
-          <div className="filters__row">
+          {/* Linha única no desktop: atalhos + datas */}
+          <div className="filters__row filters__row--top">
             <div className="btn-group" role="group" aria-label="Atalhos de período">
               <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
                 <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
@@ -447,10 +481,7 @@ export default function Ocorrencias() {
                 <span>Mês</span>
               </button>
             </div>
-          </div>
 
-          {/* Linha 2: intervalo de datas */}
-          <div className="filters__row">
             <div className="range-inline" role="group" aria-label="Intervalo de datas">
               <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
               <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
@@ -460,7 +491,7 @@ export default function Ocorrencias() {
             </div>
           </div>
 
-          {/* Linha 3: demais filtros */}
+          {/* Linha 2: demais filtros */}
           <div className="filters__row filters__row--rest">
             <FunnelIcon className="icon" aria-hidden="true" />
             <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
@@ -663,7 +694,12 @@ export default function Ocorrencias() {
           <div className="form-2col">
             <div className="form-field">
               <label>Tipo *</label>
-              <select className="input" value={form.tipo} onChange={(e)=>setForm({ ...form, tipo: e.target.value })} required>
+              <select
+                className="input"
+                value={form.tipo}
+                onChange={(e)=>setForm({ ...form, tipo: sanitizeTipo(e.target.value) })}
+                required
+              >
                 {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
@@ -755,9 +791,12 @@ export default function Ocorrencias() {
         .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
 
         /* Filters layout */
-        .filters{ width:100%; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display:flex; flex-direction:column; gap:10px }
+        .filters{
+          width:100%; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);
+          display:flex; flex-direction:column; gap:10px
+        }
         .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap }
-        .filters__row--rest{ justify-content: space-between; }
+        .filters__row--top{ justify-content:space-between; }
         .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
         .btn-group .btn.is-active{ 
           outline: 2px solid var(--accent); 
@@ -848,6 +887,11 @@ export default function Ocorrencias() {
             flex-wrap: wrap;
           }
           .filters{ gap:8px }
+          .filters__row--top{
+            flex-direction:column;
+            align-items:flex-start;
+            gap:8px;
+          }
           .filters__row--rest{ justify-content: flex-start }
           .form-2col{ grid-template-columns:1fr }
           .table--grid{ display:none }
