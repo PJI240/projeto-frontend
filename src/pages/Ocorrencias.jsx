@@ -581,18 +581,6 @@ export default function Ocorrencias() {
             style={{ width: "100%", maxWidth: 520 }}
           />
         </div>
-
-        {/* Linha 5 — Busca */}
-        <div className="filters__row">
-          <input
-            className="input input--sm"
-            placeholder="Buscar por nome, tipo ou observação…"
-            value={busca}
-            onChange={(e)=>setBusca(e.target.value)}
-            aria-label="Buscar"
-            style={{ width: "100%", maxWidth: 520 }}
-          />
-        </div>
       </header>
 
       {/* Alerts */}
@@ -868,7 +856,7 @@ export default function Ocorrencias() {
         /* Filters */
         .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px }
         .filters__row--top{ justify-content:space-between; }
-        .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
+        .btn-group{ display:flex; gap:2px; flex-wrap:wrap }
         .btn-group .btn.is-active{ 
           outline: 2px solid var(--accent); 
           outline-offset: -2px;
