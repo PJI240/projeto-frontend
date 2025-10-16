@@ -661,7 +661,7 @@ export default function Ocorrencias() {
                     <PencilSquareIcon className="icon" aria-hidden="true" /> Editar
                   </button>
                   <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
-                    <TrashIcon className="icon" aria-hidden="true" />
+                    <TrashIcon className="icon" aria-hidden="true" /> Excluir
                   </button>
                 </div>
               </div>
