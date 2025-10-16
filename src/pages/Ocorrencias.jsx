@@ -1,3 +1,4 @@
+// src/pages/Ocorrencias.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeftIcon,
@@ -103,13 +104,18 @@ function Modal({ open, onClose, title, children, footer, size = "medium" }) {
       className="fixed inset-0 z-[1000] bg-black/35 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
-      <div className="w-full max-h-[90vh] overflow-auto rounded-xl border border-gray-200 bg-white shadow-xl"
-           style={{ maxWidth: sizes[size] }}>
+      <div
+        className="w-full max-h-[90vh] overflow-auto rounded-xl border border-gray-200 bg-white shadow-xl"
+        style={{ maxWidth: sizes[size] }}
+      >
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <h2 id="modal-title" className="text-lg font-bold">{title}</h2>
-          <button className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm hover:bg-gray-50"
-                  aria-label="Fechar" onClick={onClose}>
-            <XMarkIcon className="h-5 w-5" aria-hidden="true" />
+          <button
+            className="btn btn--neutral btn--icon-only"
+            aria-label="Fechar"
+            onClick={onClose}
+          >
+            <XMarkIcon className="icon" aria-hidden="true" />
           </button>
         </div>
         <div className="p-4">{children}</div>
@@ -292,7 +298,11 @@ export default function Ocorrencias() {
       const q = busca.toLowerCase();
       arr = arr.filter(o => {
         const nome = mapFunc.get(o.funcionario_id)?.nome || "";
-        return nome.toLowerCase().includes(q) || (o.obs || "").toLowerCase().includes(q) || (o.tipo || "").toLowerCase().includes(q);
+        return (
+          nome.toLowerCase().includes(q) ||
+          (o.obs || "").toLowerCase().includes(q) ||
+          (o.tipo || "").toLowerCase().includes(q)
+        );
       });
     }
     arr.sort((a, b) => (a.data > b.data ? -1 : 1));
@@ -300,7 +310,10 @@ export default function Ocorrencias() {
   }, [ocorrencias, busca, mapFunc]);
   const totalPages = Math.max(1, Math.ceil(filtradas.length / pageSize));
   useEffect(() => { if (page > totalPages) setPage(totalPages); }, [totalPages]);
-  const pageItems = useMemo(() => filtradas.slice((page - 1) * pageSize, page * pageSize), [filtradas, page]);
+  const pageItems = useMemo(
+    () => filtradas.slice((page - 1) * pageSize, page * pageSize),
+    [filtradas, page]
+  );
 
   /* ------------ CRUD ------------ */
   const abrirNovo = () => {
@@ -330,7 +343,9 @@ export default function Ocorrencias() {
     setErr(""); setSucesso("");
     try {
       const tipoVal = sanitizeTipo(form.tipo) || (tiposPermitidos[0] || TIPOS_WHITELIST[0]);
-      if (!tiposPermitidos.includes(tipoVal)) throw new Error(`Tipo inválido. Use um dos valores permitidos: ${tiposPermitidos.join(", ")}.`);
+      if (!tiposPermitidos.includes(tipoVal)) {
+        throw new Error(`Tipo inválido. Use um dos valores permitidos: ${tiposPermitidos.join(", ")}.`);
+      }
 
       const payload = {
         funcionario_id: Number(form.funcionario_id),
@@ -342,15 +357,25 @@ export default function Ocorrencias() {
       if (!payload.funcionario_id || !payload.data) throw new Error("Selecione funcionário e data.");
 
       if (editando) {
-        await api(`/api/ocorrencias/${editando.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        await api(`/api/ocorrencias/${editando.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
         setSucesso("Ocorrência atualizada com sucesso!");
       } else {
-        await api(`/api/ocorrencias`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        await api(`/api/ocorrencias`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
         setSucesso("Ocorrência adicionada com sucesso!");
       }
       setModalAberto(false);
       await carregarOcorrencias();
-    } catch (e) { setErr(e.message || "Falha ao salvar ocorrência."); }
+    } catch (e) {
+      setErr(e.message || "Falha ao salvar ocorrência.");
+    }
   };
   const excluir = async (o) => {
     if (!confirm(`Remover ocorrência de ${mapFunc.get(o.funcionario_id)?.nome || "#"} no dia ${formatDateBR(fromISO(o.data))}?`)) return;
@@ -359,10 +384,12 @@ export default function Ocorrencias() {
       await api(`/api/ocorrencias/${o.id}`, { method: "DELETE" });
       setSucesso("Ocorrência removida com sucesso!");
       await carregarOcorrencias();
-    } catch (e) { setErr(e.message || "Falha ao excluir ocorrência."); }
+    } catch (e) {
+      setErr(e.message || "Falha ao excluir ocorrência.");
+    }
   };
 
-  /* ------------ Export CSV ------------ */
+  /* ------------ Exportações ------------ */
   const exportarCSV = () => {
     const header = ["id", "data", "funcionario_id", "funcionario_nome", "tipo", "horas", "obs"];
     const linhas = filtradas.map(o => [
@@ -376,7 +403,6 @@ export default function Ocorrencias() {
     a.href = url; a.download = `ocorrencias_${de}_a_${ate}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
-  /* ------------ Export PDF ------------ */
   const exportarPDF = () => {
     const win = window.open("", "_blank"); if (!win) return;
     const rowsHtml = filtradas.map((o) => {
@@ -410,27 +436,36 @@ export default function Ocorrencias() {
   return (
     <>
       {/* Região viva para leitores de tela */}
-      <div ref={liveRef} aria-live="polite" className="sr-only" />
+      <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* Cabeçalho */}
-      <header className="mb-3" role="region" aria-labelledby="titulo-oc">
-        <div className="mb-2">
-          <h1 id="titulo-oc" className="text-2xl font-extrabold tracking-tight text-gray-900">Ocorrências</h1>
-          <p className="text-sm text-gray-500">Registre e acompanhe ausências, atestados, feriados e outras ocorrências</p>
+      {/* HEADER (novo padrão) */}
+      <header className="page-header" role="region" aria-labelledby="titulo-oc">
+        <div className="page-header__top">
+          <h1 id="titulo-oc" className="page-title">Ocorrências</h1>
+          <p className="page-subtitle">Registre e acompanhe ausências, atestados, feriados e outras ocorrências.</p>
         </div>
 
-        {/* Toolbar unificada */}
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_auto_auto] items-start">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_auto_auto] items-start page-header__toolbar">
           {/* Filtros + Busca */}
           <div className="flex flex-wrap items-center gap-2">
-            <FunnelIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-            <select className="input input--sm min-w-[210px]" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
+            <FunnelIcon className="icon-sm text-gray-400" aria-hidden="true" />
+            <select
+              className="input input--sm min-w-[210px]"
+              value={filtroFuncionario}
+              onChange={(e)=>setFiltroFuncionario(e.target.value)}
+              aria-label="Filtrar por funcionário"
+            >
               <option value="todos">Todos os funcionários</option>
               {funcionarios.map(f => (
                 <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
               ))}
             </select>
-            <select className="input input--sm min-w-[160px]" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
+            <select
+              className="input input--sm min-w-[160px]"
+              value={filtroTipo}
+              onChange={(e)=>setFiltroTipo(e.target.value)}
+              aria-label="Filtrar por tipo"
+            >
               <option value="todos">Todos os tipos</option>
               {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -453,10 +488,10 @@ export default function Ocorrencias() {
               <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={()=>aplicarPeriodo("mes")}><span>Mês</span></button>
             </div>
             <div className="flex items-center gap-2">
-              <label className="sr-only" htmlFor="dt-de">Data inicial</label>
+              <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
               <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
               <span aria-hidden className="text-gray-400">—</span>
-              <label className="sr-only" htmlFor="dt-ate">Data final</label>
+              <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
               <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
             </div>
           </div>
@@ -472,7 +507,12 @@ export default function Ocorrencias() {
             <button className="btn btn--neutral" onClick={exportarPDF}>
               <PrinterIcon className="icon" aria-hidden="true" /><span>Exportar PDF</span>
             </button>
-            <button className="btn btn--neutral" onClick={carregarOcorrencias} disabled={loading} aria-busy={loading ? "true" : "false"}>
+            <button
+              className="btn btn--neutral"
+              onClick={carregarOcorrencias}
+              disabled={loading}
+              aria-busy={loading ? "true" : "false"}
+            >
               {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
               <span>{loading ? "Atualizando…" : "Atualizar"}</span>
             </button>
@@ -481,12 +521,16 @@ export default function Ocorrencias() {
       </header>
 
       {/* Alerts */}
-      {err && <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-white shadow-sm pl-3 pr-3 py-2">
-        <div className="border-l-4 border-rose-500 pl-3 text-rose-700 font-medium">{err}</div>
-      </div>}
-      {sucesso && <div role="status" className="mb-3 rounded-lg border border-emerald-200 bg-white shadow-sm pl-3 pr-3 py-2">
-        <div className="border-l-4 border-emerald-500 pl-3 text-emerald-700 font-medium">{sucesso}</div>
-      </div>}
+      {err && (
+        <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-white shadow-sm pl-3 pr-3 py-2">
+          <div className="border-l-4 border-rose-500 pl-3 text-rose-700 font-medium">{err}</div>
+        </div>
+      )}
+      {sucesso && (
+        <div role="status" className="mb-3 rounded-lg border border-emerald-200 bg-white shadow-sm pl-3 pr-3 py-2">
+          <div className="border-l-4 border-emerald-500 pl-3 text-emerald-700 font-medium">{sucesso}</div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
@@ -531,9 +575,9 @@ export default function Ocorrencias() {
         </div>
       )}
 
-      {/* Tabela com “bordinha” azul arredondada à esquerda */}
-      <div className="relative overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-        {/* faixa azul lateral esquerda com raio */}
+      {/* ====== LISTA RESPONSIVA ====== */}
+      {/* Tabela (>= md) com faixa azul */}
+      <div className="relative overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm hidden md:block">
         <div className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-sky-500 rounded-l-lg" aria-hidden="true" />
         <table className="min-w-[980px] w-full text-sm">
           <thead className="bg-gray-50 text-left">
@@ -590,6 +634,55 @@ export default function Ocorrencias() {
         </table>
       </div>
 
+      {/* Cards (mobile < md) — cada item vira card com lateral azul */}
+      <div className="md:hidden space-y-2">
+        {pageItems.length === 0 && (
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-6 text-center text-gray-500">
+            Sem dados no período.
+          </div>
+        )}
+        {pageItems.map((o) => {
+          const f = mapFunc.get(o.funcionario_id);
+          return (
+            <article
+              key={o.id}
+              className="relative rounded-lg border border-gray-200 bg-white shadow-sm p-4"
+            >
+              <div className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-sky-500 rounded-l-lg" aria-hidden="true" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm text-gray-500">{formatDateBR(fromISO(o.data))}</div>
+                <StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge>
+              </div>
+
+              <div className="mt-2 flex items-start gap-2">
+                <span className="mt-1 h-2.5 w-2.5 rounded-full border border-gray-200" style={{ background: f?.cor || "#999" }} />
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-900">{f?.nome || `#${o.funcionario_id}`}</div>
+                  {f?.cargo && <div className="text-xs text-gray-500">{f.cargo}</div>}
+                </div>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-gray-500">Horas:</span> <strong>{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</strong></div>
+                <div className="col-span-2">
+                  <div className="text-gray-500">Observação</div>
+                  <div className="line-clamp-2">{o.obs || "—"}</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex justify-end gap-2">
+                <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
+                  <PencilSquareIcon className="icon" aria-hidden="true" /><span>Editar</span>
+                </button>
+                <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
+                  <TrashIcon className="icon" aria-hidden="true" /><span>Excluir</span>
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
       {/* Paginação */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 px-3 py-3">
@@ -624,8 +717,8 @@ export default function Ocorrencias() {
       >
         <div className="grid grid-cols-1 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-semibold">Funcionário *</label>
-            <select className="input w-full" value={form.funcionario_id} onChange={(e)=>setForm({ ...form, funcionario_id: e.target.value })} required>
+            <label htmlFor="f_func" className="mb-1 block text-sm font-semibold">Funcionário *</label>
+            <select id="f_func" className="input w-full" value={form.funcionario_id} onChange={(e)=>setForm({ ...form, funcionario_id: e.target.value })} required>
               <option value="">Selecione…</option>
               {funcionarios.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -636,31 +729,31 @@ export default function Ocorrencias() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold">Data *</label>
-            <input type="date" className="input w-full" value={form.data} onChange={(e)=>setForm({ ...form, data: e.target.value })} required />
+            <label htmlFor="f_data" className="mb-1 block text-sm font-semibold">Data *</label>
+            <input id="f_data" type="date" className="input w-full" value={form.data} onChange={(e)=>setForm({ ...form, data: e.target.value })} required />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-semibold">Tipo *</label>
-              <select className="input w-full" value={form.tipo} onChange={(e)=>setForm({ ...form, tipo: sanitizeTipo(e.target.value) })} required>
+              <label htmlFor="f_tipo" className="mb-1 block text-sm font-semibold">Tipo *</label>
+              <select id="f_tipo" className="input w-full" value={form.tipo} onChange={(e)=>setForm({ ...form, tipo: sanitizeTipo(e.target.value) })} required>
                 {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-semibold">Horas (decimal)</label>
-              <input type="number" step="0.01" min="0" className="input w-full" placeholder="Ex.: 2.50" value={form.horas} onChange={(e)=>setForm({ ...form, horas: e.target.value })} />
+              <label htmlFor="f_horas" className="mb-1 block text-sm font-semibold">Horas (decimal)</label>
+              <input id="f_horas" type="number" step="0.01" min="0" className="input w-full" placeholder="Ex.: 2.50" value={form.horas} onChange={(e)=>setForm({ ...form, horas: e.target.value })} />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold">Observação</label>
-            <textarea className="input w-full" rows={4} placeholder="Detalhes da ocorrência…" value={form.obs} onChange={(e)=>setForm({ ...form, obs: e.target.value })} />
+            <label htmlFor="f_obs" className="mb-1 block text-sm font-semibold">Observação</label>
+            <textarea id="f_obs" className="input w-full" rows={4} placeholder="Detalhes da ocorrência…" value={form.obs} onChange={(e)=>setForm({ ...form, obs: e.target.value })} />
           </div>
         </div>
       </Modal>
 
-      {/* Utilitários locais (line-clamp para obs) */}
+      {/* Utilitário para truncar observação */}
       <style jsx>{`
         .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
       `}</style>
