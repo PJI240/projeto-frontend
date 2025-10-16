@@ -510,13 +510,14 @@ export default function Ocorrencias() {
         {/* Linha 2 — Ações (toolbar com visual de card accent à esquerda) */}
         <div className="toolbar" role="region" aria-label="Ações de ocorrências">
           <div className="toolbar__left">
-            <button className="btn btn--success" onClick={abrirNovo}>
-              <PlusCircleIcon className="icon" aria-hidden="true" />
-              <span>Nova Ocorrência</span>
-            </button>
+           
           </div>
 
           <div className="toolbar__right">
+             <button className="btn btn--success" onClick={abrirNovo}>
+              <PlusCircleIcon className="icon" aria-hidden="true" />
+              <span>Nova Ocorrência</span>
+            </button>
             <div className="btn-group" role="group" aria-label="Exportações">
               <button className="btn btn--info" onClick={exportarCSV}>
                 <ArrowDownTrayIcon className="icon" aria-hidden="true" />
@@ -837,21 +838,30 @@ export default function Ocorrencias() {
         .alert--success{ border-left-color: var(--success); }
         .alert--error{ border-left-color: var(--error); }
 
-        /* ===== Toolbar com “accent-left” (mesmo look dos contadores) ===== */
-        .toolbar{
-          display:flex; align-items:center; justify-content:space-between; gap:12px;
-          margin-top:12px; padding:10px;
-          background:var(--panel); border:1px solid var(--border);
-          border-radius:12px; box-shadow:var(--shadow);
-          border-left:4px solid var(--accent);
-        }
-        .toolbar__left, .toolbar__right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
-        .toolbar .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
-        @media (max-width: 640px){
-          .toolbar{ flex-direction:column; align-items:stretch }
-          .toolbar__right{ justify-content:space-between }
-          .toolbar .btn { width:100% }
-        }
+/* ===== Toolbar (sem contorno, sem accent, sem sombra) ===== */
+.toolbar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-top:12px; padding:0;          /* sem “card look” */
+  background:transparent;               /* sem fundo */
+  border:none;                          /* sem borda */
+  border-radius:0;                      /* sem raio */
+  box-shadow:none;                      /* sem sombra */
+}
+.toolbar__left,
+.toolbar__right{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+
+/* grupo de botões segue igual */
+.toolbar .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
+
+/* responsivo: empilha no mobile, sem estilização de card */
+@media (max-width: 640px){
+  .toolbar{ flex-direction:column; align-items:stretch; gap:8px }
+  .toolbar__right{ justify-content:space-between }
+  /* se quiser os botões ocupando a largura toda no mobile, ative a linha abaixo */
+  /* .toolbar .btn { width:100% } */
+}
 
         /* Filters */
         .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px }
