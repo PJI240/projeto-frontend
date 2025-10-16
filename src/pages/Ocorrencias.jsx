@@ -4,7 +4,7 @@ import {
   ChevronRightIcon,
   CalendarDaysIcon,
   FunnelIcon,
-  PlusCircleIcon,
+  PlusIcon,
   PencilSquareIcon,
   TrashIcon,
   ArrowPathIcon,
@@ -14,6 +14,7 @@ import {
   ClipboardDocumentListIcon,
   ClockIcon,
   PrinterIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/24/solid";
 
 const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
@@ -55,7 +56,6 @@ const TIPOS_WHITELIST = ["FERIADO", "ATESTADO", "FALTA", "FOLGA", "OUTRO"];
 
 function sanitizeTipo(t) {
   if (t == null) return "";
-  // remove barras invertidas e espaços, normaliza para UPPER
   const norm = String(t).replace(/\\+/g, "").trim().toUpperCase();
   return TIPOS_WHITELIST.includes(norm) ? norm : "";
 }
@@ -97,32 +97,47 @@ const getCorFuncionario = (id) => {
 function Modal({ open, onClose, title, children, footer, size = "medium" }) {
   if (!open) return null;
   const sizes = { small: 380, medium: 560, large: 820, xlarge: 1100 };
+  
+  const onOverlayKeyDown = (ev) => {
+    if (ev.key === "Escape") onClose?.();
+  };
+
   return (
     <div
+      className="form-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      className="modal-backdrop"
+      onKeyDown={onOverlayKeyDown}
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
-      <div className="modal-panel" style={{ maxWidth: sizes[size] }}>
-        <div className="modal-header">
-          <h2 id="modal-title" className="modal-title">{title}</h2>
-          <button className="btn btn--neutral btn--icon" aria-label="Fechar" onClick={onClose}>
+      <div className="form-container" style={{ maxWidth: sizes[size] }}>
+        <div className="form-header">
+          <h2 id="modal-title">{title}</h2>
+          <button
+            className="btn btn--neutral btn--icon-only"
+            onClick={onClose}
+            aria-label="Fechar formulário"
+          >
             <XMarkIcon className="icon" aria-hidden="true" />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-footer">{footer}</div>}
+        <div className="form-body">{children}</div>
+        {footer && <div className="form-actions">{footer}</div>}
       </div>
 
       <style jsx>{`
-        .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
-        .modal-panel{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);max-height:90vh;overflow:auto}
-        .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border)}
-        .modal-title{font-size:18px;font-weight:700}
-        .modal-body{padding:16px}
-        .modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border)}
+        .form-body {
+          padding: 0 24px;
+        }
+        .form-actions {
+          display: flex;
+          gap: 8px;
+          justify-content: flex-end;
+          padding: 16px 24px;
+          border-top: 1px solid var(--border);
+          margin-top: 16px;
+        }
       `}</style>
     </div>
   );
@@ -134,16 +149,16 @@ export default function Ocorrencias() {
   const liveRef = useRef(null);
 
   /* ------------ Estado UI ------------ */
-  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 900 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 768 : false);
   useEffect(() => {
-    const onR = () => setIsMobile(window.innerWidth <= 900);
+    const onR = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", onR);
     return () => window.removeEventListener("resize", onR);
   }, []);
 
   /* ------------ Filtros ------------ */
   const HOJE = new Date();
-  const [periodo, setPeriodo] = useState("semana"); // 'hoje' | 'semana' | 'mes' | 'custom'
+  const [periodo, setPeriodo] = useState("semana");
   const [de, setDe] = useState(() => toISO(startOfWeek(HOJE)));
   const [ate, setAte] = useState(() => toISO(addDays(startOfWeek(HOJE), 6)));
   const [filtroFuncionario, setFiltroFuncionario] = useState("todos");
@@ -195,7 +210,6 @@ export default function Ocorrencias() {
   const carregarTipos = useCallback(async () => {
     try {
       const r = await api(`/api/ocorrencias/tipos`);
-      // aceita array ou string "FERIADO,ATESTADO,..."
       let lista = Array.isArray(r?.tipos) ? r.tipos : (typeof r?.tipos === "string" ? r.tipos.split(",") : []);
       lista = sanitizeTipos(lista);
       if (!lista.length) lista = TIPOS_WHITELIST.slice();
@@ -236,8 +250,8 @@ export default function Ocorrencias() {
     await Promise.all([carregarFuncionarios(), carregarTipos(), carregarOcorrencias()]);
   }, [carregarFuncionarios, carregarTipos, carregarOcorrencias]);
 
-  useEffect(() => { recarregar(); }, []); // mount
-  useEffect(() => { carregarOcorrencias(); }, [de, ate, filtroFuncionario, filtroTipo]); // filtros mudam
+  useEffect(() => { recarregar(); }, []);
+  useEffect(() => { carregarOcorrencias(); }, [de, ate, filtroFuncionario, filtroTipo]);
 
   /* ------------ Mapas auxiliares ------------ */
   const mapFunc = useMemo(() => {
@@ -401,7 +415,7 @@ export default function Ocorrencias() {
     URL.revokeObjectURL(url);
   };
 
-  /* ------------ Export PDF (nova guia imprimível) ------------ */
+  /* ------------ Export PDF ------------ */
   const exportarPDF = () => {
     const win = window.open("", "_blank");
     if (!win) return;
@@ -479,6 +493,7 @@ export default function Ocorrencias() {
     if (t.includes("FER")) return "accent";
     return "neutral";
   };
+
   function StatusBadge({ children, tone = "neutral" }) {
     const map = {
       neutral: "badge--neutral",
@@ -498,46 +513,46 @@ export default function Ocorrencias() {
       {/* Região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* ===== Container (linhas) no padrão da página Pessoas ===== */}
-      <header className="page-header" role="region" aria-labelledby="titulo-oc">
-        {/* Linha 1 — Título e descrição */}
-        <div className="page-header__content">
-          <div className="page-header__info">
-            <h1 id="titulo-oc" className="page-title">Ocorrências</h1>
-            <p className="page-subtitle">Registre e acompanhe ausências, atestados, feriados e outras ocorrências</p>
-          </div>
+      {/* HEADER NO PADRÃO DA PÁGINA PESSOAS */}
+      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
+        <div>
+          <h1 id="titulo-pagina" className="page-title">Ocorrências</h1>
+          <p className="page-subtitle">Registre e acompanhe ausências, atestados, feriados e outras ocorrências</p>
         </div>
 
-        {/* Linha 2 — Ações */}
-        <div className="actions-row">
-          <button className="btn btn--success" onClick={abrirNovo}>
-            <PlusCircleIcon className="icon" aria-hidden="true" />
+        <div className="page-header__toolbar" aria-label="Ações da página">
+          <button className="btn btn--success" onClick={abrirNovo} aria-label="Criar nova ocorrência">
+            <PlusIcon className="icon" aria-hidden="true" />
             <span>Nova Ocorrência</span>
           </button>
-
-          <button className="btn btn--info" onClick={exportarCSV}>
-            <ArrowDownTrayIcon className="icon" aria-hidden="true" />
-            <span>Exportar CSV</span>
-          </button>
-
-          <button className="btn btn--neutral" onClick={exportarPDF}>
-            <PrinterIcon className="icon" aria-hidden="true" />
-            <span>Exportar PDF</span>
-          </button>
-
           <button
             className="btn btn--neutral"
             onClick={carregarOcorrencias}
             disabled={loading}
             aria-busy={loading ? "true" : "false"}
+            aria-label="Atualizar lista de ocorrências"
           >
             {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
             <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
         </div>
+      </header>
 
-        {/* Linha 3 — Período + datas (em linha no desktop) */}
-        <div className="filters__row filters__row--top">
+      {err && (
+        <div className="error-alert" role="alert">
+          {err}
+        </div>
+      )}
+
+      {sucesso && (
+        <div className="success-alert" role="status">
+          {sucesso}
+        </div>
+      )}
+
+      {/* Filtros de Período */}
+      <div className="filters-container">
+        <div className="periodo-filters">
           <div className="btn-group" role="group" aria-label="Atalhos de período">
             <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
               <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
@@ -550,7 +565,7 @@ export default function Ocorrencias() {
             </button>
           </div>
 
-          <div className="range-inline" role="group" aria-label="Intervalo de datas">
+          <div className="date-range" role="group" aria-label="Intervalo de datas">
             <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
             <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
             <span className="range-sep">—</span>
@@ -559,37 +574,62 @@ export default function Ocorrencias() {
           </div>
         </div>
 
-        {/* Linha 4 — Filtros */}
-        <div className="filters__row filters__row--rest">
-          <FunnelIcon className="icon" aria-hidden="true" />
-          <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
-            <option value="todos">Todos os funcionários</option>
-            {funcionarios.map(f => (
-              <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
-            ))}
-          </select>
-          <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
-            <option value="todos">Todos os tipos</option>
-            {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
+        {/* Filtros Avançados */}
+        <div className="advanced-filters">
+          <div className="filter-group">
+            <FunnelIcon className="icon" aria-hidden="true" />
+            <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
+              <option value="todos">Todos os funcionários</option>
+              {funcionarios.map(f => (
+                <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
+              ))}
+            </select>
+            <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
+              <option value="todos">Todos os tipos</option>
+              {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
 
-        {/* Linha 5 — Busca */}
-        <div className="filters__row">
-          <input
-            className="input input--sm"
-            placeholder="Buscar por nome, tipo ou observação…"
-            value={busca}
-            onChange={(e)=>setBusca(e.target.value)}
-            aria-label="Buscar"
-            style={{ width: "100%", maxWidth: 520 }}
-          />
+          {/* Busca */}
+          <div className="search-container">
+            <div className="search-bar" role="search" aria-label="Buscar ocorrências">
+              <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+              <label htmlFor="busca-ocorrencias" className="visually-hidden">Buscar por nome, tipo ou observação</label>
+              <input
+                id="busca-ocorrencias"
+                type="search"
+                className="input input--lg"
+                placeholder="Buscar por nome, tipo ou observação…"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                autoComplete="off"
+              />
+              {Boolean(busca) && (
+                <button
+                  type="button"
+                  className="btn btn--neutral btn--icon-only"
+                  onClick={() => setBusca("")}
+                  aria-label="Limpar busca"
+                >
+                  <XMarkIcon className="icon" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* Alerts */}
-      {err && <div className="alert alert--error" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
-      {sucesso && <div className="alert alert--success" role="status" style={{ marginBottom: 12 }}>{sucesso}</div>}
+      {/* Ações de Exportação */}
+      <div className="export-actions">
+        <button className="btn btn--info btn--sm" onClick={exportarCSV}>
+          <ArrowDownTrayIcon className="icon" aria-hidden="true" />
+          <span>Exportar CSV</span>
+        </button>
+        <button className="btn btn--neutral btn--sm" onClick={exportarPDF}>
+          <PrinterIcon className="icon" aria-hidden="true" />
+          <span>Exportar PDF</span>
+        </button>
+      </div>
 
       {/* KPIs */}
       <div className="stats-grid">
@@ -628,88 +668,142 @@ export default function Ocorrencias() {
         </div>
       )}
 
-      {/* Tabela / Cards */}
-      <div className="table-wrap">
-        {/* Grid para desktop */}
-        <div className="table table--grid" aria-hidden={isMobile}>
-          <div className="th th--date">Data</div>
-          <div className="th th--func">Funcionário</div>
-          <div className="th th--type">Tipo</div>
-          <div className="th th--hours">Horas</div>
-          <div className="th th--obs">Observação</div>
-          <div className="th th--actions">Ações</div>
-
-          {pageItems.map((o) => {
-            const f = mapFunc.get(o.funcionario_id);
-            return (
-              <div key={o.id} className="row">
-                <div className="td td--date">{formatDateBR(fromISO(o.data))}</div>
-                <div className="td td--func">
-                  <span className="dot" style={{ ["--func-color"]: f?.cor || "#999" }} />
-                  <span className="td__main">{f?.nome || `#${o.funcionario_id}`}</span>
-                  {f?.cargo && <span className="td__sub">{f.cargo}</span>}
-                </div>
-                <div className="td td--type">
-                  <StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge>
-                </div>
-                <div className="td td--hours">{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</div>
-                <div className="td td--obs">
-                  {o.obs ? <span className="obs">{o.obs}</span> : <span className="muted">—</span>}
-                </div>
-                <div className="td td--actions">
-                  <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
-                    <PencilSquareIcon className="icon" aria-hidden="true" /> Editar
-                  </button>
-                  <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
-                    <TrashIcon className="icon" aria-hidden="true" /> Excluir
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+      {/* LISTAGEM: Tabela (desktop) + Cards (mobile) - PADRÃO PESSOAS */}
+      <div className="listagem-container">
+        {/* Desktop/tablet: Tabela */}
+        <div className="table-wrapper table-only" role="region" aria-label="Tabela de ocorrências">
+          {loading ? (
+            <div className="loading-message" role="status">Carregando…</div>
+          ) : pageItems.length === 0 ? (
+            <div className="empty-message">Nenhuma ocorrência encontrada no período.</div>
+          ) : (
+            <div className="stat-card" style={{ overflow: "hidden" }}>
+              <table className="ocorrencias-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Data</th>
+                    <th scope="col">Funcionário</th>
+                    <th scope="col">Tipo</th>
+                    <th scope="col">Horas</th>
+                    <th scope="col">Observação</th>
+                    <th scope="col" className="actions-column">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((o) => {
+                    const f = mapFunc.get(o.funcionario_id);
+                    return (
+                      <tr key={o.id}>
+                        <td>{formatDateBR(fromISO(o.data))}</td>
+                        <td>
+                          <div className="funcionario-info">
+                            <span className="dot" style={{ ["--func-color"]: f?.cor || "#999" }} />
+                            <div>
+                              <div className="funcionario-nome">{f?.nome || `#${o.funcionario_id}`}</div>
+                              {f?.cargo && <div className="funcionario-cargo">{f.cargo}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge>
+                        </td>
+                        <td>{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</td>
+                        <td>{o.obs || "—"}</td>
+                        <td>
+                          <div className="actions-buttons">
+                            <button
+                              className="btn btn--neutral btn--sm"
+                              onClick={() => abrirEdicao(o)}
+                              aria-label={`Editar ocorrência de ${f?.nome}`}
+                            >
+                              <PencilSquareIcon className="icon" aria-hidden="true" />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              className="btn btn--danger btn--sm"
+                              onClick={() => excluir(o)}
+                              aria-label={`Excluir ocorrência de ${f?.nome}`}
+                            >
+                              <TrashIcon className="icon" aria-hidden="true" />
+                              <span>Excluir</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* Cards para mobile */}
-        <div className="cards" aria-hidden={!isMobile}>
-          {pageItems.map((o) => {
-            const f = mapFunc.get(o.funcionario_id);
-            return (
-              <div key={o.id} className="card">
-                <div className="card__header">
-                  <div className="card__title">
-                    <span className="dot" style={{ ["--func-color"]: f?.cor || "#999" }} />
-                    <span className="card__name">{f?.nome || `#${o.funcionario_id}`}</span>
-                  </div>
-                  <div className="card__actions">
-                    <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
-                      <PencilSquareIcon className="icon" aria-hidden="true" />
-                    </button>
-                    <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
-                      <TrashIcon className="icon" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-                <div className="card__row">
-                  <span className="card__label">Data</span>
-                  <span className="card__value">{formatDateBR(fromISO(o.data))}</span>
-                </div>
-                <div className="card__row">
-                  <span className="card__label">Tipo</span>
-                  <span className="card__value"><StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge></span>
-                </div>
-                <div className="card__row">
-                  <span className="card__label">Horas</span>
-                  <span className="card__value">{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</span>
-                </div>
-                {o.obs && (
-                  <div className="card__row">
-                    <span className="card__label">Obs.</span>
-                    <span className="card__value">{o.obs}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        {/* Mobile: Cards de ocorrência */}
+        <div className="cards-wrapper cards-only" role="region" aria-label="Lista de ocorrências (versão cartões)">
+          {loading ? (
+            <div className="loading-message" role="status">Carregando…</div>
+          ) : pageItems.length === 0 ? (
+            <div className="empty-message">Nenhuma ocorrência encontrada no período.</div>
+          ) : (
+            <ul className="cards-grid" aria-label="Cartões de ocorrências">
+              {pageItems.map((o) => {
+                const f = mapFunc.get(o.funcionario_id);
+                return (
+                  <li key={o.id} className="ocorrencia-card" aria-label={`Ocorrência: ${f?.nome}`}>
+                    <div className="ocorrencia-card__head">
+                      <div className="ocorrencia-card__title">
+                        <span className="dot" style={{ ["--func-color"]: f?.cor || "#999" }} />
+                        <h3>{f?.nome || `#${o.funcionario_id}`}</h3>
+                      </div>
+                      <div className="ocorrencia-card__actions">
+                        <button
+                          className="btn btn--neutral btn--sm"
+                          onClick={() => abrirEdicao(o)}
+                          aria-label={`Editar ocorrência de ${f?.nome}`}
+                          title="Editar"
+                        >
+                          <PencilSquareIcon className="icon" aria-hidden="true" />
+                          <span>Editar</span>
+                        </button>
+                        <button
+                          className="btn btn--danger btn--sm"
+                          onClick={() => excluir(o)}
+                          aria-label={`Excluir ocorrência de ${f?.nome}`}
+                          title="Excluir"
+                        >
+                          <TrashIcon className="icon" aria-hidden="true" />
+                          <span>Excluir</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="ocorrencia-card__body">
+                      <dl className="ocorrencia-dl">
+                        <div className="ocorrencia-dl__row">
+                          <dt>Data</dt>
+                          <dd>{formatDateBR(fromISO(o.data))}</dd>
+                        </div>
+                        <div className="ocorrencia-dl__row">
+                          <dt>Tipo</dt>
+                          <dd><StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge></dd>
+                        </div>
+                        <div className="ocorrencia-dl__row">
+                          <dt>Horas</dt>
+                          <dd>{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</dd>
+                        </div>
+                        {o.obs && (
+                          <div className="ocorrencia-dl__row">
+                            <dt>Observação</dt>
+                            <dd>{o.obs}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
 
@@ -726,47 +820,65 @@ export default function Ocorrencias() {
         </div>
       )}
 
-      {/* Modal CRUD */}
+      {/* Modal CRUD - PADRÃO PESSOAS */}
       <Modal
         open={modalAberto}
         onClose={() => setModalAberto(false)}
         title={editando ? "Editar Ocorrência" : "Nova Ocorrência"}
         footer={
           <>
-            <button className="btn btn--neutral" onClick={() => setModalAberto(false)}>Cancelar</button>
+            <button className="btn btn--neutral" onClick={() => setModalAberto(false)}>
+              <XMarkIcon className="icon" aria-hidden="true" />
+              <span>Cancelar</span>
+            </button>
             {editando && (
               <button className="btn btn--danger" onClick={() => excluir(editando)}>
-                <TrashIcon className="icon" aria-hidden="true" /><span>Excluir</span>
+                <TrashIcon className="icon" aria-hidden="true" />
+                <span>Excluir</span>
               </button>
             )}
             <button className="btn btn--success" onClick={salvar}>
-              <PlusCircleIcon className="icon" aria-hidden="true" /><span>{editando ? "Salvar" : "Adicionar"}</span>
+              <span>{editando ? "Salvar Alterações" : "Salvar"}</span>
             </button>
           </>
         }
       >
-        <div className="form-grid">
-          <div className="form-field">
-            <label>Funcionário *</label>
-            <select className="input" value={form.funcionario_id} onChange={(e)=>setForm({ ...form, funcionario_id: e.target.value })} required>
-              <option value="">Selecione…</option>
-              {funcionarios.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.pessoa_nome || f?.pessoa?.nome} — {f.cargo_nome || ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-field">
-            <label>Data *</label>
-            <input type="date" className="input" value={form.data} onChange={(e)=>setForm({ ...form, data: e.target.value })} required />
-          </div>
-
-          <div className="form-2col">
+        <form className="form" onSubmit={(e) => { e.preventDefault(); salvar(); }}>
+          <div className="form-grid">
             <div className="form-field">
-              <label>Tipo *</label>
+              <label htmlFor="funcionario">Funcionário *</label>
+              <select 
+                id="funcionario"
+                className="input" 
+                value={form.funcionario_id} 
+                onChange={(e)=>setForm({ ...form, funcionario_id: e.target.value })} 
+                required
+              >
+                <option value="">Selecione…</option>
+                {funcionarios.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.pessoa_nome || f?.pessoa?.nome} — {f.cargo_nome || ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="data">Data *</label>
+              <input 
+                id="data"
+                type="date" 
+                className="input" 
+                value={form.data} 
+                onChange={(e)=>setForm({ ...form, data: e.target.value })} 
+                required 
+              />
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="tipo">Tipo *</label>
               <select
+                id="tipo"
                 className="input"
                 value={form.tipo}
                 onChange={(e)=>setForm({ ...form, tipo: sanitizeTipo(e.target.value) })}
@@ -775,9 +887,11 @@ export default function Ocorrencias() {
                 {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
+
             <div className="form-field">
-              <label>Horas (decimal)</label>
+              <label htmlFor="horas">Horas (decimal)</label>
               <input
+                id="horas"
                 type="number"
                 step="0.01"
                 min="0"
@@ -787,132 +901,406 @@ export default function Ocorrencias() {
                 onChange={(e)=>setForm({ ...form, horas: e.target.value })}
               />
             </div>
-          </div>
 
-          <div className="form-field">
-            <label>Observação</label>
-            <textarea
-              className="input"
-              rows={4}
-              placeholder="Detalhes da ocorrência…"
-              value={form.obs}
-              onChange={(e)=>setForm({ ...form, obs: e.target.value })}
-            />
+            <div className="form-field span-2">
+              <label htmlFor="obs">Observação</label>
+              <textarea
+                id="obs"
+                className="input"
+                rows={4}
+                placeholder="Detalhes da ocorrência…"
+                value={form.obs}
+                onChange={(e)=>setForm({ ...form, obs: e.target.value })}
+              />
+            </div>
           </div>
-        </div>
+        </form>
       </Modal>
 
-      {/* Estilos locais */}
+      {/* estilos locais — seguindo o padrão da página Pessoas */}
       <style jsx>{`
-        /* Alertas */
-        .alert{
-          background: var(--panel);
-          border: 1px solid var(--border);
-          border-left: 4px solid var(--fg);
-          padding: 12px 14px; border-radius: 8px; box-shadow: var(--shadow);
+        .listagem-container { width: 100%; }
+        
+        .filters-container {
+          margin-bottom: 16px;
         }
-        .alert--success{ border-left-color: var(--success); }
-        .alert--error{ border-left-color: var(--error); }
-
-        /* Linha 2 (Ações) */
-        .actions-row{
-          display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;
+        
+        .periodo-filters {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
         }
-
-        /* Filters */
-        .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px }
-        .filters__row--top{ justify-content:space-between; }
-        .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
-        .btn-group .btn.is-active{ 
+        
+        .advanced-filters {
+          display: flex;
+          gap: 16px;
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+        
+        .filter-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        
+        .search-container {
+          flex: 1;
+          min-width: 300px;
+        }
+        
+        .export-actions {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+        
+        .date-range {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .range-sep {
+          color: var(--muted);
+          font-weight: 600;
+        }
+        
+        .btn-group .btn.is-active { 
           outline: 2px solid var(--accent); 
           outline-offset: -2px;
           background: var(--accent-bg);
           color: var(--accent-fg);
         }
-        .range-inline{ display:flex; align-items:center; gap:6px; flex-wrap:wrap }
-        .range-sep{ color: var(--muted) }
-        .filters__row--rest .icon{ width:18px; height:18px; color: var(--muted) }
-        .filters__row--rest select, .filters__row--rest input{ max-width: 280px }
-
-        /* Stats */
-        .stats-grid{
-          display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap:16px; margin:12px 0; width:100%;
+        
+        /* Tabela (desktop) e Cards (mobile) alternados por CSS */
+        .table-only { display: block; }
+        .cards-only { display: none; }
+        
+        @media (max-width: 768px) {
+          .table-only { display: none; }
+          .cards-only { display: block; }
         }
-        .stat-card{ 
-          background:var(--panel); border:1px solid var(--border); border-radius:12px;
-          padding:16px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow);
-          border-left: 4px solid var(--border);
+        
+        /* Info do funcionário na tabela */
+        .funcionario-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
-        .stat-card--info{ border-left-color: var(--info) }
-        .stat-card--success{ border-left-color: var(--success) }
-        .stat-card--warning{ border-left-color: var(--warning) }
-        .stat-card__icon{ width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--panel-muted);color: var(--muted) }
-        .stat-card__content{ flex:1 }
-        .stat-value{ font-size:1.75rem; font-weight:800; line-height:1 }
-        .stat-title{ font-size:.875rem; color:var(--muted); font-weight:600 }
-
+        
+        .funcionario-nome {
+          font-weight: 600;
+        }
+        
+        .funcionario-cargo {
+          font-size: 12px;
+          color: var(--muted);
+        }
+        
+        .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--func-color);
+          flex-shrink: 0;
+        }
+        
+        /* Cards grid (mobile) */
+        .cards-grid {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        
+        .ocorrencia-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          box-shadow: var(--shadow);
+          overflow: hidden;
+          position: relative;
+        }
+        
+        .ocorrencia-card::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background: var(--accent-bg);
+        }
+        
+        .ocorrencia-card__head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 14px 14px 0 14px;
+        }
+        
+        .ocorrencia-card__title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex: 1;
+        }
+        
+        .ocorrencia-card__title h3 {
+          margin: 0;
+          font-size: 1rem;
+          font-weight: 700;
+          color: var(--fg);
+        }
+        
+        .ocorrencia-card__actions {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        
+        .ocorrencia-card__body {
+          padding: 12px 14px 14px 14px;
+        }
+        
+        .ocorrencia-dl {
+          margin: 0;
+          display: grid;
+          gap: 8px;
+        }
+        
+        .ocorrencia-dl__row {
+          display: grid;
+          grid-template-columns: 100px 1fr;
+          gap: 8px;
+          align-items: start;
+        }
+        
+        .ocorrencia-dl__row dt {
+          color: var(--muted);
+          font-weight: 600;
+          font-size: var(--fs-12);
+        }
+        
+        .ocorrencia-dl__row dd {
+          margin: 0;
+          color: var(--fg);
+          font-weight: 500;
+        }
+        
+        /* Tabela padrão (desktop) */
+        .ocorrencias-table th,
+        .ocorrencias-table td { 
+          white-space: nowrap;
+          padding: 12px;
+        }
+        
+        .ocorrencias-table td:nth-child(2),
+        .ocorrencias-table th:nth-child(2),
+        .ocorrencias-table td:nth-child(5),
+        .ocorrencias-table th:nth-child(5) { 
+          white-space: normal;
+        }
+        
+        /* Ações desktop */
+        .actions-buttons { 
+          display: flex; 
+          gap: 6px; 
+          flex-wrap: wrap; 
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 16px;
+          margin-bottom: 16px;
+        }
+        
+        .stat-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          box-shadow: var(--shadow);
+        }
+        
+        .stat-card--info {
+          border-left: 4px solid var(--info);
+        }
+        
+        .stat-card--success {
+          border-left: 4px solid var(--success);
+        }
+        
+        .stat-card--warning {
+          border-left: 4px solid var(--warning);
+        }
+        
+        .stat-card__icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--panel-muted);
+          color: var(--muted);
+        }
+        
+        .stat-card__content {
+          flex: 1;
+        }
+        
+        .stat-value {
+          font-size: 1.75rem;
+          font-weight: 800;
+          line-height: 1;
+          margin-bottom: 4px;
+        }
+        
+        .stat-title {
+          font-size: 0.875rem;
+          color: var(--muted);
+          font-weight: 600;
+        }
+        
         /* Badges */
-        .badge{
-          display:inline-flex; align-items:center; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; border:1px solid;
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid;
         }
-        .badge--neutral{ background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--neutral-border) }
-        .badge--success{ background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border) }
-        .badge--error{ background: var(--error-bg); color: var(--error-fg); border-color: var(--error-border) }
-        .badge--warning{ background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border) }
-        .badge--info{ background: var(--info-bg); color: var(--info-fg); border-color: var(--info-border) }
-        .badge--accent{ background: var(--accent-bg); color: var(--accent-fg); border-color: var(--accent-border) }
-
-        .chips-wrap{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px }
-        .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:999px }
-        .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
-
-        /* Table */
-        .table-wrap{ width:100%; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:var(--shadow) }
-        .table--grid{ display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; min-width:980px }
-        .th{ padding:12px; border-bottom:2px solid var(--border); background:var(--panel-muted); font-weight:700; font-size:14px }
-        .th--actions{ text-align:center }
-        .row{ display:contents }
-        .td{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px }
-        .td--func{ gap:10px }
-        .td__main{ font-weight:700 }
-        .td__sub{ font-size:12px; color: var(--muted) }
-        .dot{ width:10px; height:10px; border-radius:999px; background: var(--func-color); border:1px solid var(--border) }
-        .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
-        .muted{ color: var(--muted) }
-        .td--actions{ justify-content:center; gap:6px }
-
-        /* Cards (mobile) */
-        .cards{ display:none }
-        .card{ background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; display: grid; gap: 8px }
-        .card + .card{ margin-top: 10px }
-        .card__header{ display:flex; align-items:center; justify-content:space-between; gap:10px }
-        .card__title{ display:flex; align-items:center; gap:8px; font-weight:700 }
-        .card__name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 60vw }
-        .card__actions{ display:flex; gap:6px }
-        .card__row{ display:flex; align-items:center; justify-content:space-between; gap:10px }
-        .card__label{ color: var(--muted); font-weight:600; font-size: 12px }
-        .card__value{ font-size: 14px }
-
-        .pagination{ display:flex; align-items:center; justify-content:center; gap:12px; padding:12px }
-        .pagination__status{ color:var(--muted); font-weight:600 }
-
-        .form-grid{ display:flex; flex-direction:column; gap:12px }
-        .form-2col{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
-        .form-field > label{ display:block; font-size:14px; font-weight:600; margin-bottom:6px }
-
-        @media (max-width: 1100px){
-          .filters__row--rest{ flex-wrap:wrap }
+        
+        .badge--neutral { background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--neutral-border) }
+        .badge--success { background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border) }
+        .badge--error { background: var(--error-bg); color: var(--error-fg); border-color: var(--error-border) }
+        .badge--warning { background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border) }
+        .badge--info { background: var(--info-bg); color: var(--info-fg); border-color: var(--info-border) }
+        .badge--accent { background: var(--accent-bg); color: var(--accent-fg); border-color: var(--accent-border) }
+        
+        .chips-wrap {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 16px;
         }
-        @media (max-width: 900px){
-          .actions-row{ justify-content:flex-start }
-          .filters__row--top{ flex-direction:column; align-items:flex-start; gap:8px }
-          .form-2col{ grid-template-columns:1fr }
-          .table--grid{ display:none }
-          .cards{ display:block }
+        
+        .chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 20px;
         }
-        @media (max-width: 480px){
-          .actions-row{ flex-direction:column; align-items:stretch }
+        
+        .chip__count {
+          font-weight: 700;
+          font-size: 12px;
+          color: var(--fg);
+        }
+        
+        .pagination {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          padding: 20px 0;
+        }
+        
+        .pagination__status {
+          color: var(--muted);
+          font-weight: 600;
+          font-size: 14px;
+        }
+        
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        
+        .span-2 {
+          grid-column: span 2;
+        }
+        
+        .form-field > label {
+          display: block;
+          font-size: 14px;
+          font-weight: 600;
+          margin-bottom: 6px;
+        }
+        
+        .success-alert {
+          background: var(--success-bg);
+          color: var(--success-fg);
+          border: 1px solid var(--success-border);
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+        }
+        
+        @media (max-width: 768px) {
+          .advanced-filters {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          
+          .search-container {
+            min-width: auto;
+          }
+          
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .span-2 {
+            grid-column: span 1;
+          }
+          
+          .ocorrencia-dl__row {
+            grid-template-columns: 90px 1fr;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .periodo-filters {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          
+          .filter-group {
+            width: 100%;
+            justify-content: space-between;
+          }
+          
+          .ocorrencia-card__head {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          
+          .ocorrencia-card__actions {
+            width: 100%;
+            justify-content: flex-end;
+          }
         }
       `}</style>
     </>
