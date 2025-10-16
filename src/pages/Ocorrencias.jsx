@@ -536,31 +536,7 @@ export default function Ocorrencias() {
           </button>
         </div>
 
-        {/* Linha 3 — Período + datas (em linha no desktop) */}
-        <div className="filters__row filters__row--top">
-          <div className="btn-group" role="group" aria-label="Atalhos de período">
-            <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
-              <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
-              <span>Semana</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
-              <span>Mês</span>
-            </button>
-            <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
-            <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-            <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
-            <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
-          </div>
-
-          <div className="range-inline" role="group" aria-label="Intervalo de datas">
-            <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
-            <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-            <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
-            <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
-          </div>
-        </div>
+{/* Linha 3 — Período + datas (em linha no desktop) */}<div className="filters__row filters__row--top"><div className="btn-group" role="group" aria-label="Atalhos de período"><button className={btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}} onClick={() => aplicarPeriodo("hoje")}><CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span></button><button className={btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}} onClick={() => aplicarPeriodo("semana")}><span>Semana</span></button><button className={btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}} onClick={() => aplicarPeriodo("mes")}><span>Mês</span></button><label className="visually-hidden" htmlFor="dt-de">Data inicial</label><input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} /><label className="visually-hidden" htmlFor="dt-ate">Data final</label><input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} /></div></div>
 
         {/* Linha 4 — Filtros */}
         <div className="filters__row filters__row--rest">
