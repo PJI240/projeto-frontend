@@ -520,11 +520,11 @@ export default function Ocorrencias() {
             <div className="btn-group" role="group" aria-label="Exportações">
               <button className="btn btn--info" onClick={exportarCSV}>
                 <ArrowDownTrayIcon className="icon" aria-hidden="true" />
-                <span className="btn__text">CSV</span>
+                <span className="btn__text">Exportar CSV</span>
               </button>
               <button className="btn btn--neutral" onClick={exportarPDF}>
                 <PrinterIcon className="icon" aria-hidden="true" />
-                <span className="btn__text">PDF</span>
+                <span className="btn__text">exportar PDF</span>
               </button>
             </div>
 
@@ -572,6 +572,14 @@ export default function Ocorrencias() {
             <option value="todos">Todos os tipos</option>
             {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
+          <input
+            className="input input--sm"
+            placeholder="Buscar por nome, tipo ou observação…"
+            value={busca}
+            onChange={(e)=>setBusca(e.target.value)}
+            aria-label="Buscar"
+            style={{ width: "100%", maxWidth: 520 }}
+          />
         </div>
 
         {/* Linha 5 — Busca */}
