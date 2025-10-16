@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeftIcon,
@@ -196,7 +195,6 @@ export default function Ocorrencias() {
   const carregarTipos = useCallback(async () => {
     try {
       const r = await api(`/api/ocorrencias/tipos`);
-      // aceita array ou string "FERIADO,ATESTADO,..."
       let lista = Array.isArray(r?.tipos) ? r.tipos : (typeof r?.tipos === "string" ? r.tipos.split(",") : []);
       lista = sanitizeTipos(lista);
       if (!lista.length) lista = TIPOS_WHITELIST.slice();
@@ -499,7 +497,7 @@ export default function Ocorrencias() {
       {/* Região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* ===== Container (linhas) no padrão da página Pessoas ===== */}
+      {/* ===== Header ===== */}
       <header className="page-header" role="region" aria-labelledby="titulo-oc">
         {/* Linha 1 — Título e descrição */}
         <div className="page-header__content">
@@ -509,35 +507,40 @@ export default function Ocorrencias() {
           </div>
         </div>
 
-        {/* Linha 2 — Ações */}
-        <div className="actions-row">
-          <button className="btn btn--success" onClick={abrirNovo}>
-            <PlusCircleIcon className="icon" aria-hidden="true" />
-            <span>Nova Ocorrência</span>
-          </button>
+        {/* Linha 2 — Ações (toolbar com visual de card accent à esquerda) */}
+        <div className="toolbar" role="region" aria-label="Ações de ocorrências">
+          <div className="toolbar__left">
+            <button className="btn btn--success" onClick={abrirNovo}>
+              <PlusCircleIcon className="icon" aria-hidden="true" />
+              <span>Nova Ocorrência</span>
+            </button>
+          </div>
 
-          <button className="btn btn--info" onClick={exportarCSV}>
-            <ArrowDownTrayIcon className="icon" aria-hidden="true" />
-            <span>Exportar CSV</span>
-          </button>
+          <div className="toolbar__right">
+            <div className="btn-group" role="group" aria-label="Exportações">
+              <button className="btn btn--info" onClick={exportarCSV}>
+                <ArrowDownTrayIcon className="icon" aria-hidden="true" />
+                <span className="btn__text">CSV</span>
+              </button>
+              <button className="btn btn--neutral" onClick={exportarPDF}>
+                <PrinterIcon className="icon" aria-hidden="true" />
+                <span className="btn__text">PDF</span>
+              </button>
+            </div>
 
-          <button className="btn btn--neutral" onClick={exportarPDF}>
-            <PrinterIcon className="icon" aria-hidden="true" />
-            <span>Exportar PDF</span>
-          </button>
-
-          <button
-            className="btn btn--neutral"
-            onClick={carregarOcorrencias}
-            disabled={loading}
-            aria-busy={loading ? "true" : "false"}
-          >
-            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
-          </button>
+            <button
+              className="btn btn--neutral"
+              onClick={carregarOcorrencias}
+              disabled={loading}
+              aria-busy={loading ? "true" : "false"}
+            >
+              {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+              <span className="btn__text">{loading ? "Atualizando…" : "Atualizar"}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Linha 3 — Período + datas (em linha no desktop) */}
+        {/* Linha 3 — Período + datas */}
         <div className="filters__row filters__row--top">
           <div className="btn-group" role="group" aria-label="Atalhos de período">
             <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
@@ -555,6 +558,7 @@ export default function Ocorrencias() {
             <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
           </div>
         </div>
+
         {/* Linha 4 — Filtros */}
         <div className="filters__row filters__row--rest">
           <FunnelIcon className="icon" aria-hidden="true" />
@@ -652,13 +656,38 @@ export default function Ocorrencias() {
                 <div className="td td--obs">
                   {o.obs ? <span className="obs">{o.obs}</span> : <span className="muted">—</span>}
                 </div>
+
+                {/* AÇÕES: Inline em telas amplas + kebab em telas menores */}
                 <div className="td td--actions">
-                  <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
-                    <PencilSquareIcon className="icon" aria-hidden="true" /> Editar
-                  </button>
-                  <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
-                    <TrashIcon className="icon" aria-hidden="true" /> Excluir
-                  </button>
+                  <div className="actions-inline">
+                    <button className="btn btn--neutral btn--icon" onClick={() => abrirEdicao(o)}>
+                      <PencilSquareIcon className="icon" aria-hidden="true" />
+                      <span className="btn__text">Editar</span>
+                    </button>
+                    <button className="btn btn--danger btn--icon" onClick={() => excluir(o)}>
+                      <TrashIcon className="icon" aria-hidden="true" />
+                      <span className="btn__text">Excluir</span>
+                    </button>
+                  </div>
+
+                  <details className="actions-menu">
+                    <summary aria-label="Mais ações" role="button">
+                      <span className="visually-hidden">Mais ações</span>
+                      <svg className="icon" viewBox="0 0 20 20" aria-hidden="true">
+                        <circle cx="3" cy="10" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="17" cy="10" r="2"/>
+                      </svg>
+                    </summary>
+                    <div className="menu" role="menu">
+                      <button role="menuitem" className="menu__item" onClick={() => abrirEdicao(o)}>
+                        <PencilSquareIcon className="icon" aria-hidden="true" />
+                        <span>Editar</span>
+                      </button>
+                      <button role="menuitem" className="menu__item menu__item--danger" onClick={() => excluir(o)}>
+                        <TrashIcon className="icon" aria-hidden="true" />
+                        <span>Excluir</span>
+                      </button>
+                    </div>
+                  </details>
                 </div>
               </div>
             );
@@ -800,6 +829,8 @@ export default function Ocorrencias() {
 
       {/* Estilos locais */}
       <style jsx>{`
+        .visually-hidden{ position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px, 1px, 1px, 1px); white-space:nowrap }
+
         /* Alertas */
         .alert{
           background: var(--panel);
@@ -810,9 +841,20 @@ export default function Ocorrencias() {
         .alert--success{ border-left-color: var(--success); }
         .alert--error{ border-left-color: var(--error); }
 
-        /* Linha 2 (Ações) */
-        .actions-row{
-          display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;
+        /* ===== Toolbar com “accent-left” (mesmo look dos contadores) ===== */
+        .toolbar{
+          display:flex; align-items:center; justify-content:space-between; gap:12px;
+          margin-top:12px; padding:10px;
+          background:var(--panel); border:1px solid var(--border);
+          border-radius:12px; box-shadow:var(--shadow);
+          border-left:4px solid var(--accent);
+        }
+        .toolbar__left, .toolbar__right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
+        .toolbar .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
+        @media (max-width: 640px){
+          .toolbar{ flex-direction:column; align-items:stretch }
+          .toolbar__right{ justify-content:space-between }
+          .toolbar .btn { width:100% }
         }
 
         /* Filters */
@@ -825,8 +867,6 @@ export default function Ocorrencias() {
           background: var(--accent-bg);
           color: var(--accent-fg);
         }
-        .range-inline{ display:flex; align-items:center; gap:6px; flex-wrap:wrap }
-        .range-sep{ color: var(--muted) }
         .filters__row--rest .icon{ width:18px; height:18px; color: var(--muted) }
         .filters__row--rest select, .filters__row--rest input{ max-width: 280px }
 
@@ -863,24 +903,58 @@ export default function Ocorrencias() {
         .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:999px }
         .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
 
-        /* Table */
-        .table-wrap{ width:100%; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:var(--shadow) }
-        .table--grid{ display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; min-width:980px }
+        /* ===== Tabela com “accent-left” e anti overflow ===== */
+        .table-wrap{
+          width:100%;
+          border:1px solid var(--border);
+          border-radius:12px;
+          background:var(--panel);
+          box-shadow:var(--shadow);
+          border-left:4px solid var(--accent);
+          overflow:auto;
+        }
+        .table--grid{ 
+          display:grid; 
+          grid-template-columns: 112px minmax(180px,1.2fr) 128px 96px minmax(220px,1.6fr) minmax(112px,0.9fr); 
+          min-width: 920px;
+        }
         .th{ padding:12px; border-bottom:2px solid var(--border); background:var(--panel-muted); font-weight:700; font-size:14px }
         .th--actions{ text-align:center }
         .row{ display:contents }
-        .td{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px }
+        .td{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; min-width:0 }
         .td--func{ gap:10px }
-        .td__main{ font-weight:700 }
+        .td__main{ font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
         .td__sub{ font-size:12px; color: var(--muted) }
         .dot{ width:10px; height:10px; border-radius:999px; background: var(--func-color); border:1px solid var(--border) }
-        .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+        .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break: break-word }
         .muted{ color: var(--muted) }
-        .td--actions{ justify-content:center; gap:6px }
+
+        /* ===== Coluna Ações: inline + kebab ===== */
+        .td--actions{ justify-content:flex-end; gap:6px }
+        .actions-inline{ display:flex; gap:6px; flex-wrap:wrap }
+        .actions-menu{ display:none; position:relative }
+        .actions-menu[open] > .menu{
+          position:absolute; right:0; top:calc(100% + 6px); z-index:20;
+          background:var(--panel); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow);
+          min-width: 160px; padding:6px;
+        }
+        .actions-menu summary{ list-style:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:8px; border:1px solid var(--border); background:var(--panel-muted) }
+        .actions-menu .menu__item{
+          width:100%; display:flex; align-items:center; gap:8px;
+          padding:8px 10px; border-radius:8px; border:1px solid transparent; background:transparent;
+        }
+        .actions-menu .menu__item:hover{ background:var(--panel-muted) }
+        .actions-menu .menu__item--danger{ color: var(--error-fg) }
+
+        /* breakpoint: quando faltar espaço, usar kebab */
+        @media (max-width: 1200px){
+          .actions-inline{ display:none }
+          .actions-menu{ display:inline-block }
+        }
 
         /* Cards (mobile) */
         .cards{ display:none }
-        .card{ background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; display: grid; gap: 8px }
+        .card{ background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; display: grid; gap: 8px; border-left:4px solid var(--accent) }
         .card + .card{ margin-top: 10px }
         .card__header{ display:flex; align-items:center; justify-content:space-between; gap:10px }
         .card__title{ display:flex; align-items:center; gap:8px; font-weight:700 }
@@ -897,18 +971,23 @@ export default function Ocorrencias() {
         .form-2col{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
         .form-field > label{ display:block; font-size:14px; font-weight:600; margin-bottom:6px }
 
+        /* Botões com texto colapsável quando faltar espaço */
+        .btn__text{ white-space:nowrap }
+        @media (max-width: 460px){
+          .toolbar__right .btn .btn__text{ display:none }
+        }
+
         @media (max-width: 1100px){
           .filters__row--rest{ flex-wrap:wrap }
         }
         @media (max-width: 900px){
-          .actions-row{ justify-content:flex-start }
           .filters__row--top{ flex-direction:column; align-items:flex-start; gap:8px }
           .form-2col{ grid-template-columns:1fr }
           .table--grid{ display:none }
           .cards{ display:block }
         }
         @media (max-width: 480px){
-          .actions-row{ flex-direction:column; align-items:stretch }
+          .toolbar__right{ flex-direction:column; align-items:stretch }
         }
       `}</style>
     </>
