@@ -52,10 +52,8 @@ function parseNumber(n) {
 
 /* =================== Tipos (sanitização) =================== */
 const TIPOS_WHITELIST = ["FERIADO", "ATESTADO", "FALTA", "FOLGA", "OUTRO"];
-
 function sanitizeTipo(t) {
   if (t == null) return "";
-  // remove barras invertidas e espaços, normaliza para UPPER
   const norm = String(t).replace(/\\+/g, "").trim().toUpperCase();
   return TIPOS_WHITELIST.includes(norm) ? norm : "";
 }
@@ -102,31 +100,50 @@ function Modal({ open, onClose, title, children, footer, size = "medium" }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      className="modal-backdrop"
+      className="fixed inset-0 z-[1000] bg-black/35 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
-      <div className="modal-panel" style={{ maxWidth: sizes[size] }}>
-        <div className="modal-header">
-          <h2 id="modal-title" className="modal-title">{title}</h2>
-          <button className="btn btn--neutral btn--icon" aria-label="Fechar" onClick={onClose}>
-            <XMarkIcon className="icon" aria-hidden="true" />
+      <div className="w-full max-h-[90vh] overflow-auto rounded-xl border border-gray-200 bg-white shadow-xl"
+           style={{ maxWidth: sizes[size] }}>
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <h2 id="modal-title" className="text-lg font-bold">{title}</h2>
+          <button className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm hover:bg-gray-50"
+                  aria-label="Fechar" onClick={onClose}>
+            <XMarkIcon className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
-        {footer && <div className="modal-footer">{footer}</div>}
+        <div className="p-4">{children}</div>
+        {footer && <div className="flex justify-end gap-2 border-t border-gray-200 px-4 py-3">{footer}</div>}
       </div>
-
-      <style jsx>{`
-        .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
-        .modal-panel{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);max-height:90vh;overflow:auto}
-        .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border)}
-        .modal-title{font-size:18px;font-weight:700}
-        .modal-body{padding:16px}
-        .modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border)}
-      `}</style>
     </div>
   );
 }
+
+/* =================== Badge =================== */
+function StatusBadge({ children, tone = "neutral" }) {
+  const map = {
+    neutral: "bg-gray-50 text-gray-700 border-gray-200",
+    success: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    error:   "bg-rose-50 text-rose-700 border-rose-200",
+    warning: "bg-amber-50 text-amber-700 border-amber-200",
+    info:    "bg-sky-50 text-sky-700 border-sky-200",
+    accent:  "bg-indigo-50 text-indigo-700 border-indigo-200",
+  };
+  return (
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${map[tone] || map.neutral}`}>
+      {children}
+    </span>
+  );
+}
+const badgeTone = (tipo) => {
+  const t = String(tipo || "").toUpperCase();
+  if (t.includes("HORA")) return "success";
+  if (t.includes("ATRASO")) return "warning";
+  if (t.includes("AUS") || t.includes("FALTA")) return "error";
+  if (t.includes("ATEST")) return "info";
+  if (t.includes("FER")) return "accent";
+  return "neutral";
+};
 
 /* =================== Página: Ocorrências =================== */
 export default function Ocorrencias() {
@@ -143,7 +160,7 @@ export default function Ocorrencias() {
 
   /* ------------ Filtros ------------ */
   const HOJE = new Date();
-  const [periodo, setPeriodo] = useState("semana"); // 'hoje' | 'semana' | 'mes' | 'custom'
+  const [periodo, setPeriodo] = useState("semana");
   const [de, setDe] = useState(() => toISO(startOfWeek(HOJE)));
   const [ate, setAte] = useState(() => toISO(addDays(startOfWeek(HOJE), 6)));
   const [filtroFuncionario, setFiltroFuncionario] = useState("todos");
@@ -173,12 +190,9 @@ export default function Ocorrencias() {
   const aplicarPeriodo = (p) => {
     const hoje = new Date();
     if (p === "hoje") {
-      setDe(toISO(hoje));
-      setAte(toISO(hoje));
+      setDe(toISO(hoje)); setAte(toISO(hoje));
     } else if (p === "semana") {
-      const ini = startOfWeek(hoje);
-      setDe(toISO(ini));
-      setAte(toISO(addDays(ini, 6)));
+      const ini = startOfWeek(hoje); setDe(toISO(ini)); setAte(toISO(addDays(ini, 6)));
     } else if (p === "mes") {
       setDe(toISO(new Date(hoje.getFullYear(), hoje.getMonth(), 1)));
       setAte(toISO(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)));
@@ -195,16 +209,11 @@ export default function Ocorrencias() {
   const carregarTipos = useCallback(async () => {
     try {
       const r = await api(`/api/ocorrencias/tipos`);
-      // aceita array ou string "FERIADO,ATESTADO,..."
       let lista = Array.isArray(r?.tipos) ? r.tipos : (typeof r?.tipos === "string" ? r.tipos.split(",") : []);
       lista = sanitizeTipos(lista);
       if (!lista.length) lista = TIPOS_WHITELIST.slice();
-
       setTiposPermitidos(lista);
-      setForm(prev => {
-        const tipoOk = sanitizeTipo(prev.tipo) || lista[0];
-        return { ...prev, tipo: tipoOk };
-      });
+      setForm(prev => ({ ...prev, tipo: sanitizeTipo(prev.tipo) || lista[0] }));
     } catch {
       setTiposPermitidos(TIPOS_WHITELIST.slice());
       setForm(prev => ({ ...prev, tipo: sanitizeTipo(prev.tipo) || TIPOS_WHITELIST[0] }));
@@ -212,8 +221,7 @@ export default function Ocorrencias() {
   }, [api]);
 
   const carregarOcorrencias = useCallback(async () => {
-    setLoading(true);
-    setErr(""); setSucesso("");
+    setLoading(true); setErr(""); setSucesso("");
     try {
       const q = (s) => encodeURIComponent(s);
       const qs = `/api/ocorrencias?from=${q(de)}&to=${q(ate)}`
@@ -265,19 +273,12 @@ export default function Ocorrencias() {
       horasTotal += parseNumber(o.horas);
       if (parseNumber(o.horas) > 0) presentesSet.add(o.funcionario_id ?? o.funcionarioId ?? o.funcionario);
     }
-    return {
-      total,
-      horasTotal,
-      presentes: presentesSet.size,
-      porTipo,
-    };
+    return { total, horasTotal, presentes: presentesSet.size, porTipo };
   }, [ocorrencias]);
 
   const porTipoArray = useMemo(() => {
     const arr = [];
-    for (const [tipo, qtd] of kpis.porTipo.entries()) {
-      arr.push({ tipo, qtd });
-    }
+    for (const [tipo, qtd] of kpis.porTipo.entries()) arr.push({ tipo, qtd });
     arr.sort((a, b) => b.qtd - a.qtd);
     return arr;
   }, [kpis]);
@@ -329,9 +330,7 @@ export default function Ocorrencias() {
     setErr(""); setSucesso("");
     try {
       const tipoVal = sanitizeTipo(form.tipo) || (tiposPermitidos[0] || TIPOS_WHITELIST[0]);
-      if (!tiposPermitidos.includes(tipoVal)) {
-        throw new Error(`Tipo inválido. Use um dos valores permitidos: ${tiposPermitidos.join(", ")}.`);
-      }
+      if (!tiposPermitidos.includes(tipoVal)) throw new Error(`Tipo inválido. Use um dos valores permitidos: ${tiposPermitidos.join(", ")}.`);
 
       const payload = {
         funcionario_id: Number(form.funcionario_id),
@@ -340,32 +339,18 @@ export default function Ocorrencias() {
         horas: form.horas === "" ? null : Number(form.horas),
         obs: form.obs || null,
       };
-
-      if (!payload.funcionario_id || !payload.data) {
-        throw new Error("Selecione funcionário e data.");
-      }
+      if (!payload.funcionario_id || !payload.data) throw new Error("Selecione funcionário e data.");
 
       if (editando) {
-        await api(`/api/ocorrencias/${editando.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await api(`/api/ocorrencias/${editando.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         setSucesso("Ocorrência atualizada com sucesso!");
       } else {
-        await api(`/api/ocorrencias`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await api(`/api/ocorrencias`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         setSucesso("Ocorrência adicionada com sucesso!");
       }
-
       setModalAberto(false);
       await carregarOcorrencias();
-    } catch (e) {
-      setErr(e.message || "Falha ao salvar ocorrência.");
-    }
+    } catch (e) { setErr(e.message || "Falha ao salvar ocorrência."); }
   };
   const excluir = async (o) => {
     if (!confirm(`Remover ocorrência de ${mapFunc.get(o.funcionario_id)?.nome || "#"} no dia ${formatDateBR(fromISO(o.data))}?`)) return;
@@ -374,347 +359,244 @@ export default function Ocorrencias() {
       await api(`/api/ocorrencias/${o.id}`, { method: "DELETE" });
       setSucesso("Ocorrência removida com sucesso!");
       await carregarOcorrencias();
-    } catch (e) {
-      setErr(e.message || "Falha ao excluir ocorrência.");
-    }
+    } catch (e) { setErr(e.message || "Falha ao excluir ocorrência."); }
   };
 
   /* ------------ Export CSV ------------ */
   const exportarCSV = () => {
     const header = ["id", "data", "funcionario_id", "funcionario_nome", "tipo", "horas", "obs"];
     const linhas = filtradas.map(o => [
-      o.id,
-      o.data,
-      o.funcionario_id,
-      mapFunc.get(o.funcionario_id)?.nome || "",
-      sanitizeTipo(o.tipo) || "",
-      (o.horas ?? ""),
+      o.id, o.data, o.funcionario_id, mapFunc.get(o.funcionario_id)?.nome || "", sanitizeTipo(o.tipo) || "", (o.horas ?? ""),
       (o.obs ?? "").replace(/\n/g, " ").replace(/;/g, ","),
     ]);
     const csv = [header.join(";")].concat(linhas.map(l => l.join(";"))).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `ocorrencias_${de}_a_${ate}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = `ocorrencias_${de}_a_${ate}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
-  /* ------------ Export PDF (nova guia imprimível) ------------ */
+  /* ------------ Export PDF ------------ */
   const exportarPDF = () => {
-    const win = window.open("", "_blank");
-    if (!win) return;
-
+    const win = window.open("", "_blank"); if (!win) return;
     const rowsHtml = filtradas.map((o) => {
       const f = mapFunc.get(o.funcionario_id);
       const nome = (f?.nome || `#${o.funcionario_id}`).replace(/</g, "&lt;");
       const obs = (o.obs || "").replace(/</g, "&lt;");
       const tipo = sanitizeTipo(o.tipo) || "—";
       const horas = (o.horas != null && o.horas !== "") ? Number(o.horas).toFixed(2) : "—";
-      return `
-        <tr>
-          <td>${formatDateBR(fromISO(o.data))}</td>
-          <td>${nome}</td>
-          <td>${tipo}</td>
-          <td style="text-align:right">${horas}</td>
-          <td>${obs}</td>
-        </tr>`;
+      return `<tr><td>${formatDateBR(fromISO(o.data))}</td><td>${nome}</td><td>${tipo}</td><td style="text-align:right">${horas}</td><td>${obs}</td></tr>`;
     }).join("");
-
     win.document.write(`
-      <!doctype html>
-      <html lang="pt-BR">
-      <head>
-        <meta charset="utf-8"/>
-        <title>Ocorrências ${de} a ${ate}</title>
-        <style>
-          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;padding:24px;color:#111827}
-          h1{font-size:20px;margin:0 0 4px 0}
-          p{margin:0 0 16px 0;color:#6b7280}
-          table{width:100%;border-collapse:collapse;font-size:12px}
-          th,td{border:1px solid #e5e7eb;padding:8px;vertical-align:top}
-          th{background:#f3f4f6;text-align:left}
-          tfoot td{font-weight:700}
-          .muted{color:#6b7280}
-          @media print{ @page{size: A4; margin: 14mm} }
-        </style>
-      </head>
-      <body>
-        <h1>Ocorrências</h1>
-        <p class="muted">Período: ${de} a ${ate}</p>
-        <table>
-          <thead>
-            <tr>
-              <th style="width:90px">Data</th>
-              <th>Funcionário</th>
-              <th style="width:110px">Tipo</th>
-              <th style="width:80px;text-align:right">Horas</th>
-              <th>Observação</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml || `<tr><td colspan="5" class="muted">Sem dados no período.</td></tr>`}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="5">Total de ocorrências: ${filtradas.length} • Horas acumuladas: ${kpis.horasTotal.toFixed(2)}</td>
-            </tr>
-          </tfoot>
-        </table>
-        <script>window.focus();</script>
-      </body>
-      </html>
+      <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><title>Ocorrências ${de} a ${ate}</title>
+      <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;padding:24px;color:#111827}
+        h1{font-size:20px;margin:0 0 4px 0} p{margin:0 0 16px 0;color:#6b7280}
+        table{width:100%;border-collapse:collapse;font-size:12px} th,td{border:1px solid #e5e7eb;padding:8px;vertical-align:top}
+        th{background:#f3f4f6;text-align:left} tfoot td{font-weight:700} .muted{color:#6b7280}
+        @media print{ @page{size: A4; margin: 14mm} }
+      </style></head>
+      <body><h1>Ocorrências</h1><p class="muted">Período: ${de} a ${ate}</p>
+        <table><thead><tr><th style="width:90px">Data</th><th>Funcionário</th><th style="width:110px">Tipo</th>
+        <th style="width:80px;text-align:right">Horas</th><th>Observação</th></tr></thead>
+        <tbody>${rowsHtml || `<tr><td colspan="5" class="muted">Sem dados no período.</td></tr>`}</tbody>
+        <tfoot><tr><td colspan="5">Total de ocorrências: ${filtradas.length} • Horas acumuladas: ${kpis.horasTotal.toFixed(2)}</td></tr></tfoot>
+        </table><script>window.focus();</script></body></html>
     `);
     win.document.close();
   };
-
-  /* ------------ UI helpers ------------ */
-  const badgeTone = (tipo) => {
-    const t = String(tipo || "").toUpperCase();
-    if (t.includes("HORA")) return "success";
-    if (t.includes("ATRASO")) return "warning";
-    if (t.includes("AUS") || t.includes("FALTA")) return "error";
-    if (t.includes("ATEST")) return "info";
-    if (t.includes("FER")) return "accent";
-    return "neutral";
-  };
-  function StatusBadge({ children, tone = "neutral" }) {
-    const map = {
-      neutral: "badge--neutral",
-      success: "badge--success",
-      error: "badge--error",
-      warning: "badge--warning",
-      info: "badge--info",
-      accent: "badge--accent",
-    };
-    const cls = map[tone] || map.neutral;
-    return <span className={`badge ${cls}`}>{children}</span>;
-  }
 
   /* =================== RENDER =================== */
   return (
     <>
       {/* Região viva para leitores de tela */}
-      <div ref={liveRef} aria-live="polite" className="visually-hidden" />
+      <div ref={liveRef} aria-live="polite" className="sr-only" />
 
-      {/* ===== Container (linhas) no padrão da página Pessoas ===== */}
-      <header className="page-header" role="region" aria-labelledby="titulo-oc">
-        {/* Linha 1 — Título e descrição */}
-        <div className="page-header__content">
-          <div className="page-header__info">
-            <h1 id="titulo-oc" className="page-title">Ocorrências</h1>
-            <p className="page-subtitle">Registre e acompanhe ausências, atestados, feriados e outras ocorrências</p>
+      {/* Cabeçalho */}
+      <header className="mb-3" role="region" aria-labelledby="titulo-oc">
+        <div className="mb-2">
+          <h1 id="titulo-oc" className="text-2xl font-extrabold tracking-tight text-gray-900">Ocorrências</h1>
+          <p className="text-sm text-gray-500">Registre e acompanhe ausências, atestados, feriados e outras ocorrências</p>
+        </div>
+
+        {/* Toolbar unificada */}
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_auto_auto] items-start">
+          {/* Filtros + Busca */}
+          <div className="flex flex-wrap items-center gap-2">
+            <FunnelIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+            <select className="input input--sm min-w-[210px]" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
+              <option value="todos">Todos os funcionários</option>
+              {funcionarios.map(f => (
+                <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
+              ))}
+            </select>
+            <select className="input input--sm min-w-[160px]" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
+              <option value="todos">Todos os tipos</option>
+              {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <input
+              className="input input--sm flex-1 min-w-[200px]"
+              placeholder="Buscar por nome, tipo ou observação…"
+              value={busca}
+              onChange={(e)=>setBusca(e.target.value)}
+              aria-label="Buscar"
+            />
           </div>
-        </div>
 
-        {/* Linha 2 — Ações */}
-        <div className="actions-row">
-          <button className="btn btn--success" onClick={abrirNovo}>
-            <PlusCircleIcon className="icon" aria-hidden="true" />
-            <span>Nova Ocorrência</span>
-          </button>
-
-          <button className="btn btn--info" onClick={exportarCSV}>
-            <ArrowDownTrayIcon className="icon" aria-hidden="true" />
-            <span>Exportar CSV</span>
-          </button>
-
-          <button className="btn btn--neutral" onClick={exportarPDF}>
-            <PrinterIcon className="icon" aria-hidden="true" />
-            <span>Exportar PDF</span>
-          </button>
-
-          <button
-            className="btn btn--neutral"
-            onClick={carregarOcorrencias}
-            disabled={loading}
-            aria-busy={loading ? "true" : "false"}
-          >
-            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
-          </button>
-        </div>
-
-        {/* Linha 3 — Período + datas (em linha no desktop) */}
-        <div className="filters__row filters__row--top">
-          <div className="btn-group" role="group" aria-label="Atalhos de período">
-            <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
-              <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
-              <span>Semana</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
-              <span>Mês</span>
-            </button>
-            <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
-            <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-            <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
-            <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
+          {/* Período + datas */}
+          <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-center">
+            <div className="inline-flex flex-wrap gap-1" role="group" aria-label="Atalhos de período">
+              <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={()=>aplicarPeriodo("hoje")}>
+                <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
+              </button>
+              <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={()=>aplicarPeriodo("semana")}><span>Semana</span></button>
+              <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={()=>aplicarPeriodo("mes")}><span>Mês</span></button>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="dt-de">Data inicial</label>
+              <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+              <span aria-hidden className="text-gray-400">—</span>
+              <label className="sr-only" htmlFor="dt-ate">Data final</label>
+              <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
+            </div>
           </div>
-        </div>
-        {/* Linha 4 — Filtros */}
-        <div className="filters__row filters__row--rest">
-          <FunnelIcon className="icon" aria-hidden="true" />
-          <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
-            <option value="todos">Todos os funcionários</option>
-            {funcionarios.map(f => (
-              <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
-            ))}
-          </select>
-          <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
-            <option value="todos">Todos os tipos</option>
-            {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
 
-        {/* Linha 5 — Busca */}
-        <div className="filters__row">
-          <input
-            className="input input--sm"
-            placeholder="Buscar por nome, tipo ou observação…"
-            value={busca}
-            onChange={(e)=>setBusca(e.target.value)}
-            aria-label="Buscar"
-            style={{ width: "100%", maxWidth: 520 }}
-          />
+          {/* Ações */}
+          <div className="flex flex-wrap gap-2 justify-start lg:justify-end">
+            <button className="btn btn--success" onClick={abrirNovo}>
+              <PlusCircleIcon className="icon" aria-hidden="true" /><span>Nova Ocorrência</span>
+            </button>
+            <button className="btn btn--info" onClick={exportarCSV}>
+              <ArrowDownTrayIcon className="icon" aria-hidden="true" /><span>Exportar CSV</span>
+            </button>
+            <button className="btn btn--neutral" onClick={exportarPDF}>
+              <PrinterIcon className="icon" aria-hidden="true" /><span>Exportar PDF</span>
+            </button>
+            <button className="btn btn--neutral" onClick={carregarOcorrencias} disabled={loading} aria-busy={loading ? "true" : "false"}>
+              {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+              <span>{loading ? "Atualizando…" : "Atualizar"}</span>
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Alerts */}
-      {err && <div className="alert alert--error" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
-      {sucesso && <div className="alert alert--success" role="status" style={{ marginBottom: 12 }}>{sucesso}</div>}
+      {err && <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-white shadow-sm pl-3 pr-3 py-2">
+        <div className="border-l-4 border-rose-500 pl-3 text-rose-700 font-medium">{err}</div>
+      </div>}
+      {sucesso && <div role="status" className="mb-3 rounded-lg border border-emerald-200 bg-white shadow-sm pl-3 pr-3 py-2">
+        <div className="border-l-4 border-emerald-500 pl-3 text-emerald-700 font-medium">{sucesso}</div>
+      </div>}
 
       {/* KPIs */}
-      <div className="stats-grid">
-        <div className="stat-card stat-card--info">
-          <div className="stat-card__icon"><ClipboardDocumentListIcon className="icon" aria-hidden="true" /></div>
-          <div className="stat-card__content">
-            <div className="stat-value">{kpis.total}</div>
-            <div className="stat-title">Ocorrências no período</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+        <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-white shadow-sm px-4 py-3">
+          <div className="h-11 w-11 rounded-md bg-sky-50 text-sky-500 grid place-items-center">
+            <ClipboardDocumentListIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="text-2xl font-extrabold leading-none">{kpis.total}</div>
+            <div className="text-sm font-semibold text-gray-500">Ocorrências no período</div>
           </div>
         </div>
-        <div className="stat-card stat-card--success">
-          <div className="stat-card__icon"><ClockIcon className="icon" aria-hidden="true" /></div>
-          <div className="stat-card__content">
-            <div className="stat-value">{kpis.horasTotal.toFixed(2)}</div>
-            <div className="stat-title">Horas acumuladas</div>
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white shadow-sm px-4 py-3">
+          <div className="h-11 w-11 rounded-md bg-emerald-50 text-emerald-600 grid place-items-center">
+            <ClockIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="text-2xl font-extrabold leading-none">{kpis.horasTotal.toFixed(2)}</div>
+            <div className="text-sm font-semibold text-gray-500">Horas acumuladas</div>
           </div>
         </div>
-        <div className="stat-card stat-card--warning">
-          <div className="stat-card__icon"><UserGroupIcon className="icon" aria-hidden="true" /></div>
-          <div className="stat-card__content">
-            <div className="stat-value">{kpis.presentes}</div>
-            <div className="stat-title">Funcionários impactados</div>
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-white shadow-sm px-4 py-3">
+          <div className="h-11 w-11 rounded-md bg-amber-50 text-amber-600 grid place-items-center">
+            <UserGroupIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="text-2xl font-extrabold leading-none">{kpis.presentes}</div>
+            <div className="text-sm font-semibold text-gray-500">Funcionários impactados</div>
           </div>
         </div>
       </div>
 
       {/* Totais por tipo */}
       {porTipoArray.length > 0 && (
-        <div className="chips-wrap" aria-label="Totais por tipo">
+        <div className="mb-3 flex flex-wrap gap-2" aria-label="Totais por tipo">
           {porTipoArray.map(({ tipo, qtd }) => (
-            <span key={tipo} className="chip" title={`${qtd} ocorrência(s) do tipo ${tipo}`}>
+            <span key={tipo} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm">
               <StatusBadge tone={badgeTone(tipo)}>{tipo}</StatusBadge>
-              <span className="chip__count">{qtd}</span>
+              <span className="text-gray-700 font-bold text-xs">{qtd}</span>
             </span>
           ))}
         </div>
       )}
 
-      {/* Tabela / Cards */}
-      <div className="table-wrap">
-        {/* Grid para desktop */}
-        <div className="table table--grid" aria-hidden={isMobile}>
-          <div className="th th--date">Data</div>
-          <div className="th th--func">Funcionário</div>
-          <div className="th th--type">Tipo</div>
-          <div className="th th--hours">Horas</div>
-          <div className="th th--obs">Observação</div>
-          <div className="th th--actions">Ações</div>
-
-          {pageItems.map((o) => {
-            const f = mapFunc.get(o.funcionario_id);
-            return (
-              <div key={o.id} className="row">
-                <div className="td td--date">{formatDateBR(fromISO(o.data))}</div>
-                <div className="td td--func">
-                  <span className="dot" style={{ ["--func-color"]: f?.cor || "#999" }} />
-                  <span className="td__main">{f?.nome || `#${o.funcionario_id}`}</span>
-                  {f?.cargo && <span className="td__sub">{f.cargo}</span>}
-                </div>
-                <div className="td td--type">
-                  <StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge>
-                </div>
-                <div className="td td--hours">{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</div>
-                <div className="td td--obs">
-                  {o.obs ? <span className="obs">{o.obs}</span> : <span className="muted">—</span>}
-                </div>
-                <div className="td td--actions">
-                  <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
-                    <PencilSquareIcon className="icon" aria-hidden="true" /> Editar
-                  </button>
-                  <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
-                    <TrashIcon className="icon" aria-hidden="true" /> Excluir
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Cards para mobile */}
-        <div className="cards" aria-hidden={!isMobile}>
-          {pageItems.map((o) => {
-            const f = mapFunc.get(o.funcionario_id);
-            return (
-              <div key={o.id} className="card">
-                <div className="card__header">
-                  <div className="card__title">
-                    <span className="dot" style={{ ["--func-color"]: f?.cor || "#999" }} />
-                    <span className="card__name">{f?.nome || `#${o.funcionario_id}`}</span>
-                  </div>
-                  <div className="card__actions">
-                    <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
-                      <PencilSquareIcon className="icon" aria-hidden="true" />
-                    </button>
-                    <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
-                      <TrashIcon className="icon" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-                <div className="card__row">
-                  <span className="card__label">Data</span>
-                  <span className="card__value">{formatDateBR(fromISO(o.data))}</span>
-                </div>
-                <div className="card__row">
-                  <span className="card__label">Tipo</span>
-                  <span className="card__value"><StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge></span>
-                </div>
-                <div className="card__row">
-                  <span className="card__label">Horas</span>
-                  <span className="card__value">{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</span>
-                </div>
-                {o.obs && (
-                  <div className="card__row">
-                    <span className="card__label">Obs.</span>
-                    <span className="card__value">{o.obs}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {/* Tabela com “bordinha” azul arredondada à esquerda */}
+      <div className="relative overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+        {/* faixa azul lateral esquerda com raio */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-sky-500 rounded-l-lg" aria-hidden="true" />
+        <table className="min-w-[980px] w-full text-sm">
+          <thead className="bg-gray-50 text-left">
+            <tr className="text-gray-600">
+              <th className="px-4 py-3 font-semibold">Data</th>
+              <th className="px-4 py-3 font-semibold">Funcionário</th>
+              <th className="px-4 py-3 font-semibold">Tipo</th>
+              <th className="px-4 py-3 font-semibold">Horas</th>
+              <th className="px-4 py-3 font-semibold">Observação</th>
+              <th className="px-4 py-3 font-semibold text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.map((o) => {
+              const f = mapFunc.get(o.funcionario_id);
+              return (
+                <tr key={o.id} className="border-t border-gray-200">
+                  <td className="px-4 py-3 align-top">{formatDateBR(fromISO(o.data))}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full border border-gray-200" style={{ background: f?.cor || "#999" }} />
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 truncate">{f?.nome || `#${o.funcionario_id}`}</div>
+                        {f?.cargo && <div className="text-xs text-gray-500">{f.cargo}</div>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <StatusBadge tone={badgeTone(o.tipo)}>{sanitizeTipo(o.tipo) || "—"}</StatusBadge>
+                  </td>
+                  <td className="px-4 py-3 align-top">{o.horas != null && o.horas !== "" ? Number(o.horas).toFixed(2) : "—"}</td>
+                  <td className="px-4 py-3 align-top">
+                    {o.obs ? <span className="line-clamp-2">{o.obs}</span> : <span className="text-gray-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <div className="flex items-center justify-center gap-2">
+                      <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
+                        <PencilSquareIcon className="icon" aria-hidden="true" /> <span className="hidden sm:inline">Editar</span>
+                      </button>
+                      <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
+                        <TrashIcon className="icon" aria-hidden="true" /> <span className="hidden sm:inline">Excluir</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {pageItems.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-gray-500">Sem dados no período.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Paginação */}
       {totalPages > 1 && (
-        <div className="pagination">
+        <div className="flex items-center justify-center gap-3 px-3 py-3">
           <button className="btn btn--neutral" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
             <ChevronLeftIcon className="icon" aria-hidden="true" /><span>Anterior</span>
           </button>
-          <span className="pagination__status">Página {page} de {totalPages}</span>
+          <span className="text-sm font-semibold text-gray-500">Página {page} de {totalPages}</span>
           <button className="btn btn--neutral" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
             <span>Próxima</span><ChevronRightIcon className="icon" aria-hidden="true" />
           </button>
@@ -740,175 +622,47 @@ export default function Ocorrencias() {
           </>
         }
       >
-        <div className="form-grid">
-          <div className="form-field">
-            <label>Funcionário *</label>
-            <select className="input" value={form.funcionario_id} onChange={(e)=>setForm({ ...form, funcionario_id: e.target.value })} required>
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-semibold">Funcionário *</label>
+            <select className="input w-full" value={form.funcionario_id} onChange={(e)=>setForm({ ...form, funcionario_id: e.target.value })} required>
               <option value="">Selecione…</option>
               {funcionarios.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.pessoa_nome || f?.pessoa?.nome} — {f.cargo_nome || ""}
+                  {(f.pessoa_nome || f?.pessoa?.nome) ?? `#${f.id}`} {f.cargo_nome ? `— ${f.cargo_nome}` : ""}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="form-field">
-            <label>Data *</label>
-            <input type="date" className="input" value={form.data} onChange={(e)=>setForm({ ...form, data: e.target.value })} required />
+          <div>
+            <label className="mb-1 block text-sm font-semibold">Data *</label>
+            <input type="date" className="input w-full" value={form.data} onChange={(e)=>setForm({ ...form, data: e.target.value })} required />
           </div>
 
-          <div className="form-2col">
-            <div className="form-field">
-              <label>Tipo *</label>
-              <select
-                className="input"
-                value={form.tipo}
-                onChange={(e)=>setForm({ ...form, tipo: sanitizeTipo(e.target.value) })}
-                required
-              >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-semibold">Tipo *</label>
+              <select className="input w-full" value={form.tipo} onChange={(e)=>setForm({ ...form, tipo: sanitizeTipo(e.target.value) })} required>
                 {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div className="form-field">
-              <label>Horas (decimal)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="input"
-                placeholder="Ex.: 2.50"
-                value={form.horas}
-                onChange={(e)=>setForm({ ...form, horas: e.target.value })}
-              />
+            <div>
+              <label className="mb-1 block text-sm font-semibold">Horas (decimal)</label>
+              <input type="number" step="0.01" min="0" className="input w-full" placeholder="Ex.: 2.50" value={form.horas} onChange={(e)=>setForm({ ...form, horas: e.target.value })} />
             </div>
           </div>
 
-          <div className="form-field">
-            <label>Observação</label>
-            <textarea
-              className="input"
-              rows={4}
-              placeholder="Detalhes da ocorrência…"
-              value={form.obs}
-              onChange={(e)=>setForm({ ...form, obs: e.target.value })}
-            />
+          <div>
+            <label className="mb-1 block text-sm font-semibold">Observação</label>
+            <textarea className="input w-full" rows={4} placeholder="Detalhes da ocorrência…" value={form.obs} onChange={(e)=>setForm({ ...form, obs: e.target.value })} />
           </div>
         </div>
       </Modal>
 
-      {/* Estilos locais */}
+      {/* Utilitários locais (line-clamp para obs) */}
       <style jsx>{`
-        /* Alertas */
-        .alert{
-          background: var(--panel);
-          border: 1px solid var(--border);
-          border-left: 4px solid var(--fg);
-          padding: 12px 14px; border-radius: 8px; box-shadow: var(--shadow);
-        }
-        .alert--success{ border-left-color: var(--success); }
-        .alert--error{ border-left-color: var(--error); }
-
-        /* Linha 2 (Ações) */
-        .actions-row{
-          display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;
-        }
-
-        /* Filters */
-        .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px }
-        .filters__row--top{ justify-content:space-between; }
-        .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
-        .btn-group .btn.is-active{ 
-          outline: 2px solid var(--accent); 
-          outline-offset: -2px;
-          background: var(--accent-bg);
-          color: var(--accent-fg);
-        }
-        .range-inline{ display:flex; align-items:center; gap:6px; flex-wrap:wrap }
-        .range-sep{ color: var(--muted) }
-        .filters__row--rest .icon{ width:18px; height:18px; color: var(--muted) }
-        .filters__row--rest select, .filters__row--rest input{ max-width: 280px }
-
-        /* Stats */
-        .stats-grid{
-          display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap:16px; margin:12px 0; width:100%;
-        }
-        .stat-card{ 
-          background:var(--panel); border:1px solid var(--border); border-radius:12px;
-          padding:16px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow);
-          border-left: 4px solid var(--border);
-        }
-        .stat-card--info{ border-left-color: var(--info) }
-        .stat-card--success{ border-left-color: var(--success) }
-        .stat-card--warning{ border-left-color: var(--warning) }
-        .stat-card__icon{ width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--panel-muted);color: var(--muted) }
-        .stat-card__content{ flex:1 }
-        .stat-value{ font-size:1.75rem; font-weight:800; line-height:1 }
-        .stat-title{ font-size:.875rem; color:var(--muted); font-weight:600 }
-
-        /* Badges */
-        .badge{
-          display:inline-flex; align-items:center; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; border:1px solid;
-        }
-        .badge--neutral{ background: var(--neutral-bg); color: var(--neutral-fg); border-color: var(--neutral-border) }
-        .badge--success{ background: var(--success-bg); color: var(--success-fg); border-color: var(--success-border) }
-        .badge--error{ background: var(--error-bg); color: var(--error-fg); border-color: var(--error-border) }
-        .badge--warning{ background: var(--warning-bg); color: var(--warning-fg); border-color: var(--warning-border) }
-        .badge--info{ background: var(--info-bg); color: var(--info-fg); border-color: var(--info-border) }
-        .badge--accent{ background: var(--accent-bg); color: var(--accent-fg); border-color: var(--accent-border) }
-
-        .chips-wrap{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px }
-        .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:999px }
-        .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
-
-        /* Table */
-        .table-wrap{ width:100%; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:var(--shadow) }
-        .table--grid{ display:grid; grid-template-columns: 120px 1.3fr 140px 110px 1.6fr 120px; min-width:980px }
-        .th{ padding:12px; border-bottom:2px solid var(--border); background:var(--panel-muted); font-weight:700; font-size:14px }
-        .th--actions{ text-align:center }
-        .row{ display:contents }
-        .td{ padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px }
-        .td--func{ gap:10px }
-        .td__main{ font-weight:700 }
-        .td__sub{ font-size:12px; color: var(--muted) }
-        .dot{ width:10px; height:10px; border-radius:999px; background: var(--func-color); border:1px solid var(--border) }
-        .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
-        .muted{ color: var(--muted) }
-        .td--actions{ justify-content:center; gap:6px }
-
-        /* Cards (mobile) */
-        .cards{ display:none }
-        .card{ background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; display: grid; gap: 8px }
-        .card + .card{ margin-top: 10px }
-        .card__header{ display:flex; align-items:center; justify-content:space-between; gap:10px }
-        .card__title{ display:flex; align-items:center; gap:8px; font-weight:700 }
-        .card__name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 60vw }
-        .card__actions{ display:flex; gap:6px }
-        .card__row{ display:flex; align-items:center; justify-content:space-between; gap:10px }
-        .card__label{ color: var(--muted); font-weight:600; font-size: 12px }
-        .card__value{ font-size: 14px }
-
-        .pagination{ display:flex; align-items:center; justify-content:center; gap:12px; padding:12px }
-        .pagination__status{ color:var(--muted); font-weight:600 }
-
-        .form-grid{ display:flex; flex-direction:column; gap:12px }
-        .form-2col{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
-        .form-field > label{ display:block; font-size:14px; font-weight:600; margin-bottom:6px }
-
-        @media (max-width: 1100px){
-          .filters__row--rest{ flex-wrap:wrap }
-        }
-        @media (max-width: 900px){
-          .actions-row{ justify-content:flex-start }
-          .filters__row--top{ flex-direction:column; align-items:flex-start; gap:8px }
-          .form-2col{ grid-template-columns:1fr }
-          .table--grid{ display:none }
-          .cards{ display:block }
-        }
-        @media (max-width: 480px){
-          .actions-row{ flex-direction:column; align-items:stretch }
-        }
+        .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
       `}</style>
     </>
   );
