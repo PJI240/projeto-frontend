@@ -548,12 +548,15 @@ export default function Ocorrencias() {
             <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
               <span>Mês</span>
             </button>
+            <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
+            <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+            <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
+            <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
           </div>
 
           <div className="range-inline" role="group" aria-label="Intervalo de datas">
             <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
             <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
-            <span className="range-sep">—</span>
             <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
             <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
           </div>
