@@ -658,7 +658,7 @@ export default function Ocorrencias() {
                 </div>
                 <div className="td td--actions">
                   <button className="btn btn--neutral btn--icon" aria-label="Editar" onClick={() => abrirEdicao(o)}>
-                    <PencilSquareIcon className="icon" aria-hidden="true" />
+                    <PencilSquareIcon className="icon" aria-hidden="true" /> Editar
                   </button>
                   <button className="btn btn--danger btn--icon" aria-label="Excluir" onClick={() => excluir(o)}>
                     <TrashIcon className="icon" aria-hidden="true" />
