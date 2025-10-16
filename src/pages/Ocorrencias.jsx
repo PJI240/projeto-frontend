@@ -55,7 +55,6 @@ const TIPOS_WHITELIST = ["FERIADO", "ATESTADO", "FALTA", "FOLGA", "OUTRO"];
 
 function sanitizeTipo(t) {
   if (t == null) return "";
-  // remove barras invertidas e espaços, normaliza para UPPER
   const norm = String(t).replace(/\\+/g, "").trim().toUpperCase();
   return TIPOS_WHITELIST.includes(norm) ? norm : "";
 }
@@ -507,79 +506,93 @@ export default function Ocorrencias() {
           </div>
         </div>
 
-        {/* Linha 2 — Ações (toolbar com visual de card accent à esquerda) */}
+        {/* Linha 2 — Toolbar clean + pills brancas + segmented */}
         <div className="toolbar" role="region" aria-label="Ações de ocorrências">
+          {/* Esquerda */}
           <div className="toolbar__left">
-           
-          </div>
-
-          <div className="toolbar__right">
-             <button className="btn btn--success" onClick={abrirNovo}>
+            <button className="btn btn--primary" onClick={abrirNovo}>
               <PlusCircleIcon className="icon" aria-hidden="true" />
               <span>Nova Ocorrência</span>
             </button>
-            <div className="btn-group" role="group" aria-label="Exportações">
-              <button className="btn btn--info" onClick={exportarCSV}>
-                <ArrowDownTrayIcon className="icon" aria-hidden="true" />
-                <span className="btn__text">Exportar CSV</span>
-              </button>
-              <button className="btn btn--neutral" onClick={exportarPDF}>
-                <PrinterIcon className="icon" aria-hidden="true" />
-                <span className="btn__text">exportar PDF</span>
-              </button>
-            </div>
-
+            <button className="btn btn--soft" onClick={exportarCSV}>
+              <ArrowDownTrayIcon className="icon" aria-hidden="true" />
+              <span>Exportar CSV</span>
+            </button>
+            <button className="btn btn--soft" onClick={exportarPDF}>
+              <PrinterIcon className="icon" aria-hidden="true" />
+              <span>exportar PDF</span>
+            </button>
             <button
-              className="btn btn--neutral"
+              className="btn btn--soft"
               onClick={carregarOcorrencias}
               disabled={loading}
               aria-busy={loading ? "true" : "false"}
             >
               {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-              <span className="btn__text">{loading ? "Atualizando…" : "Atualizar"}</span>
+              <span>Atualizar</span>
             </button>
           </div>
-        </div>
 
-        {/* Linha 3 — Período + datas */}
-        <div className="filters__row filters__row--top">
-          <div className="btn-group" role="group" aria-label="Atalhos de período">
-            <button className={`btn btn--neutral ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("hoje")}>
-              <CalendarDaysIcon className="icon" aria-hidden="true" /><span>Hoje</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("semana")}>
-              <span>Semana</span>
-            </button>
-            <button className={`btn btn--neutral ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo("mes")}>
-              <span>Mês</span>
-            </button>
+          {/* Direita */}
+          <div className="toolbar__right">
+            <div className="segmented" role="group" aria-label="Atalhos de período">
+              <button className={`segmented__btn ${periodo==='hoje' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo('hoje')}>
+                <CalendarDaysIcon className="icon" aria-hidden="true" />
+                <span>Hoje</span>
+              </button>
+              <button className={`segmented__btn ${periodo==='semana' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo('semana')}>
+                <span>Semana</span>
+              </button>
+              <button className={`segmented__btn ${periodo==='mes' ? 'is-active' : ''}`} onClick={() => aplicarPeriodo('mes')}>
+                <span>Mês</span>
+              </button>
+            </div>
+
             <label className="visually-hidden" htmlFor="dt-de">Data inicial</label>
-            <input id="dt-de" type="date" className="input input--sm" value={de} onChange={(e)=>{ setDe(e.target.value); setPeriodo("custom"); }} />
+            <div className="input-pill">
+              <CalendarDaysIcon className="icon" aria-hidden="true" />
+              <input
+                id="dt-de"
+                type="date"
+                value={de}
+                onChange={(e)=>{ setDe(e.target.value); setPeriodo('custom'); }}
+                aria-label="Data inicial"
+              />
+            </div>
+
             <label className="visually-hidden" htmlFor="dt-ate">Data final</label>
-            <input id="dt-ate" type="date" className="input input--sm" value={ate} onChange={(e)=>{ setAte(e.target.value); setPeriodo("custom"); }} />
+            <div className="input-pill">
+              <CalendarDaysIcon className="icon" aria-hidden="true" />
+              <input
+                id="dt-ate"
+                type="date"
+                value={ate}
+                onChange={(e)=>{ setAte(e.target.value); setPeriodo('custom'); }}
+                aria-label="Data final"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Linha 4 — Filtros */}
-        <div className="filters__row filters__row--rest">
+        {/* Linha 3 — Filtros + Busca em uma faixa */}
+        <div className="filters-row-one">
           <FunnelIcon className="icon" aria-hidden="true" />
-          <select className="input input--sm" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
+          <select className="pill" value={filtroFuncionario} onChange={(e)=>setFiltroFuncionario(e.target.value)} aria-label="Filtrar por funcionário">
             <option value="todos">Todos os funcionários</option>
             {funcionarios.map(f => (
               <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || f.nome || `#${f.id}`}</option>
             ))}
           </select>
-          <select className="input input--sm" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
+          <select className="pill" value={filtroTipo} onChange={(e)=>setFiltroTipo(e.target.value)} aria-label="Filtrar por tipo">
             <option value="todos">Todos os tipos</option>
             {tiposPermitidos.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <input
-            className="input input--sm"
-            placeholder="Buscar por nome, tipo ou observação…"
+            className="pill pill--grow"
+            placeholder="Buscar por nome, tipo ou observação..."
             value={busca}
             onChange={(e)=>setBusca(e.target.value)}
             aria-label="Buscar"
-            style={{ width: "100%", maxWidth: 520 }}
           />
         </div>
       </header>
@@ -654,7 +667,7 @@ export default function Ocorrencias() {
                   {o.obs ? <span className="obs">{o.obs}</span> : <span className="muted">—</span>}
                 </div>
 
-                {/* AÇÕES: Inline em telas amplas + kebab em telas menores */}
+                {/* Ações: inline (desktop) + kebab (médio/pequeno) */}
                 <div className="td td--actions">
                   <div className="actions-inline">
                     <button className="btn btn--neutral btn--icon" onClick={() => abrirEdicao(o)}>
@@ -838,45 +851,73 @@ export default function Ocorrencias() {
         .alert--success{ border-left-color: var(--success); }
         .alert--error{ border-left-color: var(--error); }
 
-/* ===== Toolbar (sem contorno, sem accent, sem sombra) ===== */
-.toolbar{
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
-  margin-top:12px; padding:0;          /* sem “card look” */
-  background:transparent;               /* sem fundo */
-  border:none;                          /* sem borda */
-  border-radius:0;                      /* sem raio */
-  box-shadow:none;                      /* sem sombra */
-}
-.toolbar__left,
-.toolbar__right{
-  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-}
-
-/* grupo de botões segue igual */
-.toolbar .btn-group{ display:flex; gap:6px; flex-wrap:wrap }
-
-/* responsivo: empilha no mobile, sem estilização de card */
-@media (max-width: 640px){
-  .toolbar{ flex-direction:column; align-items:stretch; gap:8px }
-  .toolbar__right{ justify-content:space-between }
-  /* se quiser os botões ocupando a largura toda no mobile, ative a linha abaixo */
-  /* .toolbar .btn { width:100% } */
-}
-
-        /* Filters */
-        .filters__row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px }
-        .filters__row--top{ justify-content:space-between; }
-        .btn-group{ display:flex; gap:2px; flex-wrap:wrap }
-        .btn-group .btn.is-active{ 
-          outline: 2px solid var(--accent); 
-          outline-offset: -2px;
-          background: var(--accent-bg);
-          color: var(--accent-fg);
+        /* ===== Toolbar clean (sem contorno/sombra) ===== */
+        .toolbar{
+          display:flex; align-items:center; justify-content:space-between; gap:12px;
+          margin-top:12px; padding:0; background:transparent; border:none; border-radius:0; box-shadow:none;
         }
-        .filters__row--rest .icon{ width:18px; height:18px; color: var(--muted) }
-        .filters__row--rest select, .filters__row--rest input{ max-width: 280px }
+        .toolbar__left, .toolbar__right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap }
 
-        /* Stats */
+        /* Botões “pills” brancas e primário verde */
+        .btn.btn--soft{
+          display:inline-flex; align-items:center; gap:8px;
+          background:#fff; color:var(--fg);
+          border:1px solid var(--border);
+          border-radius:12px; padding:10px 14px;
+          box-shadow:0 1px 0 rgba(0,0,0,.04);
+        }
+        .btn.btn--soft .icon{ width:18px; height:18px }
+        .btn.btn--primary{
+          display:inline-flex; align-items:center; gap:8px;
+          background:var(--success); color:#fff;
+          border:1px solid var(--success);
+          border-radius:12px; padding:10px 14px;
+          box-shadow:0 1px 0 rgba(0,0,0,.04);
+        }
+        .btn.btn--primary .icon{ width:18px; height:18px }
+
+        /* ===== Segmented (Hoje/Semana/Mês) ===== */
+        .segmented{
+          display:inline-flex; background:#fff; border:1px solid var(--border);
+          border-radius:14px; padding:4px; gap:6px;
+          box-shadow:0 1px 0 rgba(0,0,0,.04);
+        }
+        .segmented__btn{
+          display:inline-flex; align-items:center; gap:6px;
+          padding:8px 12px; border-radius:10px; border:1px solid transparent;
+          background:transparent; color:var(--fg); font-weight:600;
+        }
+        .segmented__btn .icon{ width:18px; height:18px; color:var(--muted) }
+        .segmented__btn.is-active{
+          background:var(--accent); color:#fff; border-color:transparent;
+        }
+        .segmented__btn.is-active .icon{ color:#fff }
+
+        /* ===== Date input pill ===== */
+        .input-pill{
+          display:inline-flex; align-items:center; gap:8px;
+          background:#fff; border:1px solid var(--border); border-radius:12px;
+          padding:8px 12px; box-shadow:0 1px 0 rgba(0,0,0,.04);
+        }
+        .input-pill .icon{ width:18px; height:18px; color:var(--muted) }
+        .input-pill input{
+          border:none; outline:none; background:transparent; color:var(--fg);
+          font: inherit; padding:0;
+        }
+
+        /* ===== Faixa única de filtros + busca ===== */
+        .filters-row-one{
+          display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+          margin-top:12px;
+        }
+        .pill{
+          background:#fff; border:1px solid var(--border); border-radius:12px;
+          padding:10px 12px; box-shadow:0 1px 0 rgba(0,0,0,.04);
+        }
+        .pill--grow{ flex:1 1 320px }
+        .filters-row-one .icon{ width:18px; height:18px; color:var(--muted) }
+
+        /* ===== Stats ===== */
         .stats-grid{
           display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap:16px; margin:12px 0; width:100%;
@@ -909,7 +950,7 @@ export default function Ocorrencias() {
         .chip{ display:inline-flex; align-items:center; gap:8px; padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:999px }
         .chip__count{ font-weight:700; font-size:12px; color:var(--fg) }
 
-        /* ===== Tabela com “accent-left” e anti overflow ===== */
+        /* ===== Tabela com accent-left e anti-overflow ===== */
         .table-wrap{
           width:100%;
           border:1px solid var(--border);
@@ -935,7 +976,7 @@ export default function Ocorrencias() {
         .td--obs .obs{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break: break-word }
         .muted{ color: var(--muted) }
 
-        /* ===== Coluna Ações: inline + kebab ===== */
+        /* Ações */
         .td--actions{ justify-content:flex-end; gap:6px }
         .actions-inline{ display:flex; gap:6px; flex-wrap:wrap }
         .actions-menu{ display:none; position:relative }
@@ -952,7 +993,6 @@ export default function Ocorrencias() {
         .actions-menu .menu__item:hover{ background:var(--panel-muted) }
         .actions-menu .menu__item--danger{ color: var(--error-fg) }
 
-        /* breakpoint: quando faltar espaço, usar kebab */
         @media (max-width: 1200px){
           .actions-inline{ display:none }
           .actions-menu{ display:inline-block }
@@ -977,23 +1017,28 @@ export default function Ocorrencias() {
         .form-2col{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
         .form-field > label{ display:block; font-size:14px; font-weight:600; margin-bottom:6px }
 
-        /* Botões com texto colapsável quando faltar espaço */
-        .btn__text{ white-space:nowrap }
-        @media (max-width: 460px){
-          .toolbar__right .btn .btn__text{ display:none }
+        /* Responsivo do header */
+        @media (max-width: 900px){
+          .toolbar{ flex-direction:column; align-items:stretch; gap:10px }
+          .toolbar__right{ justify-content:flex-start }
+        }
+        @media (max-width: 600px){
+          .segmented{ width:100%; justify-content:space-between }
+          .input-pill{ width:100% }
+          .input-pill input{ width:100% }
+          .toolbar__right{ width:100% }
+          .toolbar__left{ width:100%; gap:8px }
+          .toolbar__left .btn{ flex:1 1 auto; justify-content:center }
+          .filters-row-one{ flex-direction:column; align-items:stretch }
+          .pill--grow{ flex:1 1 auto }
         }
 
         @media (max-width: 1100px){
           .filters__row--rest{ flex-wrap:wrap }
         }
         @media (max-width: 900px){
-          .filters__row--top{ flex-direction:column; align-items:flex-start; gap:8px }
-          .form-2col{ grid-template-columns:1fr }
           .table--grid{ display:none }
           .cards{ display:block }
-        }
-        @media (max-width: 480px){
-          .toolbar__right{ flex-direction:column; align-items:stretch }
         }
       `}</style>
     </>
