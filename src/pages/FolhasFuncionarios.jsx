@@ -7,34 +7,39 @@ import {
   CheckCircleIcon,
   CloudArrowDownIcon,
   ExclamationTriangleIcon,
+  FunnelIcon,
   PencilSquareIcon,
   PlusIcon,
   TrashIcon,
   UserIcon,
-} from "@heroicons/react/24/solid";
+  XMarkIcon
+} from "@heroicons/react/24/outline";
 
-const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
+const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-/* ========= Utils ========= */
+/* ========= UTILS ========= */
 const norm = (v) => (v ?? "").toString().trim();
 
-/** "YYYY-MM" | "YYYY-MM-DD" | "outubro de 2025" -> "YYYY-MM" */
+/** Converte para formato YYYY-MM */
 function toYM(input) {
   const s = norm(input).toLowerCase();
   if (!s) return null;
   const mIso = s.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
   if (mIso) return `${mIso[1]}-${mIso[2]}`;
   const meses = {
-    "janeiro": "01","fevereiro": "02","março": "03","marco": "03","abril": "04","maio": "05","junho": "06",
-    "julho": "07","agosto": "08","setembro": "09","outubro": "10","novembro": "11","dezembro": "12",
+    "janeiro": "01", "fevereiro": "02", "março": "03", "marco": "03", 
+    "abril": "04", "maio": "05", "junho": "06", "julho": "07", 
+    "agosto": "08", "setembro": "09", "outubro": "10", "novembro": "11", "dezembro": "12"
   };
   const mBr = s.match(/(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro).*?(\d{4})/i);
   if (mBr) return `${mBr[2]}-${meses[mBr[1].toLowerCase()]}`;
   return null;
 }
+
 function monthISO(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 function fromMonthISO(s) { const [y, m] = String(s || "").split("-").map(Number); return y && m ? new Date(y, m - 1, 1) : null; }
 function formatMonthBR(sISO) { const d = fromMonthISO(sISO); return d ? d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : sISO || ""; }
+
 function toCSV(rows) {
   if (!rows?.length) return "";
   const keys = Object.keys(rows[0]);
@@ -42,43 +47,66 @@ function toCSV(rows) {
   const body = rows.map((r) => keys.map((k) => `"${String(r[k] ?? "").replaceAll('"', '""')}"`).join(";")).join("\n");
   return header + "\n" + body;
 }
-const dec = (v) => { const x = Number(String(v).replace(",", ".")); return Number.isFinite(x) ? x : 0; };
-function money(n) { const x = Number(n); return Number.isFinite(x) ? x.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "R$ 0,00"; }
 
-/* ========= API helper ========= */
+const dec = (v) => { 
+  if (v === "" || v == null) return 0;
+  const x = Number(String(v).replace(",", ".")); 
+  return Number.isFinite(x) ? x : 0; 
+};
+
+function money(n) { 
+  const x = Number(n); 
+  return Number.isFinite(x) ? x.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "R$ 0,00"; 
+}
+
+/* ========= API HELPER ========= */
 function useApi() {
   return useCallback(async (path, init = {}) => {
     const url = `${API_BASE}${path}`;
-    const r = await fetch(url, { credentials: "include", ...init });
-    let data = null; try { data = await r.json(); } catch {}
-    if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
+    const r = await fetch(url, { 
+      credentials: "include", 
+      headers: {
+        "Content-Type": "application/json",
+        ...init.headers
+      },
+      ...init 
+    });
+    
+    let data = null; 
+    try { data = await r.json(); } catch {}
+    
+    if (!r.ok || data?.ok === false) {
+      throw new Error(data?.error || `HTTP ${r.status}`);
+    }
+    
     return data;
   }, []);
 }
 
-/* ========= Página ========= */
+/* ========= COMPONENTE PRINCIPAL ========= */
 export default function FolhasFuncionarios() {
   const api = useApi();
   const liveRef = useRef(null);
 
-  // filtros
-  const [from, setFrom] = useState(() => monthISO(new Date()));
-  const [to, setTo] = useState(() => monthISO(new Date()));
-  const [funcionarioFiltro, setFuncionarioFiltro] = useState("todos");
-  const [q, setQ] = useState("");
-
-  // dados
+  // Estado principal
   const [lista, setLista] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [okMsg, setOkMsg] = useState("");
+  const [success, setSuccess] = useState("");
 
-  // modal
-  const [openModal, setOpenModal] = useState(false);
-  const [editing, setEditing] = useState(null);
+  // Filtros
+  const [filtros, setFiltros] = useState({
+    from: monthISO(new Date()),
+    to: monthISO(new Date()),
+    funcionario_id: "todos",
+    q: ""
+  });
+
+  // Modal
+  const [modalAberto, setModalAberto] = useState(false);
+  const [editando, setEditando] = useState(null);
   const [form, setForm] = useState({
-    folha_id: "",
     competencia: monthISO(new Date()),
     funcionario_id: "",
     horas_normais: "",
@@ -90,69 +118,111 @@ export default function FolhasFuncionarios() {
     descontos: "",
     proventos: "",
     total_liquido: "",
-    inconsistencias: 0,
+    inconsistencias: 0
   });
+  const [salvando, setSalvando] = useState(false);
 
-  /* ====== carregar ====== */
+  /* ====== CARREGAMENTO ====== */
   const carregarFuncionarios = useCallback(async () => {
-    const d = await api(`/api/funcionarios?ativos=1`);
-    setFuncionarios(d.funcionarios || []);
+    try {
+      const data = await api(`/api/funcionarios?ativos=1&limit=1000`);
+      setFuncionarios(data.funcionarios || data.items || []);
+    } catch (e) {
+      console.error("Erro ao carregar funcionários:", e);
+      setFuncionarios([]);
+    }
   }, [api]);
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErr(""); setOkMsg("");
+  const carregarDados = useCallback(async () => {
+    setLoading(true);
+    setErr("");
+    setSuccess("");
+    
     try {
       const params = new URLSearchParams();
-      if (from) params.set("from", toYM(from) || from);
-      if (to) params.set("to", toYM(to) || to);
-      if (q) params.set("q", q);
-      if (funcionarioFiltro !== "todos") params.set("funcionario_id", funcionarioFiltro);
-
-      const d = await api(`/api/folhas-funcionarios?${params.toString()}`);
-      setLista(Array.isArray(d.items) ? d.items : (d.folhas_funcionarios || []));
-      if (liveRef.current) liveRef.current.textContent = "Lista atualizada.";
-    } catch (e) {
-      setErr(`[GET /api/folhas-funcionarios] ${e.message || "Falha ao carregar"}`);
-      if (liveRef.current) liveRef.current.textContent = "Erro ao atualizar a lista.";
-    } finally { setLoading(false); }
-  }, [api, from, to, q, funcionarioFiltro]);
-
-  useEffect(() => { carregarFuncionarios(); }, [carregarFuncionarios]);
-  useEffect(() => { carregar(); }, [carregar]);
-
-  /* ====== filtrados & kpis ====== */
-  const filtrados = useMemo(() => {
-    const qn = q.toLowerCase();
-    const f = toYM(from) || from;
-    const t = toYM(to) || to;
-    return lista.filter((r) => {
-      if (funcionarioFiltro !== "todos" && String(r.funcionario_id) !== String(funcionarioFiltro)) return false;
-      if (f && r.competencia < f) return false;
-      if (t && r.competencia > t) return false;
-      if (qn) {
-        const alvo = `${r.id} ${r.funcionario_nome} ${r.competencia}`.toLowerCase();
-        if (!alvo.includes(qn)) return false;
+      const fromYM = toYM(filtros.from) || monthISO(new Date());
+      const toYMVal = toYM(filtros.to) || monthISO(new Date());
+      
+      params.set("from", fromYM);
+      params.set("to", toYMVal);
+      
+      if (filtros.q) params.set("q", filtros.q);
+      if (filtros.funcionario_id && filtros.funcionario_id !== "todos") {
+        params.set("funcionario_id", filtros.funcionario_id);
       }
+
+      const data = await api(`/api/folhas-funcionarios?${params.toString()}`);
+      setLista(Array.isArray(data.items) ? data.items : []);
+      
+      if (liveRef.current) {
+        liveRef.current.textContent = `Lista atualizada. ${data.items?.length || 0} registros encontrados.`;
+      }
+    } catch (e) {
+      setErr(`Erro: ${e.message}`);
+      if (liveRef.current) liveRef.current.textContent = "Erro ao carregar dados.";
+    } finally { 
+      setLoading(false); 
+    }
+  }, [api, filtros]);
+
+  useEffect(() => { 
+    carregarFuncionarios(); 
+  }, [carregarFuncionarios]);
+
+  useEffect(() => { 
+    carregarDados(); 
+  }, [carregarDados]);
+
+  /* ====== CÁLCULOS E FILTROS ====== */
+  const dadosFiltrados = useMemo(() => {
+    const qn = filtros.q.toLowerCase();
+    const fromYM = toYM(filtros.from);
+    const toYMVal = toYM(filtros.to);
+    
+    return lista.filter((item) => {
+      // Filtro por funcionário
+      if (filtros.funcionario_id !== "todos" && String(item.funcionario_id) !== filtros.funcionario_id) {
+        return false;
+      }
+      
+      // Filtro por período
+      if (fromYM && item.competencia < fromYM) return false;
+      if (toYMVal && item.competencia > toYMVal) return false;
+      
+      // Filtro por texto
+      if (qn) {
+        const textoBusca = `${item.id} ${item.funcionario_nome} ${item.competencia}`.toLowerCase();
+        if (!textoBusca.includes(qn)) return false;
+      }
+      
       return true;
     });
-  }, [lista, q, funcionarioFiltro, from, to]);
+  }, [lista, filtros]);
 
-  const kpis = useMemo(() => {
-    let horas = 0, liquido = 0; const pessoas = new Set();
-    filtrados.forEach((r) => {
-      horas += dec(r.horas_normais) + dec(r.he50_horas) + dec(r.he100_horas);
-      liquido += dec(r.total_liquido);
-      pessoas.add(r.funcionario_id);
+  const metricas = useMemo(() => {
+    let totalHoras = 0;
+    let totalLiquido = 0;
+    const funcionariosUnicos = new Set();
+    
+    dadosFiltrados.forEach((item) => {
+      totalHoras += dec(item.horas_normais) + dec(item.he50_horas) + dec(item.he100_horas);
+      totalLiquido += dec(item.total_liquido);
+      funcionariosUnicos.add(item.funcionario_id);
     });
-    return { horas, liquido, pessoas: pessoas.size };
-  }, [filtrados]);
+    
+    return {
+      horas: totalHoras,
+      liquido: totalLiquido,
+      funcionarios: funcionariosUnicos.size,
+      registros: dadosFiltrados.length
+    };
+  }, [dadosFiltrados]);
 
-  /* ====== ações ====== */
-  function abrirNovo() {
-    setEditing(null);
+  /* ====== AÇÕES ====== */
+  const abrirNovo = useCallback(() => {
+    setEditando(null);
     setForm({
-      folha_id: "",
-      competencia: toYM(from) || monthISO(new Date()),
+      competencia: monthISO(new Date()),
       funcionario_id: "",
       horas_normais: "",
       he50_horas: "",
@@ -163,428 +233,606 @@ export default function FolhasFuncionarios() {
       descontos: "",
       proventos: "",
       total_liquido: "",
-      inconsistencias: 0,
+      inconsistencias: 0
     });
-    setOpenModal(true);
-  }
+    setModalAberto(true);
+    setErr("");
+  }, []);
 
-  function abrirEditar(r) {
-    setEditing(r);
+  const abrirEdicao = useCallback((registro) => {
+    setEditando(registro);
     setForm({
-      folha_id: r.folha_id,
-      competencia: toYM(r.competencia) || monthISO(new Date()),
-      funcionario_id: r.funcionario_id,
-      horas_normais: r.horas_normais ?? "",
-      he50_horas: r.he50_horas ?? "",
-      he100_horas: r.he100_horas ?? "",
-      valor_base: r.valor_base ?? "",
-      valor_he50: r.valor_he50 ?? "",
-      valor_he100: r.valor_he100 ?? "",
-      descontos: r.descontos ?? "",
-      proventos: r.proventos ?? "",
-      total_liquido: r.total_liquido ?? "",
-      inconsistencias: r.inconsistencias ?? 0,
+      competencia: registro.competencia,
+      funcionario_id: registro.funcionario_id,
+      horas_normais: registro.horas_normais ?? "",
+      he50_horas: registro.he50_horas ?? "",
+      he100_horas: registro.he100_horas ?? "",
+      valor_base: registro.valor_base ?? "",
+      valor_he50: registro.valor_he50 ?? "",
+      valor_he100: registro.valor_he100 ?? "",
+      descontos: registro.descontos ?? "",
+      proventos: registro.proventos ?? "",
+      total_liquido: registro.total_liquido ?? "",
+      inconsistencias: registro.inconsistencias ?? 0
     });
-    setOpenModal(true);
-  }
+    setModalAberto(true);
+    setErr("");
+  }, []);
 
-  function recomputaTotal(next = form) {
+  const calcularTotal = useCallback((dados = form) => {
     return (
-      dec(next.valor_base) +
-      dec(next.valor_he50) +
-      dec(next.valor_he100) +
-      dec(next.proventos) -
-      dec(next.descontos)
+      dec(dados.valor_base) +
+      dec(dados.valor_he50) +
+      dec(dados.valor_he100) +
+      dec(dados.proventos) -
+      dec(dados.descontos)
     );
-  }
+  }, [form]);
 
-  async function salvar() {
-    setErr(""); setOkMsg("");
+  const salvarRegistro = async () => {
+    setSalvando(true);
+    setErr("");
+    setSuccess("");
+    
     try {
-      const competenciaYM = toYM(form.competencia);
+      // Validações
+      if (!form.funcionario_id) {
+        throw new Error("Selecione um funcionário.");
+      }
+      
+      if (!form.competencia) {
+        throw new Error("Informe a competência.");
+      }
+
+      const competenciaYM = toYM(form.competencia) || form.competencia;
+      
       const payload = {
-        ...(form.folha_id ? { folha_id: Number(form.folha_id) } : {}),
         competencia: competenciaYM,
         funcionario_id: Number(form.funcionario_id),
-        horas_normais: form.horas_normais === "" ? null : Number(dec(form.horas_normais)),
-        he50_horas:    form.he50_horas === ""    ? null : Number(dec(form.he50_horas)),
-        he100_horas:   form.he100_horas === ""   ? null : Number(dec(form.he100_horas)),
-        valor_base:    form.valor_base === ""    ? null : Number(dec(form.valor_base)),
-        valor_he50:    form.valor_he50 === ""    ? null : Number(dec(form.valor_he50)),
-        valor_he100:   form.valor_he100 === ""   ? null : Number(dec(form.valor_he100)),
-        descontos:     form.descontos === ""     ? null : Number(dec(form.descontos)),
-        proventos:     form.proventos === ""     ? null : Number(dec(form.proventos)),
-        total_liquido: form.total_liquido === "" ? Number(recomputaTotal(form)) : Number(dec(form.total_liquido)),
-        inconsistencias: Number(form.inconsistencias || 0),
+        horas_normais: form.horas_normais === "" ? null : dec(form.horas_normais),
+        he50_horas: form.he50_horas === "" ? null : dec(form.he50_horas),
+        he100_horas: form.he100_horas === "" ? null : dec(form.he100_horas),
+        valor_base: form.valor_base === "" ? null : dec(form.valor_base),
+        valor_he50: form.valor_he50 === "" ? null : dec(form.valor_he50),
+        valor_he100: form.valor_he100 === "" ? null : dec(form.valor_he100),
+        descontos: form.descontos === "" ? null : dec(form.descontos),
+        proventos: form.proventos === "" ? null : dec(form.proventos),
+        total_liquido: form.total_liquido === "" ? calcularTotal() : dec(form.total_liquido),
+        inconsistencias: Number(form.inconsistencias || 0)
       };
 
-      if (!payload.funcionario_id) throw new Error("Selecione o funcionário.");
-      if (!payload.folha_id && !competenciaYM) throw new Error("Informe a competência (YYYY-MM) ou selecione uma folha.");
-
-      if (editing) {
-        await api(`/api/folhas-funcionarios/${editing.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
-        setOkMsg("Registro atualizado.");
+      if (editando) {
+        await api(`/api/folhas-funcionarios/${editando.id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload)
+        });
+        setSuccess("Registro atualizado com sucesso.");
       } else {
-        await api(`/api/folhas-funcionarios`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
-        setOkMsg("Registro adicionado.");
+        await api(`/api/folhas-funcionarios`, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        setSuccess("Registro criado com sucesso.");
       }
-      setOpenModal(false);
-      await carregar();
-    } catch (e) { setErr(e.message || "Falha ao salvar."); }
-  }
+      
+      setModalAberto(false);
+      await carregarDados();
+    } catch (e) {
+      setErr(e.message || "Erro ao salvar registro.");
+    } finally {
+      setSalvando(false);
+    }
+  };
 
-  async function excluir(r) {
-    if (!confirm(`Excluir o lançamento de ${r.funcionario_nome} em ${formatMonthBR(r.competencia)}?`)) return;
-    setErr(""); setOkMsg("");
+  const excluirRegistro = async (registro) => {
+    if (!confirm(`Excluir o lançamento de ${registro.funcionario_nome} em ${formatMonthBR(registro.competencia)}?`)) {
+      return;
+    }
+    
+    setErr("");
+    setSuccess("");
+    
     try {
-      await api(`/api/folhas-funcionarios/${r.id}`, { method: "DELETE" });
-      setOkMsg("Registro removido.");
-      await carregar();
-    } catch (e) { setErr(e.message || "Falha ao excluir."); }
-  }
+      await api(`/api/folhas-funcionarios/${registro.id}`, { method: "DELETE" });
+      setSuccess("Registro excluído com sucesso.");
+      await carregarDados();
+    } catch (e) {
+      setErr(e.message || "Erro ao excluir registro.");
+    }
+  };
 
-  function exportarCSV() {
-    const rows = filtrados.map((r) => ({
-      id: r.id,
-      competencia: r.competencia,
-      competencia_br: formatMonthBR(r.competencia),
-      funcionario_id: r.funcionario_id,
-      funcionario_nome: r.funcionario_nome,
-      horas_normais: r.horas_normais,
-      he50_horas: r.he50_horas,
-      he100_horas: r.he100_horas,
-      valor_base: r.valor_base,
-      valor_he50: r.valor_he50,
-      valor_he100: r.valor_he100,
-      descontos: r.descontos,
-      proventos: r.proventos,
-      total_liquido: r.total_liquido,
-      inconsistencias: r.inconsistencias,
+  const exportarCSV = () => {
+    const rows = dadosFiltrados.map((item) => ({
+      id: item.id,
+      competencia: item.competencia,
+      competencia_br: formatMonthBR(item.competencia),
+      funcionario_id: item.funcionario_id,
+      funcionario_nome: item.funcionario_nome,
+      horas_normais: item.horas_normais,
+      he50_horas: item.he50_horas,
+      he100_horas: item.he100_horas,
+      valor_base: item.valor_base,
+      valor_he50: item.valor_he50,
+      valor_he100: item.valor_he100,
+      descontos: item.descontos,
+      proventos: item.proventos,
+      total_liquido: item.total_liquido,
+      inconsistencias: item.inconsistencias
     }));
+    
     const csv = toCSV(rows);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `folhas_funcionarios_${toYM(from) || from}_a_${toYM(to) || to}.csv`;
+    a.download = `folhas_funcionarios_${filtros.from}_a_${filtros.to}.csv`;
     document.body.appendChild(a);
-    a.click(); a.remove(); URL.revokeObjectURL(url);
-  }
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
-  /* ====== UI ====== */
+  const limparFiltros = () => {
+    setFiltros({
+      from: monthISO(new Date()),
+      to: monthISO(new Date()),
+      funcionario_id: "todos",
+      q: ""
+    });
+  };
+
+  /* ====== RENDER ====== */
   return (
     <>
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
       {/* Header */}
-      <header className="page-header" role="region" aria-labelledby="titulo-pagina">
-        <div>
-          <h1 id="titulo-pagina" className="page-title">Folhas × Funcionários</h1>
-          <p className="page-subtitle">Lançamentos por funcionário (horas, valores e total líquido)</p>
+      <header className="main-header">
+        <div className="header-content">
+          <h1>Folhas × Funcionários</h1>
+          <p>Lançamentos por funcionário (horas, valores e total líquido)</p>
         </div>
 
-        <div className="page-header__toolbar" aria-label="Ações">
-          <div className="segmented" role="group" aria-label="Atalhos de período">
-            <button className="btn btn--neutral is-active" onClick={() => { const m = monthISO(new Date()); setFrom(m); setTo(m); }}>
-              <CalendarDaysIcon className="icon" aria-hidden="true" /> Mês
-            </button>
-          </div>
-
-          <div className="filters">
-            <input type="month" className="input input--sm" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="De" />
-            <input type="month" className="input input--sm" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Até" />
-            <select className="input input--sm" value={funcionarioFiltro} onChange={(e) => setFuncionarioFiltro(e.target.value)} aria-label="Funcionário">
-              <option value="todos">Todos os funcionários</option>
-              {funcionarios.map((f) => (
-                <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || `#${f.id}`}</option>
-              ))}
-            </select>
-            <input type="search" className="input input--sm" placeholder="Buscar por funcionário/competência…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
-
-          <div className="actions">
-            <button className="btn btn--neutral" onClick={abrirNovo}><PlusIcon className="icon" aria-hidden="true" /> Novo</button>
-            <button className="btn btn--neutral" onClick={exportarCSV}><CloudArrowDownIcon className="icon" aria-hidden="true" /> Exportar</button>
-            <button className="btn btn--neutral" onClick={carregar} disabled={loading} aria-busy={loading ? "true" : "false"}>
-              {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
-              <span>{loading ? "Atualizando…" : "Atualizar"}</span>
-            </button>
-          </div>
+        <div className="toggles">
+          <button
+            className="toggle-btn"
+            onClick={carregarDados}
+            disabled={loading}
+            aria-busy={loading ? "true" : "false"}
+          >
+            <ArrowPathIcon className={`icon-sm ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Atualizando..." : "Atualizar"}
+          </button>
+          <button className="toggle-btn" onClick={abrirNovo}>
+            <PlusIcon className="icon-sm" />
+            Novo
+          </button>
+          <button className="toggle-btn" onClick={exportarCSV}>
+            <CloudArrowDownIcon className="icon-sm" />
+            Exportar
+          </button>
         </div>
       </header>
 
-      {/* Alerts */}
-      {err && <div className="error-alert" role="alert" style={{ marginBottom: 12 }}>{err}</div>}
-      {okMsg && <div className="success-alert" role="status" style={{ marginBottom: 12 }}>{okMsg}</div>}
+      {/* Alertas */}
+      {err && (
+        <div className="error-alert" role="alert" style={{ marginBottom: 16 }}>
+          {err}
+        </div>
+      )}
+      {success && (
+        <div className="success-alert" role="status" style={{ marginBottom: 16 }}>
+          {success}
+        </div>
+      )}
 
-      {/* KPIs */}
-      <div className="stats-grid">
-        <div className="stat-card" data-accent="info">
-          <div className="stat-card__icon"><UserIcon className="icon" aria-hidden="true" /></div>
-          <div className="stat-card__content">
-            <div className="stat-value">{new Set(filtrados.map(r => r.funcionario_id)).size}</div>
-            <div className="stat-title">Funcionários impactados</div>
+      {/* Filtros */}
+      <section style={{ marginBottom: 16 }}>
+        <div className="card" style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <FunnelIcon className="icon-sm" />
+          
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label htmlFor="filtro-from" className="visually-hidden">De</label>
+            <input
+              id="filtro-from"
+              type="month"
+              value={filtros.from}
+              onChange={(e) => setFiltros(prev => ({ ...prev, from: e.target.value }))}
+              style={{ width: 140 }}
+            />
+            <span style={{ color: "var(--muted)" }}>até</span>
+            <label htmlFor="filtro-to" className="visually-hidden">Até</label>
+            <input
+              id="filtro-to"
+              type="month"
+              value={filtros.to}
+              onChange={(e) => setFiltros(prev => ({ ...prev, to: e.target.value }))}
+              style={{ width: 140 }}
+            />
+          </div>
+
+          <select
+            value={filtros.funcionario_id}
+            onChange={(e) => setFiltros(prev => ({ ...prev, funcionario_id: e.target.value }))}
+            style={{ minWidth: 180 }}
+          >
+            <option value="todos">Todos os funcionários</option>
+            {funcionarios.map((func) => (
+              <option key={func.id} value={func.id}>
+                {func.pessoa_nome || func.nome || func.pessoa?.nome || `Funcionário #${func.id}`}
+              </option>
+            ))}
+          </select>
+
+          <input
+            aria-label="Buscar por funcionário ou competência"
+            placeholder="Buscar por funcionário/competência..."
+            value={filtros.q}
+            onChange={(e) => setFiltros(prev => ({ ...prev, q: e.target.value }))}
+            style={{ flex: 1, minWidth: 200, maxWidth: 300 }}
+          />
+
+          <button className="toggle-btn" onClick={limparFiltros}>
+            <XMarkIcon className="icon-sm" />
+            Limpar
+          </button>
+        </div>
+      </section>
+
+      {/* Métricas */}
+      <section style={{ marginBottom: 20 }}>
+        <div className="stats-grid">
+          <div className="stat-card" data-accent="info">
+            <div className="stat-card__icon">
+              <UserIcon className="icon" />
+            </div>
+            <div className="stat-card__content">
+              <div className="stat-value">{metricas.funcionarios}</div>
+              <div className="stat-title">Funcionários impactados</div>
+            </div>
+          </div>
+
+          <div className="stat-card" data-accent="success">
+            <div className="stat-card__icon">
+              <CalculatorIcon className="icon" />
+            </div>
+            <div className="stat-card__content">
+              <div className="stat-value">{metricas.horas.toFixed(2)}</div>
+              <div className="stat-title">Horas (N + 50% + 100%)</div>
+            </div>
+          </div>
+
+          <div className="stat-card" data-accent="warning">
+            <div className="stat-card__icon">
+              <CheckCircleIcon className="icon" />
+            </div>
+            <div className="stat-card__content">
+              <div className="stat-value">{money(metricas.liquido)}</div>
+              <div className="stat-title">Total líquido (somado)</div>
+            </div>
           </div>
         </div>
-        <div className="stat-card" data-accent="success">
-          <div className="stat-card__icon"><CalculatorIcon className="icon" aria-hidden="true" /></div>
-          <div className="stat-card__content">
-            <div className="stat-value">{kpis.horas.toFixed(2)}</div>
-            <div className="stat-title">Horas (N + 50% + 100%)</div>
-          </div>
-        </div>
-        <div className="stat-card" data-accent="warning">
-          <div className="stat-card__icon"><CheckCircleIcon className="icon" aria-hidden="true" /></div>
-          <div className="stat-card__content">
-            <div className="stat-value">{money(kpis.liquido)}</div>
-            <div className="stat-title">Total líquido (somado)</div>
-          </div>
-        </div>
-      </div>
+      </section>
 
       {/* Tabela */}
-      <div className="table-wrap" role="region" aria-label="Tabela de lançamentos">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Competência</th>
-              <th>Funcionário</th>
-              <th className="num">N</th>
-              <th className="num">HE 50%</th>
-              <th className="num">HE 100%</th>
-              <th className="num">Base</th>
-              <th className="num">+HE50</th>
-              <th className="num">+HE100</th>
-              <th className="num">+Prov.</th>
-              <th className="num">-Desc.</th>
-              <th className="num">Líquido</th>
-              <th className="num">Inc.</th>
-              <th className="text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.length === 0 && (
-              <tr><td colSpan={14} className="empty">Nenhum lançamento para o filtro.</td></tr>
-            )}
-            {filtrados.map((r) => (
-              <tr key={r.id}>
-                <td>#{r.id}</td>
-                <td>
-                  <div>{formatMonthBR(r.competencia)}</div>
-                  <div className="muted mono">{r.competencia}</div>
-                </td>
-                <td>{r.funcionario_nome}</td>
-                <td className="num">{dec(r.horas_normais).toFixed(2)}</td>
-                <td className="num">{dec(r.he50_horas).toFixed(2)}</td>
-                <td className="num">{dec(r.he100_horas).toFixed(2)}</td>
-                <td className="num">{money(dec(r.valor_base))}</td>
-                <td className="num">{money(dec(r.valor_he50))}</td>
-                <td className="num">{money(dec(r.valor_he100))}</td>
-                <td className="num">{money(dec(r.proventos))}</td>
-                <td className="num">{money(dec(r.descontos))}</td>
-                <td className="num"><strong>{money(dec(r.total_liquido))}</strong></td>
-                <td className="num">{r.inconsistencias ?? 0}</td>
-                <td className="text-right">
-                  <div className="row-actions">
-                    <button className="btn btn--neutral btn--icon" title="Editar" onClick={() => abrirEditar(r)}>
-                      <PencilSquareIcon className="icon" aria-hidden="true" />
-                    </button>
-                    <button className="btn btn--neutral btn--icon" title="Excluir" onClick={() => excluir(r)}>
-                      <TrashIcon className="icon" aria-hidden="true" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Cards (mobile) */}
-      <div className="cards">
-        {filtrados.map((r) => (
-          <article key={`card-${r.id}`} className="card" aria-label={`Lançamento de ${r.funcionario_nome}`}>
-            <header className="card__header">
-              <div>
-                <strong>{r.funcionario_nome}</strong>
-                <div className="muted">{formatMonthBR(r.competencia)} <span className="mono">({r.competencia})</span></div>
-              </div>
-              <div className="mono">{money(dec(r.total_liquido))}</div>
-            </header>
-            <dl className="card__grid">
-              <div><dt>N</dt><dd>{dec(r.horas_normais).toFixed(2)}</dd></div>
-              <div><dt>HE 50%</dt><dd>{dec(r.he50_horas).toFixed(2)}</dd></div>
-              <div><dt>HE 100%</dt><dd>{dec(r.he100_horas).toFixed(2)}</dd></div>
-              <div><dt>Base</dt><dd>{money(dec(r.valor_base))}</dd></div>
-              <div><dt>+HE50</dt><dd>{money(dec(r.valor_he50))}</dd></div>
-              <div><dt>+HE100</dt><dd>{money(dec(r.valor_he100))}</dd></div>
-              <div><dt>+Prov.</dt><dd>{money(dec(r.proventos))}</dd></div>
-              <div><dt>-Desc.</dt><dd>{money(dec(r.descontos))}</dd></div>
-            </dl>
-            <footer className="card__actions">
-              <button className="btn btn--neutral" onClick={() => abrirEditar(r)}><PencilSquareIcon className="icon" aria-hidden="true" /> Editar</button>
-              <button className="btn btn--neutral" onClick={() => excluir(r)}><TrashIcon className="icon" aria-hidden="true" /> Excluir</button>
-            </footer>
-          </article>
-        ))}
-      </div>
+      <section>
+        <div className="card">
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ width: "5%" }}>ID</th>
+                  <th style={{ width: "12%" }}>Competência</th>
+                  <th style={{ width: "18%" }}>Funcionário</th>
+                  <th style={{ width: "6%" }} className="num">N</th>
+                  <th style={{ width: "6%" }} className="num">HE 50%</th>
+                  <th style={{ width: "7%" }} className="num">HE 100%</th>
+                  <th style={{ width: "8%" }} className="num">Base</th>
+                  <th style={{ width: "8%" }} className="num">+HE50</th>
+                  <th style={{ width: "8%" }} className="num">+HE100</th>
+                  <th style={{ width: "8%" }} className="num">+Prov.</th>
+                  <th style={{ width: "8%" }} className="num">-Desc.</th>
+                  <th style={{ width: "10%" }} className="num">Líquido</th>
+                  <th style={{ width: "6%" }} className="num">Inc.</th>
+                  <th style={{ width: "10%" }} className="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={14} style={{ textAlign: "center", padding: "32px" }}>
+                      Carregando...
+                    </td>
+                  </tr>
+                ) : dadosFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={14} style={{ textAlign: "center", padding: "32px", color: "var(--muted)" }}>
+                      Nenhum lançamento encontrado para os filtros aplicados.
+                    </td>
+                  </tr>
+                ) : (
+                  dadosFiltrados.map((item) => (
+                    <tr key={item.id}>
+                      <td><code>#{item.id}</code></td>
+                      <td>
+                        <div>{formatMonthBR(item.competencia)}</div>
+                        <div style={{ fontSize: "var(--fs-12)", color: "var(--muted)" }}>
+                          {item.competencia}
+                        </div>
+                      </td>
+                      <td>{item.funcionario_nome}</td>
+                      <td className="num">{dec(item.horas_normais).toFixed(2)}</td>
+                      <td className="num">{dec(item.he50_horas).toFixed(2)}</td>
+                      <td className="num">{dec(item.he100_horas).toFixed(2)}</td>
+                      <td className="num">{money(item.valor_base)}</td>
+                      <td className="num">{money(item.valor_he50)}</td>
+                      <td className="num">{money(item.valor_he100)}</td>
+                      <td className="num">{money(item.proventos)}</td>
+                      <td className="num">{money(item.descontos)}</td>
+                      <td className="num">
+                        <strong>{money(item.total_liquido)}</strong>
+                      </td>
+                      <td className="num">
+                        {item.inconsistencias ? (
+                          <span style={{ color: "var(--error)" }}>{item.inconsistencias}</span>
+                        ) : (
+                          item.inconsistencias || 0
+                        )}
+                      </td>
+                      <td className="text-right">
+                        <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                          <button
+                            className="toggle-btn"
+                            onClick={() => abrirEdicao(item)}
+                            title="Editar"
+                          >
+                            <PencilSquareIcon className="icon-sm" />
+                          </button>
+                          <button
+                            className="toggle-btn"
+                            onClick={() => excluirRegistro(item)}
+                            title="Excluir"
+                          >
+                            <TrashIcon className="icon-sm" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {!loading && dadosFiltrados.length > 0 && (
+            <p style={{ marginTop: 12, color: "var(--muted)", fontSize: "var(--fs-14)" }}>
+              Mostrando {dadosFiltrados.length} de {lista.length} registros
+              {filtros.q || filtros.funcionario_id !== "todos" ? " (filtrados)" : ""}
+            </p>
+          )}
+        </div>
+      </section>
 
       {/* Modal */}
-      {openModal && (
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setOpenModal(false)}>
-          <div className="modal__content">
-            <header className="modal__header">
-              <h2 className="modal__title">{editing ? "Editar lançamento" : "Novo lançamento"}</h2>
-              <button className="btn btn--neutral btn--icon" onClick={() => setOpenModal(false)} aria-label="Fechar">✕</button>
+      {modalAberto && (
+        <div 
+          className="modal-overlay" 
+          onClick={(e) => e.target === e.currentTarget && setModalAberto(false)}
+        >
+          <div className="modal-content" style={{ maxWidth: 800 }}>
+            <header className="modal-header">
+              <h2 className="modal-title">
+                {editando ? "Editar Lançamento" : "Novo Lançamento"}
+              </h2>
+              <button
+                className="toggle-btn"
+                onClick={() => setModalAberto(false)}
+                aria-label="Fechar"
+              >
+                <XMarkIcon className="icon-sm" />
+              </button>
             </header>
 
-            <div className="modal__body">
-              <div className="form-grid">
+            <div className="modal-body">
+              <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <div className="form-field">
                   <label className="form-label">Competência *</label>
                   <input
                     type="month"
-                    className="input"
                     value={form.competencia}
-                    onChange={(e) => setForm({ ...form, competencia: toYM(e.target.value) || e.target.value })}
+                    onChange={(e) => setForm(prev => ({ ...prev, competencia: e.target.value }))}
                     required
                   />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Funcionário *</label>
-                  <select className="input" value={form.funcionario_id} onChange={(e) => setForm({ ...form, funcionario_id: e.target.value })} required>
-                    <option value="">Selecione…</option>
-                    {funcionarios.map((f) => (
-                      <option key={f.id} value={f.id}>{f.pessoa_nome || f?.pessoa?.nome || `#${f.id}`}</option>
+                  <select
+                    value={form.funcionario_id}
+                    onChange={(e) => setForm(prev => ({ ...prev, funcionario_id: e.target.value }))}
+                    required
+                  >
+                    <option value="">Selecione um funcionário...</option>
+                    {funcionarios.map((func) => (
+                      <option key={func.id} value={func.id}>
+                        {func.pessoa_nome || func.nome || func.pessoa?.nome || `Funcionário #${func.id}`}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-field">
-                  <label className="form-label">Horas normais</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.horas_normais} onChange={(e) => setForm({ ...form, horas_normais: e.target.value })} />
-                </div>
-                <div className="form-field">
-                  <label className="form-label">HE 50% (horas)</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.he50_horas} onChange={(e) => setForm({ ...form, he50_horas: e.target.value })} />
-                </div>
-                <div className="form-field">
-                  <label className="form-label">HE 100% (horas)</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.he100_horas} onChange={(e) => setForm({ ...form, he100_horas: e.target.value })} />
+                  <label className="form-label">Horas Normais</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.horas_normais}
+                    onChange={(e) => setForm(prev => ({ ...prev, horas_normais: e.target.value }))}
+                  />
                 </div>
 
                 <div className="form-field">
-                  <label className="form-label">Valor base</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_base}
-                    onChange={(e) => setForm({ ...form, valor_base: e.target.value, total_liquido: recomputaTotal({ ...form, valor_base: e.target.value }).toFixed(2) })} />
+                  <label className="form-label">HE 50% (horas)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.he50_horas}
+                    onChange={(e) => setForm(prev => ({ ...prev, he50_horas: e.target.value }))}
+                  />
                 </div>
+
+                <div className="form-field">
+                  <label className="form-label">HE 100% (horas)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.he100_horas}
+                    onChange={(e) => setForm(prev => ({ ...prev, he100_horas: e.target.value }))}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label">Valor Base</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.valor_base}
+                    onChange={(e) => {
+                      const novoForm = { ...form, valor_base: e.target.value };
+                      setForm({
+                        ...novoForm,
+                        total_liquido: calcularTotal(novoForm).toFixed(2)
+                      });
+                    }}
+                  />
+                </div>
+
                 <div className="form-field">
                   <label className="form-label">Valor HE 50%</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_he50}
-                    onChange={(e) => setForm({ ...form, valor_he50: e.target.value, total_liquido: recomputaTotal({ ...form, valor_he50: e.target.value }).toFixed(2) })} />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.valor_he50}
+                    onChange={(e) => {
+                      const novoForm = { ...form, valor_he50: e.target.value };
+                      setForm({
+                        ...novoForm,
+                        total_liquido: calcularTotal(novoForm).toFixed(2)
+                      });
+                    }}
+                  />
                 </div>
+
                 <div className="form-field">
                   <label className="form-label">Valor HE 100%</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_he100}
-                    onChange={(e) => setForm({ ...form, valor_he100: e.target.value, total_liquido: recomputaTotal({ ...form, valor_he100: e.target.value }).toFixed(2) })} />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.valor_he100}
+                    onChange={(e) => {
+                      const novoForm = { ...form, valor_he100: e.target.value };
+                      setForm({
+                        ...novoForm,
+                        total_liquido: calcularTotal(novoForm).toFixed(2)
+                      });
+                    }}
+                  />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Proventos (+)</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.proventos}
-                    onChange={(e) => setForm({ ...form, proventos: e.target.value, total_liquido: recomputaTotal({ ...form, proventos: e.target.value }).toFixed(2) })} />
-                </div>
-                <div className="form-field">
-                  <label className="form-label">Descontos (-)</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.descontos}
-                    onChange={(e) => setForm({ ...form, descontos: e.target.value, total_liquido: recomputaTotal({ ...form, descontos: e.target.value }).toFixed(2) })} />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.proventos}
+                    onChange={(e) => {
+                      const novoForm = { ...form, proventos: e.target.value };
+                      setForm({
+                        ...novoForm,
+                        total_liquido: calcularTotal(novoForm).toFixed(2)
+                      });
+                    }}
+                  />
                 </div>
 
                 <div className="form-field">
-                  <label className="form-label">Total líquido</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.total_liquido}
-                    onChange={(e) => setForm({ ...form, total_liquido: e.target.value })} />
+                  <label className="form-label">Descontos (-)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.descontos}
+                    onChange={(e) => {
+                      const novoForm = { ...form, descontos: e.target.value };
+                      setForm({
+                        ...novoForm,
+                        total_liquido: calcularTotal(novoForm).toFixed(2)
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label">Total Líquido</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={form.total_liquido}
+                    onChange={(e) => setForm(prev => ({ ...prev, total_liquido: e.target.value }))}
+                  />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Inconsistências</label>
-                  <input className="input" type="number" min="0" value={form.inconsistencias}
-                    onChange={(e) => setForm({ ...form, inconsistencias: e.target.value })} />
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.inconsistencias}
+                    onChange={(e) => setForm(prev => ({ ...prev, inconsistencias: Number(e.target.value) }))}
+                  />
                 </div>
               </div>
 
-              <p className="muted" style={{ marginTop: 8 }}>
-                <ExclamationTriangleIcon className="icon" style={{ width: 16, height: 16 }} aria-hidden="true" /> 
-                O total líquido é recalculado automaticamente quando você altera base/HE/proventos/descontos (pode ajustar manualmente).
-              </p>
+              <div style={{ marginTop: 16, padding: 12, background: "var(--info-soft)", borderRadius: "var(--radius)" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <ExclamationTriangleIcon className="icon-sm" style={{ color: "var(--info)", marginTop: 2 }} />
+                  <div style={{ fontSize: "var(--fs-14)", color: "var(--muted)" }}>
+                    <strong>Dica:</strong> O total líquido é calculado automaticamente quando você altera 
+                    valores base, horas extras, proventos ou descontos. Você pode ajustar manualmente se necessário.
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <footer className="modal__footer">
-              <button className="btn btn--neutral" onClick={() => setOpenModal(false)}>Cancelar</button>
-              <button className="btn btn--neutral" onClick={salvar}><CheckCircleIcon className="icon" aria-hidden="true" /> {editing ? "Salvar" : "Adicionar"}</button>
+            <footer className="modal-footer">
+              <button
+                className="toggle-btn"
+                onClick={() => setModalAberto(false)}
+                disabled={salvando}
+              >
+                Cancelar
+              </button>
+              <button
+                className="toggle-btn"
+                onClick={salvarRegistro}
+                disabled={salvando || !form.funcionario_id || !form.competencia}
+                aria-busy={salvando ? "true" : "false"}
+              >
+                <CheckCircleIcon className="icon-sm" />
+                {salvando ? "Salvando..." : (editando ? "Salvar" : "Criar")}
+              </button>
             </footer>
           </div>
         </div>
       )}
-
-      {/* Estilos locais (seguindo tokens do global.css) */}
-      <style jsx>{`
-        .segmented { display:flex; gap:8px; flex-wrap:wrap; }
-        .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-        .actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-        .is-active { outline:2px solid var(--accent); }
-
-        .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px; margin:16px 0 20px; }
-        .stat-card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:18px; display:flex; align-items:center; gap:14px; box-shadow:var(--shadow); }
-        .stat-card[data-accent="info"] { border-left:4px solid var(--info); }
-        .stat-card[data-accent="success"] { border-left:4px solid var(--success); }
-        .stat-card[data-accent="warning"] { border-left:4px solid var(--warning); }
-        .stat-card__icon { width:44px; height:44px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:var(--panel-muted); }
-        .stat-card__content { flex:1; }
-        .stat-value { font-size:1.6rem; font-weight:700; line-height:1; }
-        .stat-title { font-size:.85rem; color:var(--muted); font-weight:600; }
-
-        .table-wrap { display:block; overflow:auto; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:var(--shadow); }
-        .table { width:100%; border-collapse:collapse; min-width:1100px; }
-        th, td { padding:12px; border-bottom:1px solid var(--border); text-align:left; }
-        th { font-weight:700; font-size:13px; color:var(--muted); background:var(--panel-muted); }
-        .num { text-align:right; font-variant-numeric: tabular-nums; }
-        .text-right { text-align:right; }
-        .row-actions { display:flex; gap:6px; justify-content:flex-end; }
-        .btn--icon .icon { width:18px; height:18px; }
-        .muted { color:var(--muted); }
-        .mono { font-variant-numeric: tabular-nums; }
-        .empty { text-align:center; color:var(--muted); padding:32px 12px; }
-
-        .cards { display:none; }
-        .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; }
-        .card + .card { margin-top:12px; }
-        .card__header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-        .card__grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-        .card__grid dt { font-size:12px; color:var(--muted); }
-        .card__grid dd { font-weight:600; }
-        .card__actions { display:flex; gap:8px; flex-wrap:wrap; }
-
-        .modal { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.35); z-index:1000; padding:16px; }
-        .modal__content { width:min(780px,100%); background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); }
-        .modal__header, .modal__footer { padding:14px 16px; border-bottom:1px solid var(--border); }
-        .modal__footer { border-top:1px solid var(--border); border-bottom:0; display:flex; gap:8px; justify-content:flex-end; }
-        .modal__title { margin:0; font-size:18px; }
-        .modal__body { padding:16px; }
-        .form-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
-        .form-field { display:flex; flex-direction:column; gap:6px; }
-        .form-label { font-weight:600; font-size:14px; }
-
-        @media (max-width: 1024px) { .form-grid { grid-template-columns:repeat(2, 1fr); } }
-        @media (max-width: 900px)  { .table-wrap { display:none; } .cards { display:block; } .form-grid { grid-template-columns:1fr; } }
-        @media (max-width: 640px)  {
-          .page-header__toolbar { flex-direction:column; align-items:stretch; gap:8px; }
-          .segmented, .filters, .actions { width:100%; }
-          .segmented .btn, .filters .input, .actions .btn { width:100%; justify-content:center; }
-        }
-      `}</style>
     </>
   );
 }
