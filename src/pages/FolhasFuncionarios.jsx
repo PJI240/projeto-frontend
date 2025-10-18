@@ -5,8 +5,6 @@ import {
   CalculatorIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CloudArrowDownIcon,
   ExclamationTriangleIcon,
   PencilSquareIcon,
@@ -20,75 +18,40 @@ const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 /* ========= Utils ========= */
 const norm = (v) => (v ?? "").toString().trim();
 
-/** Aceita "YYYY-MM", "YYYY-MM-DD" e nomes de mês PT-BR -> retorna "YYYY-MM" */
-function normalizeYM(input) {
+/** "YYYY-MM" | "YYYY-MM-DD" | "outubro de 2025" -> "YYYY-MM" */
+function toYM(input) {
   const s = norm(input).toLowerCase();
   if (!s) return null;
   const mIso = s.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
   if (mIso) return `${mIso[1]}-${mIso[2]}`;
   const meses = {
-    janeiro: "01", fevereiro: "02", março: "03", marco: "03", abril: "04", maio: "05", junho: "06",
-    julho: "07", agosto: "08", setembro: "09", outubro: "10", novembro: "11", dezembro: "12",
+    "janeiro": "01","fevereiro": "02","março": "03","marco": "03","abril": "04","maio": "05","junho": "06",
+    "julho": "07","agosto": "08","setembro": "09","outubro": "10","novembro": "11","dezembro": "12",
   };
   const mBr = s.match(/(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro).*?(\d{4})/i);
   if (mBr) return `${mBr[2]}-${meses[mBr[1].toLowerCase()]}`;
   return null;
 }
-
-function monthISO(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
-function fromMonthISO(s) {
-  const [y, m] = String(s || "").split("-").map(Number);
-  if (!y || !m) return null;
-  return new Date(y, m - 1, 1);
-}
-function formatMonthBR(sISO) {
-  const d = fromMonthISO(sISO);
-  return d ? d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : sISO || "";
-}
+function monthISO(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+function fromMonthISO(s) { const [y, m] = String(s || "").split("-").map(Number); return y && m ? new Date(y, m - 1, 1) : null; }
+function formatMonthBR(sISO) { const d = fromMonthISO(sISO); return d ? d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : sISO || ""; }
 function toCSV(rows) {
   if (!rows?.length) return "";
   const keys = Object.keys(rows[0]);
   const header = keys.join(";");
-  const body = rows
-    .map((r) =>
-      keys
-        .map((k) => {
-          const v = r[k] ?? "";
-          const s = typeof v === "string" ? v.replaceAll('"', '""') : String(v);
-          return `"${s}"`;
-        })
-        .join(";")
-    )
-    .join("\n");
+  const body = rows.map((r) => keys.map((k) => `"${String(r[k] ?? "").replaceAll('"', '""')}"`).join(";")).join("\n");
   return header + "\n" + body;
 }
-function money(n) {
-  if (n == null || isNaN(n)) return "R$ 0,00";
-  return Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-function dec(v) {
-  const x = Number(String(v).replace(",", "."));
-  return Number.isFinite(x) ? x : 0;
-}
+const dec = (v) => { const x = Number(String(v).replace(",", ".")); return Number.isFinite(x) ? x : 0; };
+function money(n) { const x = Number(n); return Number.isFinite(x) ? x.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "R$ 0,00"; }
 
 /* ========= API helper ========= */
 function useApi() {
   return useCallback(async (path, init = {}) => {
     const url = `${API_BASE}${path}`;
-    const reqInit = { credentials: "include", ...init };
-    const r = await fetch(url, reqInit);
-    let data = null;
-    try { data = await r.json(); } catch {}
-    if (!r.ok || data?.ok === false) {
-      // erro mais descritivo p/ debug
-      let payload = "";
-      try { payload = reqInit.body ? ` | body=${JSON.stringify(JSON.parse(reqInit.body))}` : ""; } catch {}
-      throw new Error(`[${reqInit.method || "GET"} ${path}] ${data?.error || `HTTP ${r.status}`}${payload}`);
-    }
+    const r = await fetch(url, { credentials: "include", ...init });
+    let data = null; try { data = await r.json(); } catch {}
+    if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
     return data;
   }, []);
 }
@@ -99,7 +62,6 @@ export default function FolhasFuncionarios() {
   const liveRef = useRef(null);
 
   // filtros
-  const [periodo, setPeriodo] = useState("mes");
   const [from, setFrom] = useState(() => monthISO(new Date()));
   const [to, setTo] = useState(() => monthISO(new Date()));
   const [funcionarioFiltro, setFuncionarioFiltro] = useState("todos");
@@ -111,15 +73,13 @@ export default function FolhasFuncionarios() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const refTimer = useRef(null);
 
   // modal
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
     folha_id: "",
-    competencia: monthISO(new Date()), // sempre "YYYY-MM"
+    competencia: monthISO(new Date()),
     funcionario_id: "",
     horas_normais: "",
     he50_horas: "",
@@ -140,53 +100,31 @@ export default function FolhasFuncionarios() {
   }, [api]);
 
   const carregar = useCallback(async () => {
-    setLoading(true);
-    setErr(""); setOkMsg("");
+    setLoading(true); setErr(""); setOkMsg("");
     try {
       const params = new URLSearchParams();
-      if (from) params.set("from", normalizeYM(from) || from);
-      if (to) params.set("to", normalizeYM(to) || to);
+      if (from) params.set("from", toYM(from) || from);
+      if (to) params.set("to", toYM(to) || to);
       if (q) params.set("q", q);
       if (funcionarioFiltro !== "todos") params.set("funcionario_id", funcionarioFiltro);
 
       const d = await api(`/api/folhas-funcionarios?${params.toString()}`);
       setLista(Array.isArray(d.items) ? d.items : (d.folhas_funcionarios || []));
-      if (liveRef.current) liveRef.current.textContent = "Folhas/Funcionários atualizados.";
+      if (liveRef.current) liveRef.current.textContent = "Lista atualizada.";
     } catch (e) {
-      setErr(e.message || "Falha ao carregar.");
+      setErr(`[GET /api/folhas-funcionarios] ${e.message || "Falha ao carregar"}`);
       if (liveRef.current) liveRef.current.textContent = "Erro ao atualizar a lista.";
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [api, from, to, q, funcionarioFiltro]);
 
-  useEffect(() => {
-    // executa cada carga isoladamente para não mascarar a origem do erro
-    (async () => {
-      try { await carregarFuncionarios(); }
-      catch (e) { setErr((prev) => prev || `Falha ao carregar funcionários: ${e.message}`); }
-    })();
-    (async () => {
-      try { await carregar(); }
-      catch (e) { setErr((prev) => prev || `Falha ao carregar lançamentos: ${e.message}`); }
-    })();
-  }, [carregar, carregarFuncionarios]);
+  useEffect(() => { carregarFuncionarios(); }, [carregarFuncionarios]);
+  useEffect(() => { carregar(); }, [carregar]);
 
-  useEffect(() => {
-    if (autoRefresh) {
-      refTimer.current = setInterval(() => carregar(), 60000);
-    } else if (refTimer.current) {
-      clearInterval(refTimer.current);
-      refTimer.current = null;
-    }
-    return () => refTimer.current && clearInterval(refTimer.current);
-  }, [autoRefresh, carregar]);
-
-  /* ====== filtros aplicados/kpis ====== */
+  /* ====== filtrados & kpis ====== */
   const filtrados = useMemo(() => {
     const qn = q.toLowerCase();
-    const f = normalizeYM(from) || from;
-    const t = normalizeYM(to) || to;
+    const f = toYM(from) || from;
+    const t = toYM(to) || to;
     return lista.filter((r) => {
       if (funcionarioFiltro !== "todos" && String(r.funcionario_id) !== String(funcionarioFiltro)) return false;
       if (f && r.competencia < f) return false;
@@ -200,44 +138,21 @@ export default function FolhasFuncionarios() {
   }, [lista, q, funcionarioFiltro, from, to]);
 
   const kpis = useMemo(() => {
-    const total = filtrados.length;
-    let horas = 0;
-    let liquido = 0;
-    let pessoas = new Set();
+    let horas = 0, liquido = 0; const pessoas = new Set();
     filtrados.forEach((r) => {
       horas += dec(r.horas_normais) + dec(r.he50_horas) + dec(r.he100_horas);
       liquido += dec(r.total_liquido);
       pessoas.add(r.funcionario_id);
     });
-    return { total, horas, liquido, pessoas: pessoas.size };
+    return { horas, liquido, pessoas: pessoas.size };
   }, [filtrados]);
 
   /* ====== ações ====== */
-  function atalhoPeriodo(p) {
-    setPeriodo(p);
-    const hoje = new Date();
-    if (p === "hoje" || p === "mes") {
-      const m = monthISO(hoje);
-      setFrom(m); setTo(m);
-      return;
-    }
-    if (p === "semana") {
-      const d = new Date(hoje);
-      const diff = (d.getDay() + 6) % 7;
-      const ini = new Date(d);
-      ini.setDate(d.getDate() - diff);
-      const fim = new Date(ini);
-      fim.setDate(ini.getDate() + 6);
-      setFrom(monthISO(ini)); setTo(monthISO(fim));
-    }
-  }
-
   function abrirNovo() {
     setEditing(null);
-    setForm((prev) => ({
-      ...prev,
+    setForm({
       folha_id: "",
-      competencia: normalizeYM(from) || monthISO(new Date()),
+      competencia: toYM(from) || monthISO(new Date()),
       funcionario_id: "",
       horas_normais: "",
       he50_horas: "",
@@ -249,7 +164,7 @@ export default function FolhasFuncionarios() {
       proventos: "",
       total_liquido: "",
       inconsistencias: 0,
-    }));
+    });
     setOpenModal(true);
   }
 
@@ -257,7 +172,7 @@ export default function FolhasFuncionarios() {
     setEditing(r);
     setForm({
       folha_id: r.folha_id,
-      competencia: normalizeYM(r.competencia) || monthISO(new Date()),
+      competencia: toYM(r.competencia) || monthISO(new Date()),
       funcionario_id: r.funcionario_id,
       horas_normais: r.horas_normais ?? "",
       he50_horas: r.he50_horas ?? "",
@@ -274,19 +189,19 @@ export default function FolhasFuncionarios() {
   }
 
   function recomputaTotal(next = form) {
-    const total =
+    return (
       dec(next.valor_base) +
       dec(next.valor_he50) +
       dec(next.valor_he100) +
       dec(next.proventos) -
-      dec(next.descontos);
-    return total;
+      dec(next.descontos)
+    );
   }
 
   async function salvar() {
     setErr(""); setOkMsg("");
     try {
-      const competenciaYM = normalizeYM(form.competencia);
+      const competenciaYM = toYM(form.competencia);
       const payload = {
         ...(form.folha_id ? { folha_id: Number(form.folha_id) } : {}),
         competencia: competenciaYM,
@@ -299,34 +214,23 @@ export default function FolhasFuncionarios() {
         valor_he100:   form.valor_he100 === ""   ? null : Number(dec(form.valor_he100)),
         descontos:     form.descontos === ""     ? null : Number(dec(form.descontos)),
         proventos:     form.proventos === ""     ? null : Number(dec(form.proventos)),
-        total_liquido:
-          form.total_liquido === "" ? Number(recomputaTotal(form)) : Number(dec(form.total_liquido)),
+        total_liquido: form.total_liquido === "" ? Number(recomputaTotal(form)) : Number(dec(form.total_liquido)),
         inconsistencias: Number(form.inconsistencias || 0),
       };
 
       if (!payload.funcionario_id) throw new Error("Selecione o funcionário.");
-      if (!competenciaYM && !payload.folha_id) throw new Error("Informe a competência (YYYY-MM) ou selecione uma folha.");
+      if (!payload.folha_id && !competenciaYM) throw new Error("Informe a competência (YYYY-MM) ou selecione uma folha.");
 
       if (editing) {
-        await api(`/api/folhas-funcionarios/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await api(`/api/folhas-funcionarios/${editing.id}`, { method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
         setOkMsg("Registro atualizado.");
       } else {
-        await api(`/api/folhas-funcionarios`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await api(`/api/folhas-funcionarios`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
         setOkMsg("Registro adicionado.");
       }
       setOpenModal(false);
       await carregar();
-    } catch (e) {
-      setErr(e.message || "Falha ao salvar.");
-    }
+    } catch (e) { setErr(e.message || "Falha ao salvar."); }
   }
 
   async function excluir(r) {
@@ -336,9 +240,7 @@ export default function FolhasFuncionarios() {
       await api(`/api/folhas-funcionarios/${r.id}`, { method: "DELETE" });
       setOkMsg("Registro removido.");
       await carregar();
-    } catch (e) {
-      setErr(e.message || "Falha ao excluir.");
-    }
+    } catch (e) { setErr(e.message || "Falha ao excluir."); }
   }
 
   function exportarCSV() {
@@ -364,11 +266,9 @@ export default function FolhasFuncionarios() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `folhas_funcionarios_${normalizeYM(from) || from}_a_${normalizeYM(to) || to}.csv`;
+    a.download = `folhas_funcionarios_${toYM(from) || from}_a_${toYM(to) || to}.csv`;
     document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    a.click(); a.remove(); URL.revokeObjectURL(url);
   }
 
   /* ====== UI ====== */
@@ -384,30 +284,15 @@ export default function FolhasFuncionarios() {
         </div>
 
         <div className="page-header__toolbar" aria-label="Ações">
-          <div className="segmented">
-            <button className={`btn btn--neutral ${periodo === "mes" ? "is-active" : ""}`} onClick={() => atalhoPeriodo("mes")}>
+          <div className="segmented" role="group" aria-label="Atalhos de período">
+            <button className="btn btn--neutral is-active" onClick={() => { const m = monthISO(new Date()); setFrom(m); setTo(m); }}>
               <CalendarDaysIcon className="icon" aria-hidden="true" /> Mês
-            </button>
-            <button className={`btn btn--neutral ${periodo === "semana" ? "is-active" : ""}`} onClick={() => atalhoPeriodo("semana")}>
-              Semana
             </button>
           </div>
 
           <div className="filters">
-            <input
-              type="month"
-              className="input input--sm"
-              value={from}
-              onChange={(e) => setFrom(normalizeYM(e.target.value) || e.target.value)}
-              aria-label="De"
-            />
-            <input
-              type="month"
-              className="input input--sm"
-              value={to}
-              onChange={(e) => setTo(normalizeYM(e.target.value) || e.target.value)}
-              aria-label="Até"
-            />
+            <input type="month" className="input input--sm" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="De" />
+            <input type="month" className="input input--sm" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Até" />
             <select className="input input--sm" value={funcionarioFiltro} onChange={(e) => setFuncionarioFiltro(e.target.value)} aria-label="Funcionário">
               <option value="todos">Todos os funcionários</option>
               {funcionarios.map((f) => (
@@ -424,10 +309,6 @@ export default function FolhasFuncionarios() {
               {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
               <span>{loading ? "Atualizando…" : "Atualizar"}</span>
             </button>
-            <label className="btn btn--neutral" style={{ cursor: "pointer" }}>
-              <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} style={{ marginRight: 6 }} />
-              Auto Refresh
-            </label>
           </div>
         </div>
       </header>
@@ -441,7 +322,7 @@ export default function FolhasFuncionarios() {
         <div className="stat-card" data-accent="info">
           <div className="stat-card__icon"><UserIcon className="icon" aria-hidden="true" /></div>
           <div className="stat-card__content">
-            <div className="stat-value">{kpis.pessoas}</div>
+            <div className="stat-value">{new Set(filtrados.map(r => r.funcionario_id)).size}</div>
             <div className="stat-title">Funcionários impactados</div>
           </div>
         </div>
@@ -462,7 +343,7 @@ export default function FolhasFuncionarios() {
       </div>
 
       {/* Tabela */}
-      <div className="table-wrap">
+      <div className="table-wrap" role="region" aria-label="Tabela de lançamentos">
         <table className="table">
           <thead>
             <tr>
@@ -566,7 +447,7 @@ export default function FolhasFuncionarios() {
                     type="month"
                     className="input"
                     value={form.competencia}
-                    onChange={(e) => setForm({ ...form, competencia: normalizeYM(e.target.value) || e.target.value })}
+                    onChange={(e) => setForm({ ...form, competencia: toYM(e.target.value) || e.target.value })}
                     required
                   />
                 </div>
@@ -596,40 +477,47 @@ export default function FolhasFuncionarios() {
 
                 <div className="form-field">
                   <label className="form-label">Valor base</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_base} onChange={(e) => setForm({ ...form, valor_base: e.target.value, total_liquido: recomputaTotal({ ...form, valor_base: e.target.value }).toFixed(2) })} />
+                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_base}
+                    onChange={(e) => setForm({ ...form, valor_base: e.target.value, total_liquido: recomputaTotal({ ...form, valor_base: e.target.value }).toFixed(2) })} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Valor HE 50%</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_he50} onChange={(e) => setForm({ ...form, valor_he50: e.target.value, total_liquido: recomputaTotal({ ...form, valor_he50: e.target.value }).toFixed(2) })} />
+                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_he50}
+                    onChange={(e) => setForm({ ...form, valor_he50: e.target.value, total_liquido: recomputaTotal({ ...form, valor_he50: e.target.value }).toFixed(2) })} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Valor HE 100%</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_he100} onChange={(e) => setForm({ ...form, valor_he100: e.target.value, total_liquido: recomputaTotal({ ...form, valor_he100: e.target.value }).toFixed(2) })} />
+                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.valor_he100}
+                    onChange={(e) => setForm({ ...form, valor_he100: e.target.value, total_liquido: recomputaTotal({ ...form, valor_he100: e.target.value }).toFixed(2) })} />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Proventos (+)</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.proventos} onChange={(e) => setForm({ ...form, proventos: e.target.value, total_liquido: recomputaTotal({ ...form, proventos: e.target.value }).toFixed(2) })} />
+                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.proventos}
+                    onChange={(e) => setForm({ ...form, proventos: e.target.value, total_liquido: recomputaTotal({ ...form, proventos: e.target.value }).toFixed(2) })} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Descontos (-)</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.descontos} onChange={(e) => setForm({ ...form, descontos: e.target.value, total_liquido: recomputaTotal({ ...form, descontos: e.target.value }).toFixed(2) })} />
+                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.descontos}
+                    onChange={(e) => setForm({ ...form, descontos: e.target.value, total_liquido: recomputaTotal({ ...form, descontos: e.target.value }).toFixed(2) })} />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Total líquido</label>
-                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.total_liquido} onChange={(e) => setForm({ ...form, total_liquido: e.target.value })} />
+                  <input className="input" inputMode="decimal" placeholder="0,00" value={form.total_liquido}
+                    onChange={(e) => setForm({ ...form, total_liquido: e.target.value })} />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Inconsistências</label>
-                  <input className="input" type="number" min="0" value={form.inconsistencias} onChange={(e) => setForm({ ...form, inconsistencias: e.target.value })} />
+                  <input className="input" type="number" min="0" value={form.inconsistencias}
+                    onChange={(e) => setForm({ ...form, inconsistencias: e.target.value })} />
                 </div>
               </div>
 
               <p className="muted" style={{ marginTop: 8 }}>
                 <ExclamationTriangleIcon className="icon" style={{ width: 16, height: 16 }} aria-hidden="true" /> 
-                O total líquido é recalculado automaticamente quando você altera base/HE/proventos/descontos (pode ser ajustado manualmente).
+                O total líquido é recalculado automaticamente quando você altera base/HE/proventos/descontos (pode ajustar manualmente).
               </p>
             </div>
 
@@ -641,17 +529,14 @@ export default function FolhasFuncionarios() {
         </div>
       )}
 
-      {/* Estilos locais */}
+      {/* Estilos locais (seguindo tokens do global.css) */}
       <style jsx>{`
         .segmented { display:flex; gap:8px; flex-wrap:wrap; }
         .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
         .actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
         .is-active { outline:2px solid var(--accent); }
 
-        .stats-grid {
-          display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
-          gap:16px; margin:16px 0 20px;
-        }
+        .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px; margin:16px 0 20px; }
         .stat-card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:18px; display:flex; align-items:center; gap:14px; box-shadow:var(--shadow); }
         .stat-card[data-accent="info"] { border-left:4px solid var(--info); }
         .stat-card[data-accent="success"] { border-left:4px solid var(--success); }
@@ -692,15 +577,9 @@ export default function FolhasFuncionarios() {
         .form-field { display:flex; flex-direction:column; gap:6px; }
         .form-label { font-weight:600; font-size:14px; }
 
-        @media (max-width: 1024px) {
-          .form-grid { grid-template-columns:repeat(2, 1fr); }
-        }
-        @media (max-width: 900px) {
-          .table-wrap { display:none; }
-          .cards { display:block; }
-          .form-grid { grid-template-columns:1fr; }
-        }
-        @media (max-width: 640px) {
+        @media (max-width: 1024px) { .form-grid { grid-template-columns:repeat(2, 1fr); } }
+        @media (max-width: 900px)  { .table-wrap { display:none; } .cards { display:block; } .form-grid { grid-template-columns:1fr; } }
+        @media (max-width: 640px)  {
           .page-header__toolbar { flex-direction:column; align-items:stretch; gap:8px; }
           .segmented, .filters, .actions { width:100%; }
           .segmented .btn, .filters .input, .actions .btn { width:100%; justify-content:center; }
