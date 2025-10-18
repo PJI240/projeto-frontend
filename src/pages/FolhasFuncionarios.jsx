@@ -19,10 +19,23 @@ const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 
 /* ========= Utils ========= */
 const norm = (v) => (v ?? "").toString().trim();
-const onlyYM = (s) => {
-  const m = String(s || "").match(/^(\d{4})-(\d{2})$/);
-  return m ? `${m[1]}-${m[2]}` : null;
-};
+
+/** Aceita "YYYY-MM", "YYYY-MM-DD" e nomes de mês PT-BR -> retorna "YYYY-MM" */
+function normalizeYM(input) {
+  const s = norm(input).toLowerCase();
+  if (!s) return null;
+  const mIso = s.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
+  if (mIso) return `${mIso[1]}-${mIso[2]}`;
+
+  const meses = {
+    "janeiro": "01","fevereiro": "02","março": "03","marco": "03","abril": "04","maio": "05","junho": "06",
+    "julho": "07","agosto": "08","setembro": "09","outubro": "10","novembro": "11","dezembro": "12"
+  };
+  const mBr = s.match(/(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro).*?(\d{4})/i);
+  if (mBr) return `${mBr[2]}-${meses[mBr[1]]}`;
+  return null;
+}
+
 function monthISO(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -56,7 +69,7 @@ function toCSV(rows) {
 }
 function money(n) {
   if (n == null || isNaN(n)) return "R$ 0,00";
-  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return Number(n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 function dec(v) {
   const x = Number(String(v).replace(",", "."));
@@ -70,7 +83,9 @@ function useApi() {
     const r = await fetch(url, { credentials: "include", ...init });
     let data = null;
     try { data = await r.json(); } catch {}
-    if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
+    if (!r.ok || data?.ok === false) {
+      throw new Error(data?.error || `HTTP ${r.status}`);
+    }
     return data;
   }, []);
 }
@@ -101,7 +116,7 @@ export default function FolhasFuncionarios() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
     folha_id: "",
-    competencia: monthISO(new Date()), // usado só p/ facilitar seleção no modal
+    competencia: monthISO(new Date()), // sempre "YYYY-MM"
     funcionario_id: "",
     horas_normais: "",
     he50_horas: "",
@@ -126,21 +141,17 @@ export default function FolhasFuncionarios() {
     setErr(""); setOkMsg("");
     try {
       const params = new URLSearchParams();
-      if (from) params.set("from", from);
-      if (to) params.set("to", to);
+      if (from) params.set("from", normalizeYM(from) || from);
+      if (to) params.set("to", normalizeYM(to) || to);
       if (q) params.set("q", q);
       if (funcionarioFiltro !== "todos") params.set("funcionario_id", funcionarioFiltro);
 
       const d = await api(`/api/folhas-funcionarios?${params.toString()}`);
-      // Esperado do backend:
-      //  id, folha_id, funcionario_id, competencia, funcionario_nome,
-      //  horas_normais, he50_horas, he100_horas, valor_base, valor_he50, valor_he100,
-      //  descontos, proventos, total_liquido, inconsistencias
       setLista(Array.isArray(d.items) ? d.items : (d.folhas_funcionarios || []));
-      liveRef.current && (liveRef.current.textContent = "Folhas/Funcionários atualizados.");
+      if (liveRef.current) liveRef.current.textContent = "Folhas/Funcionários atualizados.";
     } catch (e) {
       setErr(e.message || "Falha ao carregar.");
-      liveRef.current && (liveRef.current.textContent = "Erro ao atualizar a lista.");
+      if (liveRef.current) liveRef.current.textContent = "Erro ao atualizar a lista.";
     } finally {
       setLoading(false);
     }
@@ -164,10 +175,12 @@ export default function FolhasFuncionarios() {
   /* ====== filtros aplicados/kpis ====== */
   const filtrados = useMemo(() => {
     const qn = q.toLowerCase();
+    const f = normalizeYM(from) || from;
+    const t = normalizeYM(to) || to;
     return lista.filter((r) => {
       if (funcionarioFiltro !== "todos" && String(r.funcionario_id) !== String(funcionarioFiltro)) return false;
-      if (from && r.competencia < from) return false;
-      if (to && r.competencia > to) return false;
+      if (f && r.competencia < f) return false;
+      if (t && r.competencia > t) return false;
       if (qn) {
         const alvo = `${r.id} ${r.funcionario_nome} ${r.competencia}`.toLowerCase();
         if (!alvo.includes(qn)) return false;
@@ -211,9 +224,11 @@ export default function FolhasFuncionarios() {
 
   function abrirNovo() {
     setEditing(null);
-    setForm({
+    setForm((prev) => ({
+      ...prev,
       folha_id: "",
-      competencia: monthISO(new Date()),
+      // usa o filtro "from" atual para pré-selecionar a competência
+      competencia: normalizeYM(from) || monthISO(new Date()),
       funcionario_id: "",
       horas_normais: "",
       he50_horas: "",
@@ -225,7 +240,7 @@ export default function FolhasFuncionarios() {
       proventos: "",
       total_liquido: "",
       inconsistencias: 0,
-    });
+    }));
     setOpenModal(true);
   }
 
@@ -233,7 +248,7 @@ export default function FolhasFuncionarios() {
     setEditing(r);
     setForm({
       folha_id: r.folha_id,
-      competencia: r.competencia || monthISO(new Date()),
+      competencia: normalizeYM(r.competencia) || monthISO(new Date()),
       funcionario_id: r.funcionario_id,
       horas_normais: r.horas_normais ?? "",
       he50_horas: r.he50_horas ?? "",
@@ -262,25 +277,28 @@ export default function FolhasFuncionarios() {
   async function salvar() {
     setErr(""); setOkMsg("");
     try {
+      const competenciaYM = normalizeYM(form.competencia);
       const payload = {
-        folha_id: form.folha_id ? Number(form.folha_id) : undefined, // opcional se backend aceitar (ou derive pela competencia)
-        competencia: onlyYM(form.competencia), // para o backend localizar/validar a folha
+        ...(form.folha_id ? { folha_id: Number(form.folha_id) } : {}),
+        competencia: competenciaYM, // garantido YYYY-MM
         funcionario_id: Number(form.funcionario_id),
         horas_normais: form.horas_normais === "" ? null : Number(dec(form.horas_normais)),
-        he50_horas: form.he50_horas === "" ? null : Number(dec(form.he50_horas)),
-        he100_horas: form.he100_horas === "" ? null : Number(dec(form.he100_horas)),
-        valor_base: form.valor_base === "" ? null : Number(dec(form.valor_base)),
-        valor_he50: form.valor_he50 === "" ? null : Number(dec(form.valor_he50)),
-        valor_he100: form.valor_he100 === "" ? null : Number(dec(form.valor_he100)),
-        descontos: form.descontos === "" ? null : Number(dec(form.descontos)),
-        proventos: form.proventos === "" ? null : Number(dec(form.proventos)),
+        he50_horas:    form.he50_horas === ""    ? null : Number(dec(form.he50_horas)),
+        he100_horas:   form.he100_horas === ""   ? null : Number(dec(form.he100_horas)),
+        valor_base:    form.valor_base === ""    ? null : Number(dec(form.valor_base)),
+        valor_he50:    form.valor_he50 === ""    ? null : Number(dec(form.valor_he50)),
+        valor_he100:   form.valor_he100 === ""   ? null : Number(dec(form.valor_he100)),
+        descontos:     form.descontos === ""     ? null : Number(dec(form.descontos)),
+        proventos:     form.proventos === ""     ? null : Number(dec(form.proventos)),
         total_liquido:
           form.total_liquido === "" ? Number(recomputaTotal(form)) : Number(dec(form.total_liquido)),
         inconsistencias: Number(form.inconsistencias || 0),
       };
 
       if (!payload.funcionario_id) throw new Error("Selecione o funcionário.");
-      if (!payload.competencia) throw new Error("Informe a competência (YYYY-MM).");
+      if (!competenciaYM && !payload.folha_id) {
+        throw new Error("Informe a competência (YYYY-MM) ou selecione uma folha.");
+      }
 
       if (editing) {
         await api(`/api/folhas-funcionarios/${editing.id}`, {
@@ -339,7 +357,7 @@ export default function FolhasFuncionarios() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `folhas_funcionarios_${from}_a_${to}.csv`;
+    a.download = `folhas_funcionarios_${normalizeYM(from) || from}_a_${normalizeYM(to) || to}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -525,7 +543,13 @@ export default function FolhasFuncionarios() {
               <div className="form-grid">
                 <div className="form-field">
                   <label className="form-label">Competência *</label>
-                  <input type="month" className="input" value={form.competencia} onChange={(e) => setForm({ ...form, competencia: e.target.value })} required />
+                  <input
+                    type="month"
+                    className="input"
+                    value={form.competencia}
+                    onChange={(e) => setForm({ ...form, competencia: normalizeYM(e.target.value) || e.target.value })}
+                    required
+                  />
                 </div>
 
                 <div className="form-field">
