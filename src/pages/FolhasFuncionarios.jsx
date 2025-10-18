@@ -26,13 +26,12 @@ function normalizeYM(input) {
   if (!s) return null;
   const mIso = s.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
   if (mIso) return `${mIso[1]}-${mIso[2]}`;
-
   const meses = {
-    "janeiro": "01","fevereiro": "02","março": "03","marco": "03","abril": "04","maio": "05","junho": "06",
-    "julho": "07","agosto": "08","setembro": "09","outubro": "10","novembro": "11","dezembro": "12"
+    janeiro: "01", fevereiro: "02", março: "03", marco: "03", abril: "04", maio: "05", junho: "06",
+    julho: "07", agosto: "08", setembro: "09", outubro: "10", novembro: "11", dezembro: "12",
   };
   const mBr = s.match(/(janeiro|fevereiro|março|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro).*?(\d{4})/i);
-  if (mBr) return `${mBr[2]}-${meses[mBr[1]]}`;
+  if (mBr) return `${mBr[2]}-${meses[mBr[1].toLowerCase()]}`;
   return null;
 }
 
@@ -80,11 +79,15 @@ function dec(v) {
 function useApi() {
   return useCallback(async (path, init = {}) => {
     const url = `${API_BASE}${path}`;
-    const r = await fetch(url, { credentials: "include", ...init });
+    const reqInit = { credentials: "include", ...init };
+    const r = await fetch(url, reqInit);
     let data = null;
     try { data = await r.json(); } catch {}
     if (!r.ok || data?.ok === false) {
-      throw new Error(data?.error || `HTTP ${r.status}`);
+      // erro mais descritivo p/ debug
+      let payload = "";
+      try { payload = reqInit.body ? ` | body=${JSON.stringify(JSON.parse(reqInit.body))}` : ""; } catch {}
+      throw new Error(`[${reqInit.method || "GET"} ${path}] ${data?.error || `HTTP ${r.status}`}${payload}`);
     }
     return data;
   }, []);
@@ -158,8 +161,15 @@ export default function FolhasFuncionarios() {
   }, [api, from, to, q, funcionarioFiltro]);
 
   useEffect(() => {
-    carregarFuncionarios();
-    carregar();
+    // executa cada carga isoladamente para não mascarar a origem do erro
+    (async () => {
+      try { await carregarFuncionarios(); }
+      catch (e) { setErr((prev) => prev || `Falha ao carregar funcionários: ${e.message}`); }
+    })();
+    (async () => {
+      try { await carregar(); }
+      catch (e) { setErr((prev) => prev || `Falha ao carregar lançamentos: ${e.message}`); }
+    })();
   }, [carregar, carregarFuncionarios]);
 
   useEffect(() => {
@@ -227,7 +237,6 @@ export default function FolhasFuncionarios() {
     setForm((prev) => ({
       ...prev,
       folha_id: "",
-      // usa o filtro "from" atual para pré-selecionar a competência
       competencia: normalizeYM(from) || monthISO(new Date()),
       funcionario_id: "",
       horas_normais: "",
@@ -280,7 +289,7 @@ export default function FolhasFuncionarios() {
       const competenciaYM = normalizeYM(form.competencia);
       const payload = {
         ...(form.folha_id ? { folha_id: Number(form.folha_id) } : {}),
-        competencia: competenciaYM, // garantido YYYY-MM
+        competencia: competenciaYM,
         funcionario_id: Number(form.funcionario_id),
         horas_normais: form.horas_normais === "" ? null : Number(dec(form.horas_normais)),
         he50_horas:    form.he50_horas === ""    ? null : Number(dec(form.he50_horas)),
@@ -296,9 +305,7 @@ export default function FolhasFuncionarios() {
       };
 
       if (!payload.funcionario_id) throw new Error("Selecione o funcionário.");
-      if (!competenciaYM && !payload.folha_id) {
-        throw new Error("Informe a competência (YYYY-MM) ou selecione uma folha.");
-      }
+      if (!competenciaYM && !payload.folha_id) throw new Error("Informe a competência (YYYY-MM) ou selecione uma folha.");
 
       if (editing) {
         await api(`/api/folhas-funcionarios/${editing.id}`, {
@@ -387,8 +394,20 @@ export default function FolhasFuncionarios() {
           </div>
 
           <div className="filters">
-            <input type="month" className="input input--sm" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="De" />
-            <input type="month" className="input input--sm" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Até" />
+            <input
+              type="month"
+              className="input input--sm"
+              value={from}
+              onChange={(e) => setFrom(normalizeYM(e.target.value) || e.target.value)}
+              aria-label="De"
+            />
+            <input
+              type="month"
+              className="input input--sm"
+              value={to}
+              onChange={(e) => setTo(normalizeYM(e.target.value) || e.target.value)}
+              aria-label="Até"
+            />
             <select className="input input--sm" value={funcionarioFiltro} onChange={(e) => setFuncionarioFiltro(e.target.value)} aria-label="Funcionário">
               <option value="todos">Todos os funcionários</option>
               {funcionarios.map((f) => (
