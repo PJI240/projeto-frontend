@@ -1051,3 +1051,157 @@ html[data-theme="hc"] select option {
 }
 
 .animate-spin { animation: spin 1s linear infinite; }
+
+/* =========================================================
+   Folhas × Funcionários — complementos de CSS (delta)
+   ========================================================= */
+
+/* Header (ações alinhadas ao nosso padrão) */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Toolbar de filtros (sem accent-left e sem contorno extra) */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.toolbar__left,
+.toolbar__right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toolbar__title { font-weight: 600; color: var(--fg); }
+
+/* Campos inline usados na toolbar */
+.field-inline { display: flex; flex-direction: column; gap: 4px; }
+.field-inline--grow { flex: 1; min-width: 220px; }
+
+/* Alias visual p/ inputs/selects em formulários e toolbar */
+.form-control {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: var(--fs-16);
+  line-height: 1.2;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.form-control::placeholder { color: color-mix(in srgb, var(--muted) 75%, transparent); }
+.form-control:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--accent-bg);
+}
+
+/* Espaçamento padrão entre seções da página */
+.section-gap { margin-bottom: 20px; }
+
+/* KPIs (cartões de métricas) */
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.kpi {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--border);
+}
+.kpi__icon {
+  width: 48px; height: 48px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--panel-muted);
+}
+.kpi__body { display: flex; flex-direction: column; }
+.kpi__value { font-size: 1.5rem; font-weight: 800; line-height: 1; color: var(--fg); }
+.kpi__label { font-size: .875rem; color: var(--muted); font-weight: 600; }
+.kpi--info    { border-left-color: var(--info); }
+.kpi--success { border-left-color: var(--success); }
+.kpi--warning { border-left-color: var(--warning); }
+
+/* Botão de ícone compacto (usado nas ações da tabela/modal) */
+.btn--icon { padding: 6px 8px; min-height: 36px; }
+
+/* Tabela genérica (a página usa .table) */
+.table-responsive { overflow: auto; }
+.table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--panel); color: var(--fg); }
+.table thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--panel-muted);
+  text-align: left; padding: 10px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700; color: var(--muted);
+}
+.table tbody td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table .num { text-align: right; }
+.table .text-right { text-align: right; }
+.table-empty {
+  text-align: center; padding: 40px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--muted);
+}
+.cell-strong { font-weight: 600; color: var(--fg); }
+.cell-muted { font-size: var(--fs-12); color: var(--muted); }
+.table-footer {
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: var(--fs-14); color: var(--muted);
+}
+
+/* Modal (aliases para o padrão usado nesta página) */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 24px; z-index: 1000; animation: fadeIn .2s ease;
+}
+.modal-content {
+  width: 100%; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.modal-lg { max-width: 820px; }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 1.125rem; font-weight: 700; margin: 0; color: var(--fg); }
+.modal-body { padding: 16px; }
+.modal-footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 16px; border-top: 1px solid var(--border);
+}
+
+/* Alertas usados nesta página (compat com seu padrão atual) */
+.alert { margin: 12px 0; padding: 12px; border-radius: 10px; border: 1px solid var(--border); }
+.alert--error {
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error-strong);
+  border-color: color-mix(in srgb, var(--error) 25%, transparent);
+}
+.alert--success {
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success-strong);
+  border-color: color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+/* Utilidades usadas na página */
+.page-subtitle { color: var(--muted); }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Responsivo específico dos filtros (melhor quebra em telas menores) */
+@media (max-width: 720px) {
+  .toolbar { align-items: stretch; }
+  .toolbar__left, .toolbar__right { width: 100%; }
+  .field-inline--grow { min-width: 160px; }
+}
