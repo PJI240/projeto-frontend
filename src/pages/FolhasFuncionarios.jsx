@@ -1,4 +1,3 @@
-// src/pages/FolhasFuncionarios.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowPathIcon,
@@ -67,7 +66,7 @@ export default function FolhasFuncionarios() {
   const api = useApi();
   const liveRef = useRef(null);
 
-  // Filtros (agora com folha_id)
+  // Filtros (com folha_id)
   const [filtros, setFiltros] = useState({
     from: monthISO(),
     to: monthISO(),
@@ -105,10 +104,19 @@ export default function FolhasFuncionarios() {
     inconsistencias: 0,
   });
 
+  const folhaSelecionada = useMemo(
+    () => folhas.find((f) => String(f.id) === String(filtros.folha_id)),
+    [folhas, filtros.folha_id]
+  );
+
   /* ===================== Loads ===================== */
-  const loadFuncionarios = useCallback(async () => {
+  // Carrega funcionarios da empresa da folha selecionada (evita empresa errada)
+  const loadFuncionarios = useCallback(async (empresaId) => {
     try {
-      const d = await api(`/api/funcionarios?ativos=1`);
+      const qs = new URLSearchParams();
+      if (empresaId) qs.set("empresa_id", String(empresaId));
+      qs.set("ativos", "1");
+      const d = await api(`/api/funcionarios?${qs.toString()}`);
       setFuncionarios(d.funcionarios || d.items || []);
     } catch (e) {
       setFuncionarios([]);
@@ -145,13 +153,12 @@ export default function FolhasFuncionarios() {
       setFolhas([]);
       console.error(e);
     }
-  }, [api, filtros.from, filtros.to, filtros.folha_id]);
+  }, [api, filtros.from, filtros.to]); // <-- removido filtros.folha_id para evitar loop
 
   const loadLancamentos = useCallback(async () => {
     setErr("");
     setOk("");
 
-    // ⚠️ Se não houver folha selecionada, garanta que não ficaremos em loading=true
     if (!filtros.folha_id) {
       setLista([]);
       setLoading(false);
@@ -178,8 +185,15 @@ export default function FolhasFuncionarios() {
     }
   }, [api, filtros.folha_id, filtros.funcionario_id, filtros.q]);
 
-  useEffect(() => { loadFuncionarios(); }, [loadFuncionarios]);
+  // Primeira carga de folhas
   useEffect(() => { loadFolhas(); }, [loadFolhas]);
+
+  // Recarrega funcionários quando a folha (empresa) mudar
+  useEffect(() => {
+    loadFuncionarios(folhaSelecionada?.empresa_id);
+  }, [loadFuncionarios, folhaSelecionada?.empresa_id]);
+
+  // Atualiza lançamentos sempre que filtros relevantes mudarem
   useEffect(() => { loadLancamentos(); }, [loadLancamentos]);
 
   /* ===================== Filtrados/KPIs ===================== */
@@ -351,11 +365,6 @@ export default function FolhasFuncionarios() {
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
 
-  const folhaSelecionada = useMemo(
-    () => folhas.find((f) => String(f.id) === String(filtros.folha_id)),
-    [folhas, filtros.folha_id]
-  );
-
   /* ===================== Render ===================== */
   return (
     <>
@@ -368,22 +377,22 @@ export default function FolhasFuncionarios() {
           <p className="page-subtitle">Lançamentos por funcionário (horas, valores e total líquido)</p>
         </div>
         <div className="header-actions">
-          <button className="btn" onClick={loadLancamentos} disabled={loading} aria-busy={loading}>
+          <button className="btn" onClick={loadLancamentos} disabled={loading} aria-busy={loading} aria-label="Atualizar lista">
             <ArrowPathIcon className={`icon-sm ${loading ? "animate-spin" : ""}`} />
             {loading ? "Atualizando..." : "Atualizar"}
           </button>
-          <button className="btn" onClick={exportar} disabled={!filtrados.length}>
+          <button className="btn" onClick={exportar} disabled={!filtrados.length} aria-label="Exportar CSV">
             <CloudArrowDownIcon className="icon-sm" /> Exportar
           </button>
-          <button className="btn btn--primary" onClick={startNovo} disabled={!filtros.folha_id}>
+          <button className="btn btn--primary" onClick={startNovo} disabled={!filtros.folha_id} aria-label="Novo lançamento">
             <PlusIcon className="icon-sm" /> Novo
           </button>
         </div>
       </header>
 
       {/* Alertas */}
-      {err && <div className="alert alert--error">{err}</div>}
-      {ok && <div className="alert alert--success">{ok}</div>}
+      {err && <div className="alert alert--error" role="alert">{err}</div>}
+      {ok && <div className="alert alert--success" role="status">{ok}</div>}
 
       {/* Filtros */}
       <section className="card toolbar">
@@ -420,7 +429,9 @@ export default function FolhasFuncionarios() {
         </div>
 
         <div className="toolbar__right">
+                  <label className="sr-only" htmlFor="f-busca">Buscar por funcionário</label>
           <input
+            id="f-busca"
             type="search"
             className="form-control"
             placeholder="Buscar por funcionário…"
@@ -436,6 +447,7 @@ export default function FolhasFuncionarios() {
               funcionario_id: "todos",
               q: "",
             })}
+            aria-label="Limpar filtros"
           >
             <XMarkIcon className="icon-sm" /> Limpar
           </button>
@@ -524,10 +536,10 @@ export default function FolhasFuncionarios() {
                       <td className="num">{r.inconsistencias || 0}</td>
                       <td className="text-right">
                         <div className="btn-group">
-                          <button className="btn btn--icon" onClick={() => startEdit(r)} title="Editar">
+                          <button className="btn btn--icon" onClick={() => startEdit(r)} title="Editar" aria-label={`Editar lançamento #${r.id}`}>
                             <PencilSquareIcon className="icon-sm" />
                           </button>
-                          <button className="btn btn--icon" onClick={() => excluir(r)} title="Excluir">
+                          <button className="btn btn--icon" onClick={() => excluir(r)} title="Excluir" aria-label={`Excluir lançamento #${r.id}`}>
                             <TrashIcon className="icon-sm" />
                           </button>
                         </div>
@@ -714,7 +726,7 @@ export default function FolhasFuncionarios() {
         </div>
       )}
 
-      {/* Estilos mínimos */}
+      {/* Estilos mínimos (seguindo tokens/a11y do seu global.css) */}
       <style jsx>{`
         .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
         .page-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
