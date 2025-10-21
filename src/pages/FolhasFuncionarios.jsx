@@ -45,24 +45,14 @@ function useApi() {
   return useCallback(async (path, init = {}) => {
     const r = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache, no-store, max-age=0",
-        Pragma: "no-cache",
-        ...(init.headers || {}),
-      },
+      headers: { "Content-Type": "application/json", ...(init.headers || {}) },
       ...init,
     });
     let data = null;
     try {
       data = await r.json();
     } catch {
-      /* resposta vazia (ex.: 304) */
-    }
-    if (r.status === 304) {
-      // fallback seguro para não quebrar a UI
-      return { ok: true, items: [] };
+      /* resposta vazia */
     }
     if (!r.ok || data?.ok === false) {
       throw new Error(data?.error || `Erro ${r.status}`);
@@ -126,7 +116,6 @@ export default function FolhasFuncionarios() {
       const qs = new URLSearchParams();
       if (empresaId) qs.set("empresa_id", String(empresaId));
       qs.set("ativos", "1");
-      qs.set("_", Date.now()); // cache-buster
       const d = await api(`/api/funcionarios?${qs.toString()}`);
       setFuncionarios(d.funcionarios || d.items || []);
     } catch (e) {
@@ -143,7 +132,6 @@ export default function FolhasFuncionarios() {
       if (f) qs.set("from", f);
       if (t) qs.set("to", t);
       qs.set("scope", "mine");
-      qs.set("_", Date.now()); // cache-buster
 
       const d = await api(`/api/folhas?${qs.toString()}`);
       const list = (d.folhas || []).slice();
@@ -165,7 +153,7 @@ export default function FolhasFuncionarios() {
       setFolhas([]);
       console.error(e);
     }
-  }, [api, filtros.from, filtros.to]); // evita loop desnecessário
+  }, [api, filtros.from, filtros.to]); // <-- removido filtros.folha_id para evitar loop
 
   const loadLancamentos = useCallback(async () => {
     setErr("");
@@ -185,7 +173,6 @@ export default function FolhasFuncionarios() {
       if (filtros.funcionario_id !== "todos")
         qs.set("funcionario_id", filtros.funcionario_id);
       if (filtros.q) qs.set("q", filtros.q.trim());
-      qs.set("_", Date.now()); // cache-buster
 
       const d = await api(`/api/folhas-funcionarios?${qs.toString()}`);
       setLista(Array.isArray(d.items) ? d.items : []);
@@ -442,7 +429,7 @@ export default function FolhasFuncionarios() {
         </div>
 
         <div className="toolbar__right">
-          <label className="sr-only" htmlFor="f-busca">Buscar por funcionário</label>
+                  <label className="sr-only" htmlFor="f-busca">Buscar por funcionário</label>
           <input
             id="f-busca"
             type="search"
