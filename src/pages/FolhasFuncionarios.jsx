@@ -131,31 +131,77 @@ export default function FolhasFuncionarios() {
     }
   }, [api]);
 
-  // CARGA SIMPLIFICADA: busca TODOS os lançamentos do usuário
+  // Helper para montar query a partir dos filtros
+  const makeQueryFromFilters = useCallback(
+    (f) => {
+      const qs = new URLSearchParams();
+      if (f.folha_id && f.folha_id !== "todas") qs.set("folha_id", f.folha_id);
+      if (f.funcionario_id && f.funcionario_id !== "todos") qs.set("funcionario_id", f.funcionario_id);
+      if (norm(f.q)) qs.set("q", norm(f.q));
+      const qstr = qs.toString();
+      return qstr ? `?${qstr}` : "";
+    },
+    []
+  );
+
+  // Lista lançamentos com filtros; com retry automático se o backend exigir folha_id
   const loadLancamentos = useCallback(async () => {
     setErr("");
     setOk("");
     setLoading(true);
-    
+
+    const q1 = makeQueryFromFilters(filtros);
     try {
-      // Chama a API SEM parâmetros - backend retorna todos os lançamentos das empresas do usuário
-      const d = await api(`/api/folhas-funcionarios`);
+      const d = await api(`/api/folhas-funcionarios${q1}`);
       setLista(Array.isArray(d.items) ? d.items : []);
       if (liveRef.current) liveRef.current.textContent = `Carregados ${d.items?.length || 0} lançamentos.`;
     } catch (e) {
-      setErr(e.message);
-      if (liveRef.current) liveRef.current.textContent = "Falha ao carregar lançamentos.";
+      // Compat: se o backend exigir folha_id, tenta novamente com a primeira folha disponível
+      const exigeFolha = /folha_id.*obrigat(ó|o)rio/i.test(e.message || "");
+      const folhaPrimeira = folhas[0]?.id;
+      if (exigeFolha && folhaPrimeira) {
+        try {
+          const qs2 = new URLSearchParams();
+          qs2.set("folha_id", String(folhaPrimeira));
+          const d2 = await api(`/api/folhas-funcionarios?${qs2.toString()}`);
+          setLista(Array.isArray(d2.items) ? d2.items : []);
+          // Alinha o filtro visual com o retry
+          setFiltros((p) => ({ ...p, folha_id: String(folhaPrimeira) }));
+          if (liveRef.current) liveRef.current.textContent = `Compat: carregados ${d2.items?.length || 0} lançamentos (folha #${folhaPrimeira}).`;
+          setErr("");
+        } catch (e2) {
+          setErr(e2.message);
+          if (liveRef.current) liveRef.current.textContent = "Falha ao carregar lançamentos (compat).";
+        }
+      } else {
+        setErr(e.message);
+        if (liveRef.current) liveRef.current.textContent = "Falha ao carregar lançamentos.";
+      }
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, filtros, folhas, makeQueryFromFilters]);
 
-  // Carrega dados iniciais
-  useEffect(() => { 
-    loadFolhas(); 
+  // Carrega dados base (folhas/funcionarios)
+  useEffect(() => {
+    loadFolhas();
     loadFuncionarios();
-    loadLancamentos();
-  }, [loadFolhas, loadFuncionarios, loadLancamentos]);
+  }, [loadFolhas, loadFuncionarios]);
+
+  // Assim que houver folhas, se o filtro estiver em "todas", define a 1ª folha (compat back antigo)
+  useEffect(() => {
+    if (folhas.length) {
+      setFiltros((p) => ({
+        ...p,
+        folha_id: p.folha_id === "todas" ? String(folhas[0].id) : p.folha_id,
+      }));
+    }
+  }, [folhas]);
+
+  // Recarrega lista quando filtros mudarem (e já houver alguma folha)
+  useEffect(() => {
+    if (folhas.length) loadLancamentos();
+  }, [folhas.length, filtros.folha_id, filtros.funcionario_id, filtros.q, loadLancamentos]);
 
   /* ===================== Filtrados/KPIs ===================== */
   const filtrados = useMemo(() => {
@@ -182,20 +228,20 @@ export default function FolhasFuncionarios() {
     let horas = 0, liquido = 0;
     const pessoas = new Set();
     const folhasUnicas = new Set();
-    
+
     filtrados.forEach((r) => {
       horas += dec(r.horas_normais) + dec(r.he50_horas) + dec(r.he100_horas);
       liquido += dec(r.total_liquido);
       pessoas.add(r.funcionario_id);
       folhasUnicas.add(r.folha_id);
     });
-    
-    return { 
-      horas, 
-      liquido, 
-      pessoas: pessoas.size, 
+
+    return {
+      horas,
+      liquido,
+      pessoas: pessoas.size,
       folhas: folhasUnicas.size,
-      registros: filtrados.length 
+      registros: filtrados.length
     };
   }, [filtrados]);
 
@@ -373,6 +419,7 @@ export default function FolhasFuncionarios() {
             value={filtros.folha_id}
             onChange={(e) => setFiltros((p) => ({ ...p, folha_id: e.target.value }))}
           >
+            {/* Mostra "Todas" mas, em back antigo, o loadLancamentos converte pra 1ª folha */}
             <option value="todas">Todas as folhas</option>
             {folhas.map((f) => (
               <option key={f.id} value={f.id}>
