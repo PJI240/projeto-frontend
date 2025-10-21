@@ -71,13 +71,13 @@ export default function FolhasFuncionarios() {
   const [filtros, setFiltros] = useState({
     from: monthISO(),
     to: monthISO(),
-    folha_id: "", // <— obrigatório para listar
+    folha_id: "",
     funcionario_id: "todos",
     q: "",
   });
 
   // Masters
-  const [folhas, setFolhas] = useState([]); // opções de folhas {id, competencia, empresa_id, status}
+  const [folhas, setFolhas] = useState([]); // {id, competencia, empresa_id, status}
   const [funcionarios, setFuncionarios] = useState([]);
 
   // Dados e UI
@@ -91,7 +91,7 @@ export default function FolhasFuncionarios() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    folha_id: "", // <— obrigatório no POST
+    folha_id: "",
     funcionario_id: "",
     horas_normais: "",
     he50_horas: "",
@@ -118,8 +118,6 @@ export default function FolhasFuncionarios() {
 
   const loadFolhas = useCallback(async () => {
     try {
-      // Carrega SOMENTE as folhas que o usuário pode ver (escopo mine) e
-      // já trazemos por período para não poluir o select.
       const qs = new URLSearchParams();
       const f = toYM(filtros.from) || filtros.from;
       const t = toYM(filtros.to) || filtros.to;
@@ -128,26 +126,43 @@ export default function FolhasFuncionarios() {
       qs.set("scope", "mine");
 
       const d = await api(`/api/folhas?${qs.toString()}`);
-      setFolhas(d.folhas || []);
+      const list = (d.folhas || []).slice();
+
+      // ordena por competência DESC e id DESC (igual backend)
+      list.sort((a, b) => {
+        if (a.competencia === b.competencia) return Number(b.id) - Number(a.id);
+        return a.competencia < b.competencia ? 1 : -1;
+      });
+
+      setFolhas(list);
+
+      // auto-seleciona folha mais recente se nada estiver selecionado ou se a atual não existir mais
+      if (!filtros.folha_id || !list.some((x) => String(x.id) === String(filtros.folha_id))) {
+        const first = list[0];
+        setFiltros((p) => ({ ...p, folha_id: first ? String(first.id) : "" }));
+      }
     } catch (e) {
       setFolhas([]);
       console.error(e);
     }
-  }, [api, filtros.from, filtros.to]);
+  }, [api, filtros.from, filtros.to, filtros.folha_id]);
 
   const loadLancamentos = useCallback(async () => {
-    setLoading(true);
     setErr("");
     setOk("");
-    try {
-      if (!filtros.folha_id) {
-        // não chama API se não houver folha — evita o erro “folha_id é obrigatório”
-        setLista([]);
-        return;
-      }
 
+    // ⚠️ Se não houver folha selecionada, garanta que não ficaremos em loading=true
+    if (!filtros.folha_id) {
+      setLista([]);
+      setLoading(false);
+      if (liveRef.current) liveRef.current.textContent = "Selecione uma folha.";
+      return;
+    }
+
+    setLoading(true);
+    try {
       const qs = new URLSearchParams();
-      qs.set("folha_id", String(filtros.folha_id)); // <— backend espera esse ID
+      qs.set("folha_id", String(filtros.folha_id));
       if (filtros.funcionario_id !== "todos")
         qs.set("funcionario_id", filtros.funcionario_id);
       if (filtros.q) qs.set("q", filtros.q.trim());
@@ -161,40 +176,27 @@ export default function FolhasFuncionarios() {
     } finally {
       setLoading(false);
     }
-  }, [api, filtros]);
+  }, [api, filtros.folha_id, filtros.funcionario_id, filtros.q]);
 
-  useEffect(() => {
-    loadFuncionarios();
-  }, [loadFuncionarios]);
-
-  useEffect(() => {
-    loadFolhas();
-  }, [loadFolhas]);
-
-  useEffect(() => {
-    loadLancamentos();
-  }, [loadLancamentos]);
+  useEffect(() => { loadFuncionarios(); }, [loadFuncionarios]);
+  useEffect(() => { loadFolhas(); }, [loadFolhas]);
+  useEffect(() => { loadLancamentos(); }, [loadLancamentos]);
 
   /* ===================== Filtrados/KPIs ===================== */
   const filtrados = useMemo(() => {
     const termo = filtros.q.toLowerCase().trim();
     return lista.filter((r) => {
-      if (
-        filtros.funcionario_id !== "todos" &&
-        String(r.funcionario_id) !== String(filtros.funcionario_id)
-      )
-        return false;
+      if (filtros.funcionario_id !== "todos" && String(r.funcionario_id) !== String(filtros.funcionario_id)) return false;
       if (termo) {
         const alvo = `${r.id} ${r.funcionario_nome} ${r.competencia}`.toLowerCase();
         if (!alvo.includes(termo)) return false;
       }
       return true;
     });
-  }, [lista, filtros]);
+  }, [lista, filtros.funcionario_id, filtros.q]);
 
   const kpis = useMemo(() => {
-    let horas = 0,
-      liquido = 0;
+    let horas = 0, liquido = 0;
     const pessoas = new Set();
     filtrados.forEach((r) => {
       horas += dec(r.horas_normais) + dec(r.he50_horas) + dec(r.he100_horas);
@@ -206,16 +208,12 @@ export default function FolhasFuncionarios() {
 
   /* ===================== CRUD ===================== */
   const calcTotal = (v = form) =>
-    dec(v.valor_base) +
-    dec(v.valor_he50) +
-    dec(v.valor_he100) +
-    dec(v.proventos) -
-    dec(v.descontos);
+    dec(v.valor_base) + dec(v.valor_he50) + dec(v.valor_he100) + dec(v.proventos) - dec(v.descontos);
 
   const startNovo = () => {
     setEditing(null);
     setForm({
-      folha_id: filtros.folha_id || "", // pré-seleciona a folha atual
+      folha_id: filtros.folha_id || "",
       funcionario_id: "",
       horas_normais: "",
       he50_horas: "",
@@ -228,15 +226,13 @@ export default function FolhasFuncionarios() {
       total_liquido: "",
       inconsistencias: 0,
     });
-    setErr("");
-    setOk("");
-    setOpen(true);
+    setErr(""); setOk(""); setOpen(true);
   };
 
   const startEdit = (r) => {
     setEditing(r);
     setForm({
-      folha_id: r.folha_id, // read-only na UI
+      folha_id: r.folha_id,
       funcionario_id: r.funcionario_id,
       horas_normais: r.horas_normais ?? "",
       he50_horas: r.he50_horas ?? "",
@@ -249,22 +245,19 @@ export default function FolhasFuncionarios() {
       total_liquido: r.total_liquido ?? "",
       inconsistencias: r.inconsistencias ?? 0,
     });
-    setErr("");
-    setOk("");
-    setOpen(true);
+    setErr(""); setOk(""); setOpen(true);
   };
 
   const salvar = async () => {
     setSaving(true);
-    setErr("");
-    setOk("");
+    setErr(""); setOk("");
     try {
       if (!form.folha_id) throw new Error("Selecione a folha (obrigatório).");
       if (!form.funcionario_id) throw new Error("Selecione o funcionário.");
 
       const toNumOrNull = (v) => (v === "" || v == null ? null : dec(v));
       const payload = {
-        folha_id: Number(form.folha_id), // <— envia folha_id
+        folha_id: Number(form.folha_id),
         funcionario_id: Number(form.funcionario_id),
         horas_normais: toNumOrNull(form.horas_normais),
         he50_horas: toNumOrNull(form.he50_horas),
@@ -279,7 +272,6 @@ export default function FolhasFuncionarios() {
       };
 
       if (editing) {
-        // NÃO troca a folha em edição (backend não permite)
         await api(`/api/folhas-funcionarios/${editing.id}`, {
           method: "PUT",
           body: JSON.stringify({
@@ -315,16 +307,8 @@ export default function FolhasFuncionarios() {
   };
 
   const excluir = async (r) => {
-    if (
-      !confirm(
-        `Excluir o lançamento de ${r.funcionario_nome} em ${formatMonthBR(
-          r.competencia
-        )}?`
-      )
-    )
-      return;
-    setErr("");
-    setOk("");
+    if (!confirm(`Excluir o lançamento de ${r.funcionario_nome} em ${formatMonthBR(r.competencia)}?`)) return;
+    setErr(""); setOk("");
     try {
       await api(`/api/folhas-funcionarios/${r.id}`, { method: "DELETE" });
       setOk("Registro removido.");
@@ -335,10 +319,7 @@ export default function FolhasFuncionarios() {
   };
 
   const exportar = () => {
-    if (!filtrados.length) {
-      setErr("Nada para exportar.");
-      return;
-    }
+    if (!filtrados.length) { setErr("Nada para exportar."); return; }
     const rows = filtrados.map((r) => ({
       id: r.id,
       competencia: r.competencia,
@@ -359,24 +340,15 @@ export default function FolhasFuncionarios() {
     const keys = Object.keys(rows[0]);
     const csv = [
       keys.join(";"),
-      ...rows.map((r) =>
-        keys
-          .map((k) => `"${String(r[k] ?? "").replace(/"/g, '""')}"`)
-          .join(";")
-      ),
+      ...rows.map((r) => keys.map((k) => `"${String(r[k] ?? "").replace(/"/g, '""')}"`).join(";")),
     ].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], {
-      type: "text/csv;charset=utf-8",
-    });
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = Object.assign(document.createElement("a"), {
       href: url,
       download: `folhas_funcionarios_folha${filtros.folha_id || "??"}.csv`,
     });
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
 
   const folhaSelecionada = useMemo(
@@ -393,9 +365,7 @@ export default function FolhasFuncionarios() {
       <header className="page-header">
         <div>
           <h1 className="page-title">Folhas × Funcionários</h1>
-          <p className="page-subtitle">
-            Lançamentos por funcionário (horas, valores e total líquido)
-          </p>
+          <p className="page-subtitle">Lançamentos por funcionário (horas, valores e total líquido)</p>
         </div>
         <div className="header-actions">
           <button className="btn" onClick={loadLancamentos} disabled={loading} aria-busy={loading}>
@@ -418,18 +388,14 @@ export default function FolhasFuncionarios() {
       {/* Filtros */}
       <section className="card toolbar">
         <div className="toolbar__left">
-          <span className="toolbar__title">
-            <FunnelIcon className="icon-sm text-muted" /> Filtros
-          </span>
+          <span className="toolbar__title"><FunnelIcon className="icon-sm text-muted" /> Filtros</span>
 
           <label className="sr-only" htmlFor="f-folha">Folha</label>
           <select
             id="f-folha"
             className="form-control"
             value={filtros.folha_id}
-            onChange={(e) =>
-              setFiltros((p) => ({ ...p, folha_id: e.target.value }))
-            }
+            onChange={(e) => setFiltros((p) => ({ ...p, folha_id: e.target.value }))}
           >
             <option value="">Selecione a folha…</option>
             {folhas.map((f) => (
@@ -442,9 +408,7 @@ export default function FolhasFuncionarios() {
           <select
             className="form-control"
             value={filtros.funcionario_id}
-            onChange={(e) =>
-              setFiltros((p) => ({ ...p, funcionario_id: e.target.value }))
-            }
+            onChange={(e) => setFiltros((p) => ({ ...p, funcionario_id: e.target.value }))}
           >
             <option value="todos">Todos os funcionários</option>
             {funcionarios.map((f) => (
@@ -465,15 +429,13 @@ export default function FolhasFuncionarios() {
           />
           <button
             className="btn"
-            onClick={() =>
-              setFiltros({
-                from: monthISO(),
-                to: monthISO(),
-                folha_id: "",
-                funcionario_id: "todos",
-                q: "",
-              })
-            }
+            onClick={() => setFiltros({
+              from: monthISO(),
+              to: monthISO(),
+              folha_id: "",
+              funcionario_id: "todos",
+              q: "",
+            })}
           >
             <XMarkIcon className="icon-sm" /> Limpar
           </button>
@@ -483,8 +445,7 @@ export default function FolhasFuncionarios() {
       {/* Dica quando nenhuma folha está selecionada */}
       {!filtros.folha_id && (
         <div className="card" style={{ marginBottom: 12 }}>
-          Selecione uma <strong>Folha</strong> para visualizar e lançar valores dos
-          funcionários. Esta lista mostra apenas folhas já criadas.
+          Selecione uma <strong>Folha</strong> para visualizar e lançar valores dos funcionários. Esta lista mostra apenas folhas já criadas.
         </div>
       )}
 
@@ -492,27 +453,21 @@ export default function FolhasFuncionarios() {
       {!!filtros.folha_id && (
         <section className="stats-grid">
           <article className="stat-card" data-accent="info">
-            <div className="stat-card__icon">
-              <UserIcon className="icon" />
-            </div>
+            <div className="stat-card__icon"><UserIcon className="icon" /></div>
             <div className="stat-card__content">
               <div className="stat-value">{kpis.pessoas}</div>
               <div className="stat-title">Funcionários impactados</div>
             </div>
           </article>
           <article className="stat-card" data-accent="success">
-            <div className="stat-card__icon">
-              <CalculatorIcon className="icon" />
-            </div>
+            <div className="stat-card__icon"><CalculatorIcon className="icon" /></div>
             <div className="stat-card__content">
               <div className="stat-value">{kpis.horas.toFixed(2)}</div>
               <div className="stat-title">Horas (N + 50% + 100%)</div>
             </div>
           </article>
           <article className="stat-card" data-accent="warning">
-            <div className="stat-card__icon">
-              <CheckCircleIcon className="icon" />
-            </div>
+            <div className="stat-card__icon"><CheckCircleIcon className="icon" /></div>
             <div className="stat-card__content">
               <div className="stat-value">{money(kpis.liquido)}</div>
               <div className="stat-title">Total líquido (somado)</div>
@@ -532,45 +487,28 @@ export default function FolhasFuncionarios() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Competência</th>
-                  <th>Funcionário</th>
-                  <th className="num">N</th>
-                  <th className="num">HE 50%</th>
-                  <th className="num">HE 100%</th>
-                  <th className="num">Base</th>
-                  <th className="num">+HE50</th>
-                  <th className="num">+HE100</th>
-                  <th className="num">+Prov.</th>
-                  <th className="num">-Desc.</th>
-                  <th className="num">Líquido</th>
-                  <th className="num">Inc.</th>
-                  <th className="text-right">Ações</th>
+                  <th>ID</th><th>Competência</th><th>Funcionário</th>
+                  <th className="num">N</th><th className="num">HE 50%</th><th className="num">HE 100%</th>
+                  <th className="num">Base</th><th className="num">+HE50</th><th className="num">+HE100</th>
+                  <th className="num">+Prov.</th><th className="num">-Desc.</th><th className="num">Líquido</th>
+                  <th className="num">Inc.</th><th className="text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={14} className="table-empty">
-                      <ArrowPathIcon className="icon-sm animate-spin" /> Carregando…
-                    </td>
-                  </tr>
+                  <tr><td colSpan={14} className="table-empty">
+                    <ArrowPathIcon className="icon-sm animate-spin" /> Carregando…
+                  </td></tr>
                 ) : !filtrados.length ? (
-                  <tr>
-                    <td colSpan={14} className="table-empty text-muted">
-                      Nenhum lançamento para a folha selecionada.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={14} className="table-empty text-muted">
+                    Nenhum lançamento para a folha selecionada.
+                  </td></tr>
                 ) : (
                   filtrados.map((r) => (
                     <tr key={r.id}>
+                      <td><code>#{r.id}</code></td>
                       <td>
-                        <code>#{r.id}</code>
-                      </td>
-                      <td>
-                        <div className="cell-strong">
-                          {formatMonthBR(r.competencia)}
-                        </div>
+                        <div className="cell-strong">{formatMonthBR(r.competencia)}</div>
                         <div className="cell-muted">{r.competencia}</div>
                       </td>
                       <td className="cell-strong">{r.funcionario_nome}</td>
@@ -582,24 +520,14 @@ export default function FolhasFuncionarios() {
                       <td className="num">{money(r.valor_he100)}</td>
                       <td className="num">{money(r.proventos)}</td>
                       <td className="num">{money(r.descontos)}</td>
-                      <td className="num">
-                        <strong>{money(r.total_liquido)}</strong>
-                      </td>
+                      <td className="num"><strong>{money(r.total_liquido)}</strong></td>
                       <td className="num">{r.inconsistencias || 0}</td>
                       <td className="text-right">
                         <div className="btn-group">
-                          <button
-                            className="btn btn--icon"
-                            onClick={() => startEdit(r)}
-                            title="Editar"
-                          >
+                          <button className="btn btn--icon" onClick={() => startEdit(r)} title="Editar">
                             <PencilSquareIcon className="icon-sm" />
                           </button>
-                          <button
-                            className="btn btn--icon"
-                            onClick={() => excluir(r)}
-                            title="Excluir"
-                          >
+                          <button className="btn btn--icon" onClick={() => excluir(r)} title="Excluir">
                             <TrashIcon className="icon-sm" />
                           </button>
                         </div>
@@ -613,34 +541,20 @@ export default function FolhasFuncionarios() {
         )}
         {!!filtros.folha_id && !loading && !!filtrados.length && (
           <div className="table-footer">
-            <span>
-              Mostrando {filtrados.length} de {lista.length} registros
-            </span>
-            <span>
-              Total filtrado: <strong>{money(kpis.liquido)}</strong>
-            </span>
+            <span>Mostrando {filtrados.length} de {lista.length} registros</span>
+            <span>Total filtrado: <strong>{money(kpis.liquido)}</strong></span>
           </div>
         )}
       </section>
 
       {/* Modal */}
       {open && (
-        <div
-          className="modal"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => e.target === e.currentTarget && !saving && setOpen(false)}
-        >
+        <div className="modal" role="dialog" aria-modal="true"
+             onClick={(e) => e.target === e.currentTarget && !saving && setOpen(false)}>
           <div className="modal__content">
             <header className="modal__header">
-              <h2 className="modal__title">
-                {editing ? "Editar lançamento" : "Novo lançamento"}
-              </h2>
-              <button
-                className="btn btn--icon"
-                onClick={() => !saving && setOpen(false)}
-                aria-label="Fechar"
-              >
+              <h2 className="modal__title">{editing ? "Editar lançamento" : "Novo lançamento"}</h2>
+              <button className="btn btn--icon" onClick={() => !saving && setOpen(false)} aria-label="Fechar">
                 <XMarkIcon className="icon-sm" />
               </button>
             </header>
@@ -649,15 +563,13 @@ export default function FolhasFuncionarios() {
               {err && <div className="alert alert--error">{err}</div>}
 
               <div className="form-grid">
-                {/* Folha (obrigatório e somente leitura em edição) */}
+                {/* Folha */}
                 <div className="form-field">
                   <label className="form-label">Folha *</label>
                   <select
                     className="form-control"
                     value={form.folha_id}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, folha_id: e.target.value }))
-                    }
+                    onChange={(e) => setForm((p) => ({ ...p, folha_id: e.target.value }))}
                     required
                     disabled={saving || !!editing}
                   >
@@ -671,15 +583,9 @@ export default function FolhasFuncionarios() {
                   {form.folha_id && (
                     <small className="cell-muted">
                       Competência:&nbsp;
-                      {
-                        folhas.find((f) => String(f.id) === String(form.folha_id))
-                          ?.competencia
-                      }{" "}
-                      (
-                      {formatMonthBR(
-                        folhas.find((f) => String(f.id) === String(form.folha_id))
-                          ?.competencia
-                      )}
+                      {folhas.find((f) => String(f.id) === String(form.folha_id))?.competencia}
+                      {" "}(
+                      {formatMonthBR(folhas.find((f) => String(f.id) === String(form.folha_id))?.competencia)}
                       )
                     </small>
                   )}
@@ -691,9 +597,7 @@ export default function FolhasFuncionarios() {
                   <select
                     className="form-control"
                     value={form.funcionario_id}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, funcionario_id: e.target.value }))
-                    }
+                    onChange={(e) => setForm((p) => ({ ...p, funcionario_id: e.target.value }))}
                     required
                     disabled={saving}
                   >
@@ -709,191 +613,101 @@ export default function FolhasFuncionarios() {
                 {/* Horas */}
                 <div className="form-field">
                   <label className="form-label">Horas normais</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.horas_normais}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, horas_normais: e.target.value }))
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => setForm((p) => ({ ...p, horas_normais: e.target.value }))}
+                    disabled={saving} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">HE 50% (horas)</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.he50_horas}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, he50_horas: e.target.value }))
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => setForm((p) => ({ ...p, he50_horas: e.target.value }))}
+                    disabled={saving} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">HE 100% (horas)</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.he100_horas}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, he100_horas: e.target.value }))
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => setForm((p) => ({ ...p, he100_horas: e.target.value }))}
+                    disabled={saving} />
                 </div>
 
                 {/* Valores */}
                 <div className="form-field">
                   <label className="form-label">Valor base</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.valor_base}
-                    onChange={(e) =>
-                      setForm((p) => {
-                        const valor_base = e.target.value;
-                        return {
-                          ...p,
-                          valor_base,
-                          total_liquido: calcTotal({ ...p, valor_base }).toFixed(2),
-                        };
-                      })
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => {
+                      const valor_base = e.target.value;
+                      setForm((p) => ({ ...p, valor_base, total_liquido: calcTotal({ ...p, valor_base }).toFixed(2) }));
+                    }}
+                    disabled={saving} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Valor HE 50%</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.valor_he50}
-                    onChange={(e) =>
-                      setForm((p) => {
-                        const valor_he50 = e.target.value;
-                        return {
-                          ...p,
-                          valor_he50,
-                          total_liquido: calcTotal({ ...p, valor_he50 }).toFixed(2),
-                        };
-                      })
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => {
+                      const valor_he50 = e.target.value;
+                      setForm((p) => ({ ...p, valor_he50, total_liquido: calcTotal({ ...p, valor_he50 }).toFixed(2) }));
+                    }}
+                    disabled={saving} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Valor HE 100%</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.valor_he100}
-                    onChange={(e) =>
-                      setForm((p) => {
-                        const valor_he100 = e.target.value;
-                        return {
-                          ...p,
-                          valor_he100,
-                          total_liquido: calcTotal({ ...p, valor_he100 }).toFixed(2),
-                        };
-                      })
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => {
+                      const valor_he100 = e.target.value;
+                      setForm((p) => ({ ...p, valor_he100, total_liquido: calcTotal({ ...p, valor_he100 }).toFixed(2) }));
+                    }}
+                    disabled={saving} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Proventos (+)</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.proventos}
-                    onChange={(e) =>
-                      setForm((p) => {
-                        const proventos = e.target.value;
-                        return {
-                          ...p,
-                          proventos,
-                          total_liquido: calcTotal({ ...p, proventos }).toFixed(2),
-                        };
-                      })
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => {
+                      const proventos = e.target.value;
+                      setForm((p) => ({ ...p, proventos, total_liquido: calcTotal({ ...p, proventos }).toFixed(2) }));
+                    }}
+                    disabled={saving} />
                 </div>
                 <div className="form-field">
                   <label className="form-label">Descontos (-)</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.descontos}
-                    onChange={(e) =>
-                      setForm((p) => {
-                        const descontos = e.target.value;
-                        return {
-                          ...p,
-                          descontos,
-                          total_liquido: calcTotal({ ...p, descontos }).toFixed(2),
-                        };
-                      })
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => {
+                      const descontos = e.target.value;
+                      setForm((p) => ({ ...p, descontos, total_liquido: calcTotal({ ...p, descontos }).toFixed(2) }));
+                    }}
+                    disabled={saving} />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Total líquido</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    step="0.01"
+                  <input className="form-control" type="number" step="0.01"
                     value={form.total_liquido}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, total_liquido: e.target.value }))
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => setForm((p) => ({ ...p, total_liquido: e.target.value }))}
+                    disabled={saving} />
                 </div>
 
                 <div className="form-field">
                   <label className="form-label">Inconsistências</label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    min="0"
+                  <input className="form-control" type="number" min="0"
                     value={form.inconsistencias}
-                    onChange={(e) =>
-                      setForm((p) => ({
-                        ...p,
-                        inconsistencias: Number(e.target.value),
-                      }))
-                    }
-                    disabled={saving}
-                  />
+                    onChange={(e) => setForm((p) => ({ ...p, inconsistencias: Number(e.target.value) }))}
+                    disabled={saving} />
                 </div>
               </div>
             </div>
 
             <footer className="modal__footer">
-              <button className="btn" onClick={() => setOpen(false)} disabled={saving}>
-                Cancelar
-              </button>
-              <button
-                className="btn btn--primary"
-                onClick={salvar}
-                disabled={saving || !form.folha_id || !form.funcionario_id}
-                aria-busy={saving}
-              >
-                <CheckCircleIcon className="icon-sm" />{" "}
-                {saving ? "Salvando..." : editing ? "Salvar" : "Criar"}
+              <button className="btn" onClick={() => setOpen(false)} disabled={saving}>Cancelar</button>
+              <button className="btn btn--primary" onClick={salvar}
+                disabled={saving || !form.folha_id || !form.funcionario_id} aria-busy={saving}>
+                <CheckCircleIcon className="icon-sm" /> {saving ? "Salvando..." : (editing ? "Salvar" : "Criar")}
               </button>
             </footer>
           </div>
