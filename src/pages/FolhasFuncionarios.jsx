@@ -16,12 +16,6 @@ const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 
 /* ===================== Utils ===================== */
 const norm = (v) => (v ?? "").toString().trim();
-const monthISO = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-const toYM = (s) => {
-  const m = String(s || "").match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
-  return m ? `${m[1]}-${m[2]}` : null;
-};
 const formatMonthBR = (ym) => {
   const [y, m] = String(ym || "").split("-").map(Number);
   if (!y || !m) return ym || "";
@@ -66,17 +60,15 @@ export default function FolhasFuncionarios() {
   const api = useApi();
   const liveRef = useRef(null);
 
-  // Filtros (com folha_id)
+  // Filtros SIMPLIFICADOS
   const [filtros, setFiltros] = useState({
-    from: monthISO(),
-    to: monthISO(),
-    folha_id: "",
+    folha_id: "todas",
     funcionario_id: "todos",
     q: "",
   });
 
   // Masters
-  const [folhas, setFolhas] = useState([]); // {id, competencia, empresa_id, status}
+  const [folhas, setFolhas] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
 
   // Dados e UI
@@ -104,17 +96,11 @@ export default function FolhasFuncionarios() {
     inconsistencias: 0,
   });
 
-  const folhaSelecionada = useMemo(
-    () => folhas.find((f) => String(f.id) === String(filtros.folha_id)),
-    [folhas, filtros.folha_id]
-  );
-
   /* ===================== Loads ===================== */
-  // Carrega funcionarios da empresa da folha selecionada (evita empresa errada)
-  const loadFuncionarios = useCallback(async (empresaId) => {
+  // Carrega funcionarios das empresas do usuário
+  const loadFuncionarios = useCallback(async () => {
     try {
       const qs = new URLSearchParams();
-      if (empresaId) qs.set("empresa_id", String(empresaId));
       qs.set("ativos", "1");
       const d = await api(`/api/funcionarios?${qs.toString()}`);
       setFuncionarios(d.funcionarios || d.items || []);
@@ -127,97 +113,90 @@ export default function FolhasFuncionarios() {
   const loadFolhas = useCallback(async () => {
     try {
       const qs = new URLSearchParams();
-      const f = toYM(filtros.from) || filtros.from;
-      const t = toYM(filtros.to) || filtros.to;
-      if (f) qs.set("from", f);
-      if (t) qs.set("to", t);
       qs.set("scope", "mine");
 
       const d = await api(`/api/folhas?${qs.toString()}`);
       const list = (d.folhas || []).slice();
 
-      // ordena por competência DESC e id DESC (igual backend)
+      // ordena por competência DESC
       list.sort((a, b) => {
         if (a.competencia === b.competencia) return Number(b.id) - Number(a.id);
         return a.competencia < b.competencia ? 1 : -1;
       });
 
       setFolhas(list);
-
-      // auto-seleciona folha mais recente se nada estiver selecionado ou se a atual não existir mais
-      if (!filtros.folha_id || !list.some((x) => String(x.id) === String(filtros.folha_id))) {
-        const first = list[0];
-        setFiltros((p) => ({ ...p, folha_id: first ? String(first.id) : "" }));
-      }
     } catch (e) {
       setFolhas([]);
       console.error(e);
     }
-  }, [api, filtros.from, filtros.to]); // <-- removido filtros.folha_id para evitar loop
+  }, [api]);
 
+  // CARGA SIMPLIFICADA: busca TODOS os lançamentos do usuário
   const loadLancamentos = useCallback(async () => {
     setErr("");
     setOk("");
-
-    if (!filtros.folha_id) {
-      setLista([]);
-      setLoading(false);
-      if (liveRef.current) liveRef.current.textContent = "Selecione uma folha.";
-      return;
-    }
-
     setLoading(true);
+    
     try {
-      const qs = new URLSearchParams();
-      qs.set("folha_id", String(filtros.folha_id));
-      if (filtros.funcionario_id !== "todos")
-        qs.set("funcionario_id", filtros.funcionario_id);
-      if (filtros.q) qs.set("q", filtros.q.trim());
-
-      const d = await api(`/api/folhas-funcionarios?${qs.toString()}`);
+      // Chama a API SEM parâmetros - backend retorna todos os lançamentos das empresas do usuário
+      const d = await api(`/api/folhas-funcionarios`);
       setLista(Array.isArray(d.items) ? d.items : []);
-      if (liveRef.current) liveRef.current.textContent = "Dados atualizados.";
+      if (liveRef.current) liveRef.current.textContent = `Carregados ${d.items?.length || 0} lançamentos.`;
     } catch (e) {
       setErr(e.message);
-      if (liveRef.current) liveRef.current.textContent = "Falha ao atualizar.";
+      if (liveRef.current) liveRef.current.textContent = "Falha ao carregar lançamentos.";
     } finally {
       setLoading(false);
     }
-  }, [api, filtros.folha_id, filtros.funcionario_id, filtros.q]);
+  }, [api]);
 
-  // Primeira carga de folhas
-  useEffect(() => { loadFolhas(); }, [loadFolhas]);
-
-  // Recarrega funcionários quando a folha (empresa) mudar
-  useEffect(() => {
-    loadFuncionarios(folhaSelecionada?.empresa_id);
-  }, [loadFuncionarios, folhaSelecionada?.empresa_id]);
-
-  // Atualiza lançamentos sempre que filtros relevantes mudarem
-  useEffect(() => { loadLancamentos(); }, [loadLancamentos]);
+  // Carrega dados iniciais
+  useEffect(() => { 
+    loadFolhas(); 
+    loadFuncionarios();
+    loadLancamentos();
+  }, [loadFolhas, loadFuncionarios, loadLancamentos]);
 
   /* ===================== Filtrados/KPIs ===================== */
   const filtrados = useMemo(() => {
     const termo = filtros.q.toLowerCase().trim();
     return lista.filter((r) => {
-      if (filtros.funcionario_id !== "todos" && String(r.funcionario_id) !== String(filtros.funcionario_id)) return false;
+      // Filtro por folha
+      if (filtros.folha_id !== "todas" && String(r.folha_id) !== String(filtros.folha_id)) {
+        return false;
+      }
+      // Filtro por funcionário
+      if (filtros.funcionario_id !== "todos" && String(r.funcionario_id) !== String(filtros.funcionario_id)) {
+        return false;
+      }
+      // Busca
       if (termo) {
         const alvo = `${r.id} ${r.funcionario_nome} ${r.competencia}`.toLowerCase();
         if (!alvo.includes(termo)) return false;
       }
       return true;
     });
-  }, [lista, filtros.funcionario_id, filtros.q]);
+  }, [lista, filtros.folha_id, filtros.funcionario_id, filtros.q]);
 
   const kpis = useMemo(() => {
     let horas = 0, liquido = 0;
     const pessoas = new Set();
+    const folhasUnicas = new Set();
+    
     filtrados.forEach((r) => {
       horas += dec(r.horas_normais) + dec(r.he50_horas) + dec(r.he100_horas);
       liquido += dec(r.total_liquido);
       pessoas.add(r.funcionario_id);
+      folhasUnicas.add(r.folha_id);
     });
-    return { horas, liquido, pessoas: pessoas.size, registros: filtrados.length };
+    
+    return { 
+      horas, 
+      liquido, 
+      pessoas: pessoas.size, 
+      folhas: folhasUnicas.size,
+      registros: filtrados.length 
+    };
   }, [filtrados]);
 
   /* ===================== CRUD ===================== */
@@ -227,7 +206,7 @@ export default function FolhasFuncionarios() {
   const startNovo = () => {
     setEditing(null);
     setForm({
-      folha_id: filtros.folha_id || "",
+      folha_id: "",
       funcionario_id: "",
       horas_normais: "",
       he50_horas: "",
@@ -288,19 +267,7 @@ export default function FolhasFuncionarios() {
       if (editing) {
         await api(`/api/folhas-funcionarios/${editing.id}`, {
           method: "PUT",
-          body: JSON.stringify({
-            funcionario_id: payload.funcionario_id,
-            horas_normais: payload.horas_normais,
-            he50_horas: payload.he50_horas,
-            he100_horas: payload.he100_horas,
-            valor_base: payload.valor_base,
-            valor_he50: payload.valor_he50,
-            valor_he100: payload.valor_he100,
-            descontos: payload.descontos,
-            proventos: payload.proventos,
-            total_liquido: payload.total_liquido,
-            inconsistencias: payload.inconsistencias,
-          }),
+          body: JSON.stringify(payload),
         });
         setOk("Registro atualizado.");
       } else {
@@ -313,6 +280,7 @@ export default function FolhasFuncionarios() {
 
       setOpen(false);
       await loadLancamentos();
+      await loadFolhas(); // Recarrega folhas caso tenha criado uma nova
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -338,6 +306,7 @@ export default function FolhasFuncionarios() {
       id: r.id,
       competencia: r.competencia,
       competencia_br: formatMonthBR(r.competencia),
+      folha_id: r.folha_id,
       funcionario_id: r.funcionario_id,
       funcionario_nome: r.funcionario_nome,
       horas_normais: r.horas_normais,
@@ -360,7 +329,7 @@ export default function FolhasFuncionarios() {
     const url = URL.createObjectURL(blob);
     const a = Object.assign(document.createElement("a"), {
       href: url,
-      download: `folhas_funcionarios_folha${filtros.folha_id || "??"}.csv`,
+      download: `folhas_funcionarios_${new Date().toISOString().split('T')[0]}.csv`,
     });
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   };
@@ -384,7 +353,7 @@ export default function FolhasFuncionarios() {
           <button className="btn" onClick={exportar} disabled={!filtrados.length} aria-label="Exportar CSV">
             <CloudArrowDownIcon className="icon-sm" /> Exportar
           </button>
-          <button className="btn btn--primary" onClick={startNovo} disabled={!filtros.folha_id} aria-label="Novo lançamento">
+          <button className="btn btn--primary" onClick={startNovo} aria-label="Novo lançamento">
             <PlusIcon className="icon-sm" /> Novo
           </button>
         </div>
@@ -394,22 +363,20 @@ export default function FolhasFuncionarios() {
       {err && <div className="alert alert--error" role="alert">{err}</div>}
       {ok && <div className="alert alert--success" role="status">{ok}</div>}
 
-      {/* Filtros */}
+      {/* Filtros SIMPLIFICADOS */}
       <section className="card toolbar">
         <div className="toolbar__left">
           <span className="toolbar__title"><FunnelIcon className="icon-sm text-muted" /> Filtros</span>
 
-          <label className="sr-only" htmlFor="f-folha">Folha</label>
           <select
-            id="f-folha"
             className="form-control"
             value={filtros.folha_id}
             onChange={(e) => setFiltros((p) => ({ ...p, folha_id: e.target.value }))}
           >
-            <option value="">Selecione a folha…</option>
+            <option value="todas">Todas as folhas</option>
             {folhas.map((f) => (
               <option key={f.id} value={f.id}>
-                #{f.id} — {formatMonthBR(f.competencia)} ({f.competencia})
+                #{f.id} — {formatMonthBR(f.competencia)}
               </option>
             ))}
           </select>
@@ -429,21 +396,17 @@ export default function FolhasFuncionarios() {
         </div>
 
         <div className="toolbar__right">
-                  <label className="sr-only" htmlFor="f-busca">Buscar por funcionário</label>
           <input
-            id="f-busca"
             type="search"
             className="form-control"
-            placeholder="Buscar por funcionário…"
+            placeholder="Buscar por funcionário ou competência…"
             value={filtros.q}
             onChange={(e) => setFiltros((p) => ({ ...p, q: e.target.value }))}
           />
           <button
             className="btn"
             onClick={() => setFiltros({
-              from: monthISO(),
-              to: monthISO(),
-              folha_id: "",
+              folha_id: "todas",
               funcionario_id: "todos",
               q: "",
             })}
@@ -454,35 +417,35 @@ export default function FolhasFuncionarios() {
         </div>
       </section>
 
-      {/* Dica quando nenhuma folha está selecionada */}
-      {!filtros.folha_id && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          Selecione uma <strong>Folha</strong> para visualizar e lançar valores dos funcionários. Esta lista mostra apenas folhas já criadas.
-        </div>
-      )}
-
       {/* KPIs */}
-      {!!filtros.folha_id && (
+      {lista.length > 0 && (
         <section className="stats-grid">
           <article className="stat-card" data-accent="info">
             <div className="stat-card__icon"><UserIcon className="icon" /></div>
             <div className="stat-card__content">
               <div className="stat-value">{kpis.pessoas}</div>
-              <div className="stat-title">Funcionários impactados</div>
+              <div className="stat-title">Funcionários</div>
             </div>
           </article>
           <article className="stat-card" data-accent="success">
             <div className="stat-card__icon"><CalculatorIcon className="icon" /></div>
             <div className="stat-card__content">
               <div className="stat-value">{kpis.horas.toFixed(2)}</div>
-              <div className="stat-title">Horas (N + 50% + 100%)</div>
+              <div className="stat-title">Horas totais</div>
             </div>
           </article>
           <article className="stat-card" data-accent="warning">
             <div className="stat-card__icon"><CheckCircleIcon className="icon" /></div>
             <div className="stat-card__content">
               <div className="stat-value">{money(kpis.liquido)}</div>
-              <div className="stat-title">Total líquido (somado)</div>
+              <div className="stat-title">Total líquido</div>
+            </div>
+          </article>
+          <article className="stat-card" data-accent="info">
+            <div className="stat-card__icon"><ArrowPathIcon className="icon" /></div>
+            <div className="stat-card__content">
+              <div className="stat-value">{kpis.folhas}</div>
+              <div className="stat-title">Folhas</div>
             </div>
           </article>
         </section>
@@ -490,68 +453,62 @@ export default function FolhasFuncionarios() {
 
       {/* Tabela */}
       <section className="card">
-        {!filtros.folha_id ? (
-          <div className="table-empty text-muted" style={{ padding: 16 }}>
-            Escolha uma folha no filtro acima.
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>ID</th><th>Competência</th><th>Funcionário</th>
-                  <th className="num">N</th><th className="num">HE 50%</th><th className="num">HE 100%</th>
-                  <th className="num">Base</th><th className="num">+HE50</th><th className="num">+HE100</th>
-                  <th className="num">+Prov.</th><th className="num">-Desc.</th><th className="num">Líquido</th>
-                  <th className="num">Inc.</th><th className="text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={14} className="table-empty">
-                    <ArrowPathIcon className="icon-sm animate-spin" /> Carregando…
-                  </td></tr>
-                ) : !filtrados.length ? (
-                  <tr><td colSpan={14} className="table-empty text-muted">
-                    Nenhum lançamento para a folha selecionada.
-                  </td></tr>
-                ) : (
-                  filtrados.map((r) => (
-                    <tr key={r.id}>
-                      <td><code>#{r.id}</code></td>
-                      <td>
-                        <div className="cell-strong">{formatMonthBR(r.competencia)}</div>
-                        <div className="cell-muted">{r.competencia}</div>
-                      </td>
-                      <td className="cell-strong">{r.funcionario_nome}</td>
-                      <td className="num">{dec(r.horas_normais).toFixed(2)}</td>
-                      <td className="num">{dec(r.he50_horas).toFixed(2)}</td>
-                      <td className="num">{dec(r.he100_horas).toFixed(2)}</td>
-                      <td className="num">{money(r.valor_base)}</td>
-                      <td className="num">{money(r.valor_he50)}</td>
-                      <td className="num">{money(r.valor_he100)}</td>
-                      <td className="num">{money(r.proventos)}</td>
-                      <td className="num">{money(r.descontos)}</td>
-                      <td className="num"><strong>{money(r.total_liquido)}</strong></td>
-                      <td className="num">{r.inconsistencias || 0}</td>
-                      <td className="text-right">
-                        <div className="btn-group">
-                          <button className="btn btn--icon" onClick={() => startEdit(r)} title="Editar" aria-label={`Editar lançamento #${r.id}`}>
-                            <PencilSquareIcon className="icon-sm" />
-                          </button>
-                          <button className="btn btn--icon" onClick={() => excluir(r)} title="Excluir" aria-label={`Excluir lançamento #${r.id}`}>
-                            <TrashIcon className="icon-sm" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {!!filtros.folha_id && !loading && !!filtrados.length && (
+        <div className="table-responsive">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th><th>Competência</th><th>Funcionário</th>
+                <th className="num">N</th><th className="num">HE 50%</th><th className="num">HE 100%</th>
+                <th className="num">Base</th><th className="num">+HE50</th><th className="num">+HE100</th>
+                <th className="num">+Prov.</th><th className="num">-Desc.</th><th className="num">Líquido</th>
+                <th className="num">Inc.</th><th className="text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={14} className="table-empty">
+                  <ArrowPathIcon className="icon-sm animate-spin" /> Carregando…
+                </td></tr>
+              ) : !filtrados.length ? (
+                <tr><td colSpan={14} className="table-empty text-muted">
+                  {lista.length === 0 ? "Nenhum lançamento encontrado." : "Nenhum lançamento corresponde aos filtros."}
+                </td></tr>
+              ) : (
+                filtrados.map((r) => (
+                  <tr key={r.id}>
+                    <td><code>#{r.id}</code></td>
+                    <td>
+                      <div className="cell-strong">{formatMonthBR(r.competencia)}</div>
+                      <div className="cell-muted">Folha #{r.folha_id}</div>
+                    </td>
+                    <td className="cell-strong">{r.funcionario_nome}</td>
+                    <td className="num">{dec(r.horas_normais).toFixed(2)}</td>
+                    <td className="num">{dec(r.he50_horas).toFixed(2)}</td>
+                    <td className="num">{dec(r.he100_horas).toFixed(2)}</td>
+                    <td className="num">{money(r.valor_base)}</td>
+                    <td className="num">{money(r.valor_he50)}</td>
+                    <td className="num">{money(r.valor_he100)}</td>
+                    <td className="num">{money(r.proventos)}</td>
+                    <td className="num">{money(r.descontos)}</td>
+                    <td className="num"><strong>{money(r.total_liquido)}</strong></td>
+                    <td className="num">{r.inconsistencias || 0}</td>
+                    <td className="text-right">
+                      <div className="btn-group">
+                        <button className="btn btn--icon" onClick={() => startEdit(r)} title="Editar" aria-label={`Editar lançamento #${r.id}`}>
+                          <PencilSquareIcon className="icon-sm" />
+                        </button>
+                        <button className="btn btn--icon" onClick={() => excluir(r)} title="Excluir" aria-label={`Excluir lançamento #${r.id}`}>
+                          <TrashIcon className="icon-sm" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!loading && !!filtrados.length && (
           <div className="table-footer">
             <span>Mostrando {filtrados.length} de {lista.length} registros</span>
             <span>Total filtrado: <strong>{money(kpis.liquido)}</strong></span>
@@ -559,7 +516,7 @@ export default function FolhasFuncionarios() {
         )}
       </section>
 
-      {/* Modal */}
+      {/* Modal (mantido igual) */}
       {open && (
         <div className="modal" role="dialog" aria-modal="true"
              onClick={(e) => e.target === e.currentTarget && !saving && setOpen(false)}>
@@ -583,7 +540,7 @@ export default function FolhasFuncionarios() {
                     value={form.folha_id}
                     onChange={(e) => setForm((p) => ({ ...p, folha_id: e.target.value }))}
                     required
-                    disabled={saving || !!editing}
+                    disabled={saving}
                   >
                     <option value="">Selecione…</option>
                     {folhas.map((f) => (
@@ -592,15 +549,6 @@ export default function FolhasFuncionarios() {
                       </option>
                     ))}
                   </select>
-                  {form.folha_id && (
-                    <small className="cell-muted">
-                      Competência:&nbsp;
-                      {folhas.find((f) => String(f.id) === String(form.folha_id))?.competencia}
-                      {" "}(
-                      {formatMonthBR(folhas.find((f) => String(f.id) === String(form.folha_id))?.competencia)}
-                      )
-                    </small>
-                  )}
                 </div>
 
                 {/* Funcionário */}
@@ -622,7 +570,7 @@ export default function FolhasFuncionarios() {
                   </select>
                 </div>
 
-                {/* Horas */}
+                {/* Horas e valores (mantido igual) */}
                 <div className="form-field">
                   <label className="form-label">Horas normais</label>
                   <input className="form-control" type="number" step="0.01"
@@ -645,7 +593,6 @@ export default function FolhasFuncionarios() {
                     disabled={saving} />
                 </div>
 
-                {/* Valores */}
                 <div className="form-field">
                   <label className="form-label">Valor base</label>
                   <input className="form-control" type="number" step="0.01"
@@ -726,7 +673,7 @@ export default function FolhasFuncionarios() {
         </div>
       )}
 
-      {/* Estilos mínimos (seguindo tokens/a11y do seu global.css) */}
+      {/* Estilos (mantidos iguais) */}
       <style jsx>{`
         .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
         .page-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
