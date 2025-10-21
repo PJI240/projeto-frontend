@@ -117,10 +117,12 @@ export default function FolhasFuncionarios() {
   });
 
   /* ============ LOADERS (sem empresa_id; requireAuth resolve via cookie) ============ */
-  const loadFolhas = useCallback(async () => {
-    const qs = new URLSearchParams();
-    if (statusFolha !== "todas") qs.set("status", statusFolha);
-    const r = await fetch(`${API_BASE}/api/folhas?${qs}`, { credentials: "include" });
+const loadFolhas = useCallback(async () => {
+   const qs = new URLSearchParams();
+
+   if (statusFolha !== "todas") qs.set("status", statusFolha);
+   
+   const r = await fetch(`${API_BASE}/api/folhas?${qs}`, { credentials: "include" });
     const data = await r.json().catch(() => null);
 
     if (!r.ok || data?.ok === false) {
