@@ -1,3 +1,4 @@
+// src/pages/FolhasFuncionarios.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownTrayIcon,
@@ -139,7 +140,6 @@ export default function FolhasFuncionarios() {
     const tried = [];
     let lastStatus = null;
 
-    // 1) Se permissões responderem 200, consideramos sessão OK
     const tryPerms = async () => {
       const tryUrl = async (url) => {
         tried.push(url);
@@ -157,7 +157,6 @@ export default function FolhasFuncionarios() {
 
     const gotPerms = await tryPerms();
 
-    // 2) Tentar extrair user/empresa de endpoints comuns, se existirem
     const tryJson = async (url) => {
       tried.push(url);
       try {
@@ -207,7 +206,7 @@ export default function FolhasFuncionarios() {
     const list = data.folhas || data || [];
     list.sort((a, b) => (a.competencia === b.competencia ? (b.id ?? 0) - (a.id ?? 0) : (a.competencia > b.competencia ? -1 : 1)));
     setFolhas(list);
-    setFolhaId((prev) => prev || (list[0]?.id ?? ""));
+    // NÃO força folhaId aqui; devolve para o bootstrap decidir carregar de imediato
     return list;
   }, [statusFolha]);
 
@@ -242,15 +241,22 @@ export default function FolhasFuncionarios() {
     if (liveRef.current) liveRef.current.textContent = "Registros atualizados.";
   }, [filtroFunc, q, funcionarios]);
 
-  // Bootstrap
+  // Bootstrap — já carrega a 1ª folha retornada (evita esperar o efeito do setState)
   useEffect(() => {
     const ctrl = new AbortController();
     (async () => {
       setLoading(true); setErr(""); setSuccess("");
       try {
         await loadSessao();
-        await Promise.all([loadFolhas(), loadFuncionarios()]);
-        if (folhaId) await loadRows(folhaId, ctrl.signal);
+        const [list] = await Promise.all([loadFolhas(), loadFuncionarios()]);
+        const firstId = list?.[0]?.id ?? "";
+        const targetId = folhaId || firstId;
+        if (targetId) {
+          setFolhaId((prev) => prev || targetId);
+          await loadRows(targetId, ctrl.signal);
+        } else {
+          setRows([]);
+        }
       } catch (e) {
         setErr(e.message || "Falha ao carregar dados.");
       } finally {
@@ -264,9 +270,13 @@ export default function FolhasFuncionarios() {
   // Recarrega as folhas ao mudar status
   useEffect(() => {
     (async () => {
-      try { await loadFolhas(); } catch (e) { setErr(e.message || "Falha ao carregar folhas."); }
+      try {
+        const list = await loadFolhas();
+        // Se não houver folha selecionada, seleciona a 1ª
+        if (!folhaId && list?.length) setFolhaId(list[0].id);
+      } catch (e) { setErr(e.message || "Falha ao carregar folhas."); }
     })();
-  }, [loadFolhas]);
+  }, [loadFolhas]); // folhaId intencionalmente fora
 
   // Recarrega rows ao mudar filtros
   useEffect(() => {
@@ -284,8 +294,9 @@ export default function FolhasFuncionarios() {
     setLoading(true); setErr(""); setSuccess("");
     const ctrl = new AbortController();
     try {
-      await Promise.all([loadFolhas(), loadFuncionarios()]);
-      await loadRows(folhaId, ctrl.signal);
+      const [list] = await Promise.all([loadFolhas(), loadFuncionarios()]);
+      const id = folhaId || list?.[0]?.id || "";
+      await loadRows(id, ctrl.signal);
       setSuccess("Atualizado com sucesso.");
     } catch (e) {
       if (e.name !== "AbortError") setErr(e.message || "Falha ao atualizar.");
