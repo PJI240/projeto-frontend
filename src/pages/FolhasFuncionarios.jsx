@@ -17,7 +17,7 @@ import {
 const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 
 /* ===== Overrides DEV (TEMP) =====
-   - Se a sessão não vier do cookie, usamos esses valores de fallback
+   - Somente para exibir no banner caso /me não retorne (não interfere nas chamadas)
    - Coloque em .env.local:
       VITE_DEV_EMPRESA_ID=123
       VITE_DEV_USUARIO_ID=456
@@ -124,7 +124,7 @@ export default function FolhasFuncionarios() {
     inconsistencias: "",
   });
 
-  /* ============ Sessão do usuário (para exibir e para fallback de empresa) ============ */
+  /* ============ Sessão do usuário (para exibir) ============ */
   const [sessao, setSessao] = useState({
     usuario_id: null,
     empresa_id: null,
@@ -134,78 +134,67 @@ export default function FolhasFuncionarios() {
     _debugLastStatus: null,
   });
 
-  const pick = (obj, keys, fallback=null) => {
-    for (const k of keys) if (obj?.[k] != null) return obj[k];
-    return fallback;
-  };
-
+  /* ===== Sessão: mesmo critério do MENU + tentativa de /me e empresa ===== */
   const loadSessao = useCallback(async () => {
-    const endpoints = [
-      `${API_BASE}/api/sessao`,
-      `${API_BASE}/api/session`,
-      `${API_BASE}/api/me`,
-      `${API_BASE}/api/whoami`,
-    ];
     const tried = [];
     let lastStatus = null;
 
-    for (const url of endpoints) {
+    // 1) Se permissões responderem 200, consideramos sessão OK
+    const tryPerms = async () => {
+      const tryUrl = async (url) => {
+        tried.push(url);
+        try {
+          const r = await fetch(url, { credentials: "include" });
+          lastStatus = r.status;
+          if (!r.ok) return false;
+          const js = await r.json().catch(() => ({}));
+          return Array.isArray(js?.codes);
+        } catch { return false; }
+      };
+      return (await tryUrl(`${API_BASE}/api/permissoes_menu/minhas`)) ||
+             (await tryUrl(`${API_BASE}/api/permissoes/minhas`));
+    };
+
+    const gotPerms = await tryPerms();
+
+    // 2) Tentar extrair user/empresa de endpoints comuns, se existirem
+    const tryJson = async (url) => {
       tried.push(url);
       try {
         const r = await fetch(url, { credentials: "include" });
         lastStatus = r.status;
-        const data = await r.json().catch(() => null);
-        if (!r.ok || !data) continue;
+        if (!r.ok) return null;
+        return await r.json().catch(() => null);
+      } catch { return null; }
+    };
 
-        const root = data.session || data.usuario || data.user || data;
+    const me = (await tryJson(`${API_BASE}/api/me`)) ||
+               (await tryJson(`${API_BASE}/api/usuarios/me`)) || {};
 
-        const usuario_id = Number(
-          pick(root, ["usuario_id","user_id","id","uid","pessoa_id"], null)
-        );
+    const empresa =
+      (await tryJson(`${API_BASE}/api/empresas/minha`)) ||
+      (await tryJson(`${API_BASE}/api/empresas/ativa`)) ||
+      me?.empresa || me?.company || {};
 
-        let empresa_id = pick(root, ["empresa_id","company_id","id_empresa"], null);
-        if (empresa_id == null) {
-          const empresa = root.empresa || root.company;
-          empresa_id = pick(empresa, ["id","empresa_id","company_id"], null);
-        }
-        if (empresa_id == null) empresa_id = pick(root, ["grupo_economico_id"], null);
+    const num = (v) => (v == null ? null : Number(v));
+    const usuario_id =
+      num(me?.usuario_id) ?? num(me?.user_id) ?? num(me?.id) ?? num(me?.uid) ?? null;
+    const empresa_id =
+      num(empresa?.id) ?? num(empresa?.empresa_id) ?? num(me?.empresa_id) ?? null;
 
-        setSessao({
-          usuario_id: Number.isFinite(usuario_id) ? usuario_id : null,
-          empresa_id: Number.isFinite(Number(empresa_id)) ? Number(empresa_id) : empresa_id ?? null,
-          carregando: false,
-          erro: "",
-          _debugTried: tried,
-          _debugLastStatus: lastStatus,
-        });
-        return;
-      } catch (e) {
-        // segue tentando
-      }
-    }
-
-    // Fallback DEV (ainda marcamos como sem sessão, mas com overrides)
-    setSessao(s => ({
-      ...s,
-      usuario_id: s.usuario_id ?? (DEV_USUARIO_ID ? Number(DEV_USUARIO_ID) : null),
-      empresa_id: s.empresa_id ?? (DEV_EMPRESA_ID ? Number(DEV_EMPRESA_ID) : null),
+    setSessao({
+      usuario_id: usuario_id ?? (DEV_USUARIO_ID ? Number(DEV_USUARIO_ID) : null),
+      empresa_id: empresa_id ?? (DEV_EMPRESA_ID ? Number(DEV_EMPRESA_ID) : null),
       carregando: false,
-      erro: "Não foi possível obter a sessão.",
+      erro: gotPerms ? "" : "Não foi possível obter a sessão.",
       _debugTried: tried,
       _debugLastStatus: lastStatus,
-    }));
+    });
   }, []);
 
-  /* ===== Helper: anexa empresa_id quando disponível (sessão ou DEV) ===== */
-  const withEmpresa = (qs = new URLSearchParams()) => {
-    const emp = sessao.empresa_id ?? (DEV_EMPRESA_ID ? Number(DEV_EMPRESA_ID) : null);
-    if (emp) qs.set("empresa_id", String(emp));
-    return qs;
-  };
-
-  /* ============ LOADERS (usam empresa_id quando existir) ============ */
+  /* ============ LOADERS (sem empresa_id na query — cookie resolve) ============ */
   const loadFolhas = useCallback(async () => {
-    const qs = withEmpresa(new URLSearchParams());
+    const qs = new URLSearchParams();
     if (statusFolha !== "todas") qs.set("status", statusFolha);
 
     const r = await fetch(`${API_BASE}/api/folhas?${qs}`, { credentials: "include" });
@@ -220,20 +209,18 @@ export default function FolhasFuncionarios() {
     setFolhas(list);
     setFolhaId((prev) => prev || (list[0]?.id ?? ""));
     return list;
-  }, [statusFolha, sessao.empresa_id]);
+  }, [statusFolha]);
 
   const loadFuncionarios = useCallback(async () => {
-    const qs = withEmpresa(new URLSearchParams());
-    qs.set("ativos", "1");
-    const r = await fetch(`${API_BASE}/api/funcionarios?${qs}`, { credentials: "include" });
+    const r = await fetch(`${API_BASE}/api/funcionarios?ativos=1`, { credentials: "include" });
     const data = await r.json().catch(() => null);
     if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
     setFuncionarios(data.funcionarios || data.items || []);
-  }, [sessao.empresa_id]);
+  }, []);
 
   const loadRows = useCallback(async (folha_id, signal) => {
     if (!folha_id) { setRows([]); return; }
-    const params = withEmpresa(new URLSearchParams({ folha_id }));
+    const params = new URLSearchParams({ folha_id });
     if (filtroFunc !== "todos") params.set("funcionario_id", filtroFunc);
     if (q) params.set("q", q);
 
@@ -253,7 +240,7 @@ export default function FolhasFuncionarios() {
 
     setRows(items);
     if (liveRef.current) liveRef.current.textContent = "Registros atualizados.";
-  }, [filtroFunc, q, funcionarios, sessao.empresa_id]);
+  }, [filtroFunc, q, funcionarios]);
 
   // Bootstrap
   useEffect(() => {
@@ -274,7 +261,7 @@ export default function FolhasFuncionarios() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recarrega as folhas ao mudar status ou empresa da sessão
+  // Recarrega as folhas ao mudar status
   useEffect(() => {
     (async () => {
       try { await loadFolhas(); } catch (e) { setErr(e.message || "Falha ao carregar folhas."); }
@@ -382,9 +369,6 @@ export default function FolhasFuncionarios() {
       proventos: parseDec(form.proventos),
       total_liquido: form.total_liquido === "" ? null : parseDec(form.total_liquido),
       inconsistencias: (form.inconsistencias || "").trim() || null,
-      // TEMP: se não houver sessão, incluir empresa_id no payload para o backend aceitar
-      ...(sessao.empresa_id ? { empresa_id: Number(sessao.empresa_id) }
-        : DEV_EMPRESA_ID ? { empresa_id: Number(DEV_EMPRESA_ID) } : {}),
     };
     if (p.total_liquido == null) {
       p.total_liquido = p.valor_base + p.valor_he50 + p.valor_he100 + p.proventos - p.descontos;
@@ -406,11 +390,8 @@ export default function FolhasFuncionarios() {
         body: JSON.stringify(p),
       };
       const url = editando
-        ? `${API_BASE}/api/folhas-funcionarios`
-          + `/${editando.id}`
-          + `${sessao.empresa_id || DEV_EMPRESA_ID ? `?empresa_id=${encodeURIComponent(sessao.empresa_id ?? DEV_EMPRESA_ID)}` : ""}`
-        : `${API_BASE}/api/folhas-funcionarios`
-          + `${sessao.empresa_id || DEV_EMPRESA_ID ? `?empresa_id=${encodeURIComponent(sessao.empresa_id ?? DEV_EMPRESA_ID)}` : ""}`;
+        ? `${API_BASE}/api/folhas-funcionarios/${editando.id}`
+        : `${API_BASE}/api/folhas-funcionarios`;
 
       const r = await fetch(url, init);
       const data = await r.json().catch(() => null);
@@ -431,8 +412,7 @@ export default function FolhasFuncionarios() {
     if (!confirm(`Remover lançamento de ${nome}?`)) return;
     try {
       setErr(""); setSuccess("");
-      const url = `${API_BASE}/api/folhas-funcionarios/${r.id}`
-        + `${sessao.empresa_id || DEV_EMPRESA_ID ? `?empresa_id=${encodeURIComponent(sessao.empresa_id ?? DEV_EMPRESA_ID)}` : ""}`;
+      const url = `${API_BASE}/api/folhas-funcionarios/${r.id}`;
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${res.status}`);
@@ -588,14 +568,9 @@ export default function FolhasFuncionarios() {
           </span>
         ) : (
           <span style={{ fontWeight: 600 }}>
-            Usuário ID: <code>#{sessao.usuario_id ?? "?"}</code>
+            Usuário ID: <code>#{sessao.usuario_id ?? DEV_USUARIO_ID ?? "?"}</code>
             {" "}&bull;{" "}
-            Empresa ID: <code>#{sessao.empresa_id ?? "?"}</code>
-          </span>
-        )}
-        {(DEV_EMPRESA_ID || DEV_USUARIO_ID) && (
-          <span className="muted" style={{ marginLeft: "auto", fontSize: "0.85em" }}>
-            DEV override: usuário={DEV_USUARIO_ID || "—"} empresa={DEV_EMPRESA_ID || "—"}
+            Empresa ID: <code>#{sessao.empresa_id ?? DEV_EMPRESA_ID ?? "?"}</code>
           </span>
         )}
       </div>
