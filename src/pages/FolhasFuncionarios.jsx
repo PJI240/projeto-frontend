@@ -116,13 +116,58 @@ export default function FolhasFuncionarios() {
     inconsistencias: "",
   });
 
-  /* ============ LOADERS (sem empresa_id; requireAuth resolve via cookie) ============ */
-const loadFolhas = useCallback(async () => {
-   const qs = new URLSearchParams();
+  /* ============ Sessão do usuário (para exibir ID de usuário e empresa) ============ */
+  const [sessao, setSessao] = useState({ usuario_id: null, empresa_id: null, carregando: true, erro: "" });
 
-   if (statusFolha !== "todas") qs.set("status", statusFolha);
-   
-   const r = await fetch(`${API_BASE}/api/folhas?${qs}`, { credentials: "include" });
+  const pick = (obj, keys, fallback=null) => {
+    for (const k of keys) if (obj?.[k] != null) return obj[k];
+    return fallback;
+  };
+
+  const loadSessao = useCallback(async () => {
+    const endpoints = [
+      `${API_BASE}/api/sessao`,
+      `${API_BASE}/api/session`,
+      `${API_BASE}/api/me`,
+      `${API_BASE}/api/whoami`,
+    ];
+    for (const url of endpoints) {
+      try {
+        const r = await fetch(url, { credentials: "include" });
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data) continue;
+
+        const root = data.session || data.usuario || data.user || data;
+
+        const usuario_id = Number(
+          pick(root, ["usuario_id","user_id","id","uid","pessoa_id"], null)
+        );
+
+        let empresa_id = pick(root, ["empresa_id","company_id","id_empresa"], null);
+        if (empresa_id == null) {
+          const empresa = root.empresa || root.company;
+          empresa_id = pick(empresa, ["id","empresa_id","company_id"], null);
+        }
+        if (empresa_id == null) empresa_id = pick(root, ["grupo_economico_id"], null);
+
+        setSessao({
+          usuario_id: Number.isFinite(usuario_id) ? usuario_id : null,
+          empresa_id: Number.isFinite(Number(empresa_id)) ? Number(empresa_id) : empresa_id ?? null,
+          carregando: false,
+          erro: "",
+        });
+        return;
+      } catch {}
+    }
+    setSessao(s => ({ ...s, carregando:false, erro:"Não foi possível obter a sessão." }));
+  }, []);
+
+  /* ============ LOADERS (sem empresa_id; requireAuth resolve via cookie) ============ */
+  const loadFolhas = useCallback(async () => {
+    const qs = new URLSearchParams();
+    if (statusFolha !== "todas") qs.set("status", statusFolha);
+
+    const r = await fetch(`${API_BASE}/api/folhas?${qs}`, { credentials: "include" });
     const data = await r.json().catch(() => null);
 
     if (!r.ok || data?.ok === false) {
@@ -175,7 +220,7 @@ const loadFolhas = useCallback(async () => {
     (async () => {
       setLoading(true); setErr(""); setSuccess("");
       try {
-        await Promise.all([loadFolhas(), loadFuncionarios()]);
+        await Promise.all([loadSessao(), loadFolhas(), loadFuncionarios()]);
         if (folhaId) await loadRows(folhaId, ctrl.signal);
       } catch (e) {
         setErr(e.message || "Falha ao carregar dados.");
@@ -464,6 +509,34 @@ const loadFolhas = useCallback(async () => {
     <>
       {/* live region */}
       <div ref={liveRef} aria-live="polite" style={{ position: "absolute", width:1, height:1, overflow:"hidden", clip:"rect(1px,1px,1px,1px)" }} />
+
+      {/* Banner TEMP: IDs da sessão */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="card"
+        style={{
+          marginBottom: 12,
+          padding: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          borderLeft: "4px solid var(--info)",
+        }}
+      >
+        <ClipboardDocumentListIcon className="icon-sm" aria-hidden="true" />
+        {sessao.carregando ? (
+          <span className="muted">Carregando sessão…</span>
+        ) : sessao.erro ? (
+          <span className="muted">Sessão indisponível.</span>
+        ) : (
+          <span style={{ fontWeight: 600 }}>
+            Usuário ID: <code>#{sessao.usuario_id ?? "?"}</code>
+            {" "}&bull;{" "}
+            Empresa ID: <code>#{sessao.empresa_id ?? "?"}</code>
+          </span>
+        )}
+      </div>
 
       {/* Header */}
       <header className="main-header">
