@@ -1,4 +1,3 @@
-// src/pages/FolhasFuncionarios.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownTrayIcon,
@@ -16,6 +15,15 @@ import {
 } from "@heroicons/react/24/outline";
 
 const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
+
+/* ===== Overrides DEV (TEMP) =====
+   - Se a sessão não vier do cookie, usamos esses valores de fallback
+   - Coloque em .env.local:
+      VITE_DEV_EMPRESA_ID=123
+      VITE_DEV_USUARIO_ID=456
+*/
+const DEV_EMPRESA_ID = (import.meta.env.VITE_DEV_EMPRESA_ID ?? "").toString().trim() || null;
+const DEV_USUARIO_ID = (import.meta.env.VITE_DEV_USUARIO_ID ?? "").toString().trim() || null;
 
 /* ============ Utils numéricos/formatadores (robustos a BR/EN) ============ */
 const brMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -116,8 +124,15 @@ export default function FolhasFuncionarios() {
     inconsistencias: "",
   });
 
-  /* ============ Sessão do usuário (para exibir ID de usuário e empresa) ============ */
-  const [sessao, setSessao] = useState({ usuario_id: null, empresa_id: null, carregando: true, erro: "" });
+  /* ============ Sessão do usuário (para exibir e para fallback de empresa) ============ */
+  const [sessao, setSessao] = useState({
+    usuario_id: null,
+    empresa_id: null,
+    carregando: true,
+    erro: "",
+    _debugTried: [],
+    _debugLastStatus: null,
+  });
 
   const pick = (obj, keys, fallback=null) => {
     for (const k of keys) if (obj?.[k] != null) return obj[k];
@@ -131,9 +146,14 @@ export default function FolhasFuncionarios() {
       `${API_BASE}/api/me`,
       `${API_BASE}/api/whoami`,
     ];
+    const tried = [];
+    let lastStatus = null;
+
     for (const url of endpoints) {
+      tried.push(url);
       try {
         const r = await fetch(url, { credentials: "include" });
+        lastStatus = r.status;
         const data = await r.json().catch(() => null);
         if (!r.ok || !data) continue;
 
@@ -155,23 +175,43 @@ export default function FolhasFuncionarios() {
           empresa_id: Number.isFinite(Number(empresa_id)) ? Number(empresa_id) : empresa_id ?? null,
           carregando: false,
           erro: "",
+          _debugTried: tried,
+          _debugLastStatus: lastStatus,
         });
         return;
-      } catch {}
+      } catch (e) {
+        // segue tentando
+      }
     }
-    setSessao(s => ({ ...s, carregando:false, erro:"Não foi possível obter a sessão." }));
+
+    // Fallback DEV (ainda marcamos como sem sessão, mas com overrides)
+    setSessao(s => ({
+      ...s,
+      usuario_id: s.usuario_id ?? (DEV_USUARIO_ID ? Number(DEV_USUARIO_ID) : null),
+      empresa_id: s.empresa_id ?? (DEV_EMPRESA_ID ? Number(DEV_EMPRESA_ID) : null),
+      carregando: false,
+      erro: "Não foi possível obter a sessão.",
+      _debugTried: tried,
+      _debugLastStatus: lastStatus,
+    }));
   }, []);
 
-  /* ============ LOADERS (sem empresa_id; requireAuth resolve via cookie) ============ */
+  /* ===== Helper: anexa empresa_id quando disponível (sessão ou DEV) ===== */
+  const withEmpresa = (qs = new URLSearchParams()) => {
+    const emp = sessao.empresa_id ?? (DEV_EMPRESA_ID ? Number(DEV_EMPRESA_ID) : null);
+    if (emp) qs.set("empresa_id", String(emp));
+    return qs;
+  };
+
+  /* ============ LOADERS (usam empresa_id quando existir) ============ */
   const loadFolhas = useCallback(async () => {
-    const qs = new URLSearchParams();
+    const qs = withEmpresa(new URLSearchParams());
     if (statusFolha !== "todas") qs.set("status", statusFolha);
 
     const r = await fetch(`${API_BASE}/api/folhas?${qs}`, { credentials: "include" });
     const data = await r.json().catch(() => null);
 
     if (!r.ok || data?.ok === false) {
-      // 404 ou outro erro: mostre feedback mas não quebre
       throw new Error(data?.error || `HTTP ${r.status}`);
     }
 
@@ -180,18 +220,20 @@ export default function FolhasFuncionarios() {
     setFolhas(list);
     setFolhaId((prev) => prev || (list[0]?.id ?? ""));
     return list;
-  }, [statusFolha]);
+  }, [statusFolha, sessao.empresa_id]);
 
   const loadFuncionarios = useCallback(async () => {
-    const r = await fetch(`${API_BASE}/api/funcionarios?ativos=1`, { credentials: "include" });
+    const qs = withEmpresa(new URLSearchParams());
+    qs.set("ativos", "1");
+    const r = await fetch(`${API_BASE}/api/funcionarios?${qs}`, { credentials: "include" });
     const data = await r.json().catch(() => null);
     if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
-    setFuncionarios(data.funcionarios || []);
-  }, []);
+    setFuncionarios(data.funcionarios || data.items || []);
+  }, [sessao.empresa_id]);
 
   const loadRows = useCallback(async (folha_id, signal) => {
     if (!folha_id) { setRows([]); return; }
-    const params = new URLSearchParams({ folha_id });
+    const params = withEmpresa(new URLSearchParams({ folha_id }));
     if (filtroFunc !== "todos") params.set("funcionario_id", filtroFunc);
     if (q) params.set("q", q);
 
@@ -199,8 +241,7 @@ export default function FolhasFuncionarios() {
     const data = await r.json().catch(() => null);
     if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
 
-    const items = Array.isArray(data) ? data : (data.folhas_funcionarios || []);
-    // Ordenar por nome (se existir) depois id
+    const items = Array.isArray(data) ? data : (data.folhas_funcionarios || data.items || []);
     items.sort((a, b) => {
       const af = funcionarios.find(f => f.id === a.funcionario_id);
       const bf = funcionarios.find(f => f.id === b.funcionario_id);
@@ -212,7 +253,7 @@ export default function FolhasFuncionarios() {
 
     setRows(items);
     if (liveRef.current) liveRef.current.textContent = "Registros atualizados.";
-  }, [filtroFunc, q, funcionarios]);
+  }, [filtroFunc, q, funcionarios, sessao.empresa_id]);
 
   // Bootstrap
   useEffect(() => {
@@ -220,7 +261,8 @@ export default function FolhasFuncionarios() {
     (async () => {
       setLoading(true); setErr(""); setSuccess("");
       try {
-        await Promise.all([loadSessao(), loadFolhas(), loadFuncionarios()]);
+        await loadSessao();
+        await Promise.all([loadFolhas(), loadFuncionarios()]);
         if (folhaId) await loadRows(folhaId, ctrl.signal);
       } catch (e) {
         setErr(e.message || "Falha ao carregar dados.");
@@ -232,7 +274,7 @@ export default function FolhasFuncionarios() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recarrega as folhas ao mudar status
+  // Recarrega as folhas ao mudar status ou empresa da sessão
   useEffect(() => {
     (async () => {
       try { await loadFolhas(); } catch (e) { setErr(e.message || "Falha ao carregar folhas."); }
@@ -340,6 +382,9 @@ export default function FolhasFuncionarios() {
       proventos: parseDec(form.proventos),
       total_liquido: form.total_liquido === "" ? null : parseDec(form.total_liquido),
       inconsistencias: (form.inconsistencias || "").trim() || null,
+      // TEMP: se não houver sessão, incluir empresa_id no payload para o backend aceitar
+      ...(sessao.empresa_id ? { empresa_id: Number(sessao.empresa_id) }
+        : DEV_EMPRESA_ID ? { empresa_id: Number(DEV_EMPRESA_ID) } : {}),
     };
     if (p.total_liquido == null) {
       p.total_liquido = p.valor_base + p.valor_he50 + p.valor_he100 + p.proventos - p.descontos;
@@ -361,8 +406,11 @@ export default function FolhasFuncionarios() {
         body: JSON.stringify(p),
       };
       const url = editando
-        ? `${API_BASE}/api/folhas-funcionarios/${editando.id}`
-        : `${API_BASE}/api/folhas-funcionarios`;
+        ? `${API_BASE}/api/folhas-funcionarios`
+          + `/${editando.id}`
+          + `${sessao.empresa_id || DEV_EMPRESA_ID ? `?empresa_id=${encodeURIComponent(sessao.empresa_id ?? DEV_EMPRESA_ID)}` : ""}`
+        : `${API_BASE}/api/folhas-funcionarios`
+          + `${sessao.empresa_id || DEV_EMPRESA_ID ? `?empresa_id=${encodeURIComponent(sessao.empresa_id ?? DEV_EMPRESA_ID)}` : ""}`;
 
       const r = await fetch(url, init);
       const data = await r.json().catch(() => null);
@@ -383,7 +431,9 @@ export default function FolhasFuncionarios() {
     if (!confirm(`Remover lançamento de ${nome}?`)) return;
     try {
       setErr(""); setSuccess("");
-      const res = await fetch(`${API_BASE}/api/folhas-funcionarios/${r.id}`, { method: "DELETE", credentials: "include" });
+      const url = `${API_BASE}/api/folhas-funcionarios/${r.id}`
+        + `${sessao.empresa_id || DEV_EMPRESA_ID ? `?empresa_id=${encodeURIComponent(sessao.empresa_id ?? DEV_EMPRESA_ID)}` : ""}`;
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${res.status}`);
       setSuccess("Registro removido.");
@@ -510,7 +560,7 @@ export default function FolhasFuncionarios() {
       {/* live region */}
       <div ref={liveRef} aria-live="polite" style={{ position: "absolute", width:1, height:1, overflow:"hidden", clip:"rect(1px,1px,1px,1px)" }} />
 
-      {/* Banner TEMP: IDs da sessão */}
+      {/* Banner TEMP: IDs da sessão + debug */}
       <div
         role="status"
         aria-live="polite"
@@ -528,12 +578,24 @@ export default function FolhasFuncionarios() {
         {sessao.carregando ? (
           <span className="muted">Carregando sessão…</span>
         ) : sessao.erro ? (
-          <span className="muted">Sessão indisponível.</span>
+          <span className="muted">
+            Sessão indisponível.
+            {" "}
+            <span style={{ fontSize: "0.9em" }}>
+              (API_BASE: <code>{API_BASE || "same-origin"}</code>,
+              última resposta: {String(sessao._debugLastStatus || "—")})
+            </span>
+          </span>
         ) : (
           <span style={{ fontWeight: 600 }}>
             Usuário ID: <code>#{sessao.usuario_id ?? "?"}</code>
             {" "}&bull;{" "}
             Empresa ID: <code>#{sessao.empresa_id ?? "?"}</code>
+          </span>
+        )}
+        {(DEV_EMPRESA_ID || DEV_USUARIO_ID) && (
+          <span className="muted" style={{ marginLeft: "auto", fontSize: "0.85em" }}>
+            DEV override: usuário={DEV_USUARIO_ID || "—"} empresa={DEV_EMPRESA_ID || "—"}
           </span>
         )}
       </div>
@@ -841,7 +903,6 @@ export default function FolhasFuncionarios() {
         .visually-hidden { position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap }
         .muted{ color: var(--muted) }
 
-        /* Botões (fallback coerente com Permissoes.jsx) */
         .toggle-btn{
           display:inline-flex; align-items:center; gap:8px;
           border:1px solid var(--border); border-radius: var(--radius);
