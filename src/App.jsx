@@ -46,19 +46,12 @@ function Landing() {
       try {
         const r = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
         const data = await r.json().catch(() => null);
-
         if (!alive) return;
 
         if (r.ok && data?.ok && data.user) {
           const roles = (data.roles || []).map((s) => String(s).toLowerCase());
           const isAdm = roles.includes("administrador") || roles.includes("desenvolvedor");
-          
-          // CORREÇÃO: Redireciona para dashboard_func se não for admin
-          if (isAdm) {
-            setState({ loading: false, path: "/dashboard_adm" });
-          } else {
-            setState({ loading: false, path: "/dashboard_func" });
-          }
+          setState({ loading: false, path: isAdm ? "/dashboard_adm" : "/dashboard_func" });
         } else {
           setState({ loading: false, path: "/login" });
         }
@@ -69,7 +62,7 @@ function Landing() {
     return () => { alive = false; };
   }, []);
 
-  if (state.loading) return null; // opcional: tela de splash
+  if (state.loading) return null; // splash opcional
   return <Navigate to={state.path} replace />;
 }
 
@@ -77,13 +70,14 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* 🔓 públicas: sem menu */}
+        {/* 🔓 públicas */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* 🔒 internas: com menu via AppLayout */}
+        {/* 🔒 internas com layout */}
         <Route element={<AppLayout />}>
+          {/* dashboards */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard_adm" element={<DashboardAdm />} />
           <Route path="/dashboard_func" element={<DashboardFunc />} />
@@ -109,7 +103,14 @@ export default function App() {
 
           {/* folha */}
           <Route path="/folhas" element={<Folhas />} />
+
+          {/* ✅ novas rotas compatíveis com o componente FolhasFuncionarios */}
+          <Route path="/folhas/:folhaId/funcionarios" element={<FolhasFuncionarios />} />
+          <Route path="/folhas/funcionarios" element={<FolhasFuncionarios />} />
+
+          {/* ✅ mantém a rota antiga por compatibilidade de menu/links legados */}
           <Route path="/folhas-funcionarios" element={<FolhasFuncionarios />} />
+
           <Route path="/folhas-itens" element={<FolhasItens />} />
 
           {/* dev */}
@@ -117,6 +118,9 @@ export default function App() {
           <Route path="/dev-auditoria" element={<DevAuditoria />} />
           <Route path="/dev-config" element={<DevConfig />} />
         </Route>
+
+        {/* 404 opcional
+        <Route path="*" element={<NotFound />} /> */}
       </Routes>
     </Router>
   );
