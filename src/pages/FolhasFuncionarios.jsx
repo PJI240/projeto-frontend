@@ -11,10 +11,9 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/solid";
 
-// Usa o mesmo padrão visual de src/pages/Usuarios.jsx
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-// ----- Helpers HTTP -----
+/* ===== Helpers HTTP ===== */
 async function fetchJSON(url, init = {}) {
   const r = await fetch(url, { credentials: "include", ...init });
   const data = await r.json().catch(() => null);
@@ -22,7 +21,7 @@ async function fetchJSON(url, init = {}) {
   return data;
 }
 
-// Fallback de nome/CPF vindos de respostas diferentes
+/* Fallbacks de nome/CPF (para diferentes formatos de resposta) */
 function getDisplayName(row) {
   return (
     row?.nome ??
@@ -44,29 +43,29 @@ export default function FolhasFuncionarios() {
   const [folhaId, setFolhaId] = useState(folhaIdParam ? Number(folhaIdParam) : null);
   const [folhaInfo, setFolhaInfo] = useState(null);
 
-  // Estados base de tela
+  // Estado da tela
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("");
   const [lista, setLista] = useState([]); // linhas já incluídas
 
-  // Modal "incluir funcionário"
+  // Modal inclusão
   const [showForm, setShowForm] = useState(false);
   const [query, setQuery] = useState("");
-  const [candidatos, setCandidatos] = useState([]);
+  const [candidatos, setCandidatos] = useState([]); // candidatos retornados pela busca
   const [busy, setBusy] = useState(false);
 
   const liveRef = useRef(null);
   const buscaRef = useRef(null);
   const buscaTimer = useRef(null);
 
-  // Pode editar?
-const canEdit = useMemo(() => {
-  const st = String(folhaInfo?.status || "").trim().toUpperCase();
-  return st === "ABERTA";
-}, [folhaInfo]);
+  /* Pode editar? (se a folha estiver ABERTA) */
+  const canEdit = useMemo(() => {
+    const st = String(folhaInfo?.status || "").trim().toUpperCase();
+    return st === "ABERTA";
+  }, [folhaInfo]);
 
-  // ----- Utils -----
+  /* ===== Utils ===== */
   function fmtBRL(x) {
     const n = Number(x);
     if (!Number.isFinite(n)) return "—";
@@ -77,7 +76,7 @@ const canEdit = useMemo(() => {
     }
   }
 
-  // Filtro
+  /* Filtro da tabela */
   const filtrados = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return lista;
@@ -88,7 +87,7 @@ const canEdit = useMemo(() => {
     });
   }, [filter, lista]);
 
-  // Seleção em massa
+  /* Seleção em massa */
   const [selecionados, setSelecionados] = useState([]);
   const allIds = useMemo(() => (lista || []).map((r) => r.id), [lista]);
   const allChecked = selecionados.length > 0 && selecionados.length === allIds.length;
@@ -97,15 +96,15 @@ const canEdit = useMemo(() => {
     setSelecionados((prev) => (on ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
   }
 
-  // ---------- Carregamentos ----------
+  /* ===== Carregamentos ===== */
   async function carregarFolhas() {
     const data = await fetchJSON(`${API_BASE}/api/folhas`);
     const arr = Array.isArray(data) ? data : (data.folhas || []);
     setFolhas(arr);
 
-    // Seleciona automaticamente se não houver na URL
+    // Se não veio id pela URL, prefira uma ABERTA
     if (!folhaId && arr.length > 0) {
-      const prefer = arr.find((f) => ["rascunho", "aberta", "aberto"].includes(String(f.status).toLowerCase()));
+      const prefer = arr.find((f) => String(f.status).toUpperCase() === "ABERTA");
       const chosen = (prefer || arr[0]).id;
       setFolhaId(chosen);
     }
@@ -114,7 +113,8 @@ const canEdit = useMemo(() => {
   async function carregarFolhaInfo(id) {
     if (!id) { setFolhaInfo(null); return; }
     const info = await fetchJSON(`${API_BASE}/api/folhas/${id}`);
-    setFolhaInfo(Array.isArray(info) ? info?.[0] : info); // tolera {..} ou [..]
+    // backend responde { ok:true, folha:{...} } — extrai corretamente
+    setFolhaInfo(info?.folha ?? info);
   }
 
   async function carregarLista(id) {
@@ -141,7 +141,7 @@ const canEdit = useMemo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Se URL (:folhaId) mudar externamente, sincroniza o estado
+  // Sincroniza se a URL mudar externamente
   useEffect(() => {
     if (folhaIdParam && Number(folhaIdParam) !== Number(folhaId)) {
       setFolhaId(Number(folhaIdParam));
@@ -159,7 +159,7 @@ const canEdit = useMemo(() => {
       try {
         await carregarFolhaInfo(folhaId);
         await carregarLista(folhaId);
-        // ✅ mantém URL no padrão /folhas/:folhaId/funcionarios
+        // Mantém a URL no padrão /folhas/:folhaId/funcionarios
         if (String(folhaIdParam || "") !== String(folhaId)) {
           navigate(`/folhas/${folhaId}/funcionarios`, { replace: true });
         }
@@ -173,7 +173,7 @@ const canEdit = useMemo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folhaId]);
 
-  // ---------- Ações ----------
+  /* ===== Ações ===== */
   function abrirInclusao() {
     if (!canEdit) return;
     setShowForm(true);
@@ -199,7 +199,7 @@ const canEdit = useMemo(() => {
     }
   }
 
-  // debounce para busca
+  // debounce
   function buscarCandidatos(q) {
     setQuery(q);
     clearTimeout(buscaTimer.current);
@@ -216,11 +216,43 @@ const canEdit = useMemo(() => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ funcionario_id: Number(c.funcionario_id) }),
       });
-      setShowForm(false);
       await carregarLista(folhaId);
       if (liveRef.current) liveRef.current.textContent = `${getDisplayName(c)} incluído na folha.`;
+      setShowForm(false);
     } catch (e) {
       setErr(e.message || "Falha ao incluir funcionário.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // NOVO: incluir todos os candidatos listados
+  async function incluirTodos() {
+    if (!folhaId || !candidatos.length) return;
+    if (!window.confirm(`Incluir todos os ${candidatos.length} funcionário(s) listados nesta folha?`)) return;
+
+    setBusy(true);
+    try {
+      // inclui em sequência para facilitar controle de erros de duplicidade etc.
+      for (const c of candidatos) {
+        try {
+          await fetchJSON(`${API_BASE}/api/folhas/${folhaId}/funcionarios`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ funcionario_id: Number(c.funcionario_id) }),
+          });
+        } catch (e) {
+          // segue nos próximos — poderia colecionar erros se quiser mostrar um resumo
+          console.warn("Falha ao incluir", c, e);
+        }
+      }
+      await carregarLista(folhaId);
+      if (liveRef.current) {
+        liveRef.current.textContent = `Inclusão em massa concluída (${candidatos.length} candidato(s) processados).`;
+      }
+      setShowForm(false);
+    } catch (e) {
+      setErr(e.message || "Falha na inclusão em massa.");
     } finally {
       setBusy(false);
     }
@@ -260,7 +292,7 @@ const canEdit = useMemo(() => {
     }
   }
 
-  // Totais
+  /* Totais */
   const totais = useMemo(() => {
     const base = {
       horas_normais: 0,
@@ -355,7 +387,7 @@ const canEdit = useMemo(() => {
             ))}
           </select>
           {!canEdit && folhaId && (
-            <small className="hint">Esta folha está <strong>fechada</strong> (ou não editável). Não é possível incluir novos funcionários.</small>
+            <small className="hint">Esta folha está <strong>fechada</strong>. Não é possível incluir novos funcionários.</small>
           )}
         </div>
       </div>
@@ -567,10 +599,27 @@ const canEdit = useMemo(() => {
           <div className="form-container" style={{ maxWidth: 560 }}>
             <div className="form-header">
               <h2 id="titulo-form">Incluir funcionário</h2>
-              <button className="btn btn--neutral btn--icon-only" onClick={() => setShowForm(false)} aria-label="Fechar formulário">
-                <XMarkIcon className="icon" aria-hidden="true" />
-              </button>
+              <div className="form-actions">
+                {/* NOVO: botão Incluir Todos */}
+                <button
+                  className="btn btn--success"
+                  onClick={incluirTodos}
+                  disabled={!canEdit || busy || candidatos.length === 0}
+                  title={candidatos.length ? "Incluir todos os listados" : "Nenhum candidato listado"}
+                >
+                  <CheckIcon className="icon" aria-hidden="true" />
+                  <span>Incluir todos</span>
+                </button>
+                <button
+                  className="btn btn--neutral btn--icon-only"
+                  onClick={() => setShowForm(false)}
+                  aria-label="Fechar formulário"
+                >
+                  <XMarkIcon className="icon" aria-hidden="true" />
+                </button>
+              </div>
             </div>
+
             <div className="form">
               {!canEdit ? (
                 <div className="error-alert">Esta folha não permite novos lançamentos.</div>
@@ -589,6 +638,7 @@ const canEdit = useMemo(() => {
                         value={query}
                         onChange={(e) => buscarCandidatos(e.target.value)}
                         autoComplete="off"
+                        disabled={busy}
                       />
                       {Boolean(query) && (
                         <button
@@ -619,7 +669,11 @@ const canEdit = useMemo(() => {
                                 <div className="simple-list__subtitle">CPF: {getCPF(c)}</div>
                               </div>
                               <div className="simple-list__actions">
-                                <button className="btn btn--success btn--sm" onClick={() => incluirFuncionario(c)}>
+                                <button
+                                  className="btn btn--success btn--sm"
+                                  onClick={() => incluirFuncionario(c)}
+                                  disabled={busy}
+                                >
                                   <CheckIcon className="icon" aria-hidden="true" />
                                   <span>Incluir</span>
                                 </button>
@@ -637,7 +691,7 @@ const canEdit = useMemo(() => {
         </div>
       )}
 
-      {/* estilos locais mínimos (igual estrutura do Usuarios.jsx) */}
+      {/* estilos locais mínimos */}
       <style jsx>{`
         .listagem-container { width: 100%; }
         .search-container { margin-bottom: 16px; }
@@ -677,6 +731,8 @@ const canEdit = useMemo(() => {
         .simple-list__title { font-weight: 600; }
         .simple-list__subtitle { font-size: var(--fs-12); color: var(--muted); }
         .simple-list__actions { display: flex; gap: 6px; }
+        .form-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .form-actions { display: inline-flex; align-items: center; gap: 8px; }
       `}</style>
     </>
   );
