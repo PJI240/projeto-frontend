@@ -52,12 +52,12 @@ export default function FolhasFuncionarios() {
   // Modal inclusão
   const [showForm, setShowForm] = useState(false);
   const [query, setQuery] = useState("");
-  const [candidatos, setCandidatos] = useState([]); // candidatos retornados pela busca
+  const [candidatosAll, setCandidatosAll] = useState([]); // todos carregados do backend
+  const [candidatos, setCandidatos] = useState([]);       // exibidos (filtrados no cliente)
   const [busy, setBusy] = useState(false);
 
   const liveRef = useRef(null);
   const buscaRef = useRef(null);
-  const buscaTimer = useRef(null);
 
   /* Pode editar? (se a folha estiver ABERTA) */
   const canEdit = useMemo(() => {
@@ -76,7 +76,7 @@ export default function FolhasFuncionarios() {
     }
   }
 
-  /* Filtro da tabela */
+  /* Filtro da tabela principal */
   const filtrados = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return lista;
@@ -113,7 +113,6 @@ export default function FolhasFuncionarios() {
   async function carregarFolhaInfo(id) {
     if (!id) { setFolhaInfo(null); return; }
     const info = await fetchJSON(`${API_BASE}/api/folhas/${id}`);
-    // backend responde { ok:true, folha:{...} } — extrai corretamente
     setFolhaInfo(info?.folha ?? info);
   }
 
@@ -174,38 +173,43 @@ export default function FolhasFuncionarios() {
   }, [folhaId]);
 
   /* ===== Ações ===== */
-  function abrirInclusao() {
-    if (!canEdit) return;
+
+  // Abre o modal e carrega TODOS os candidatos (sem precisar digitar)
+  async function abrirInclusao() {
+    if (!canEdit || !folhaId) return;
     setShowForm(true);
     setQuery("");
+    setCandidatosAll([]);
     setCandidatos([]);
-    setTimeout(() => buscaRef.current?.focus(), 0);
-  }
-
-  async function buscarCandidatosNow(q) {
-    if (!folhaId || q.trim().length < 2) { setCandidatos([]); return; }
     setBusy(true);
     try {
-      const data = await fetchJSON(
-        `${API_BASE}/api/folhas/${folhaId}/candidatos?search=${encodeURIComponent(q)}`
-      );
+      // Sem ?search — backend já retorna os aptos (ativos, mesma empresa e não incluídos)
+      const data = await fetchJSON(`${API_BASE}/api/folhas/${folhaId}/candidatos`);
       const arr = Array.isArray(data) ? data : (data.candidatos || []);
-      setCandidatos(arr);
+      setCandidatosAll(arr);
+      setCandidatos(arr); // exibe tudo inicialmente
+      setTimeout(() => buscaRef.current?.focus(), 0);
     } catch (e) {
-      setErr(e.message || "Falha ao buscar candidatos.");
-      setCandidatos([]);
+      setErr(e.message || "Falha ao carregar candidatos.");
+      setShowForm(false);
     } finally {
       setBusy(false);
     }
   }
 
-  // debounce
-  function buscarCandidatos(q) {
+  // Filtro local de candidatos (nome/CPF)
+  function filtrarCandidatosLocal(q) {
     setQuery(q);
-    clearTimeout(buscaTimer.current);
-    buscaTimer.current = setTimeout(() => buscarCandidatosNow(q), 250);
+    const t = q.trim().toLowerCase();
+    if (!t) { setCandidatos(candidatosAll); return; }
+    setCandidatos(
+      candidatosAll.filter((c) => {
+        const nome = String(getDisplayName(c) || "").toLowerCase();
+        const cpf  = String(getCPF(c) || "").toLowerCase();
+        return nome.includes(t) || cpf.includes(t);
+      })
+    );
   }
-  useEffect(() => () => clearTimeout(buscaTimer.current), []);
 
   async function incluirFuncionario(c) {
     if (!folhaId) return;
@@ -218,7 +222,10 @@ export default function FolhasFuncionarios() {
       });
       await carregarLista(folhaId);
       if (liveRef.current) liveRef.current.textContent = `${getDisplayName(c)} incluído na folha.`;
-      setShowForm(false);
+      // remove do pool local para não duplicar visualmente
+      const rest = candidatosAll.filter((x) => x.funcionario_id !== c.funcionario_id);
+      setCandidatosAll(rest);
+      setCandidatos((prev) => prev.filter((x) => x.funcionario_id !== c.funcionario_id));
     } catch (e) {
       setErr(e.message || "Falha ao incluir funcionário.");
     } finally {
@@ -226,14 +233,13 @@ export default function FolhasFuncionarios() {
     }
   }
 
-  // NOVO: incluir todos os candidatos listados
+  // Inclui todos os visíveis (respeita o filtro atual)
   async function incluirTodos() {
     if (!folhaId || !candidatos.length) return;
     if (!window.confirm(`Incluir todos os ${candidatos.length} funcionário(s) listados nesta folha?`)) return;
 
     setBusy(true);
     try {
-      // inclui em sequência para facilitar controle de erros de duplicidade etc.
       for (const c of candidatos) {
         try {
           await fetchJSON(`${API_BASE}/api/folhas/${folhaId}/funcionarios`, {
@@ -242,7 +248,6 @@ export default function FolhasFuncionarios() {
             body: JSON.stringify({ funcionario_id: Number(c.funcionario_id) }),
           });
         } catch (e) {
-          // segue nos próximos — poderia colecionar erros se quiser mostrar um resumo
           console.warn("Falha ao incluir", c, e);
         }
       }
@@ -398,7 +403,7 @@ export default function FolhasFuncionarios() {
         </div>
       )}
 
-      {/* Busca */}
+      {/* Busca (lista principal) */}
       <div className="search-container">
         <div className="search-bar" role="search" aria-label="Buscar funcionários nesta folha">
           <MagnifyingGlassIcon className="icon" aria-hidden="true" />
@@ -600,7 +605,6 @@ export default function FolhasFuncionarios() {
             <div className="form-header">
               <h2 id="titulo-form">Incluir funcionário</h2>
               <div className="form-actions">
-                {/* NOVO: botão Incluir Todos */}
                 <button
                   className="btn btn--success"
                   onClick={incluirTodos}
@@ -626,7 +630,7 @@ export default function FolhasFuncionarios() {
               ) : (
                 <>
                   <div className="form-field span-2">
-                    <label htmlFor="ff_busca">Buscar</label>
+                    <label htmlFor="ff_busca">Buscar (filtra a lista abaixo)</label>
                     <div className="search-bar">
                       <MagnifyingGlassIcon className="icon" aria-hidden="true" />
                       <input
@@ -634,9 +638,9 @@ export default function FolhasFuncionarios() {
                         ref={buscaRef}
                         type="search"
                         className="input input--lg"
-                        placeholder="Nome ou CPF (mín. 2 caracteres)"
+                        placeholder="Nome ou CPF"
                         value={query}
-                        onChange={(e) => buscarCandidatos(e.target.value)}
+                        onChange={(e) => filtrarCandidatosLocal(e.target.value)}
                         autoComplete="off"
                         disabled={busy}
                       />
@@ -644,22 +648,24 @@ export default function FolhasFuncionarios() {
                         <button
                           type="button"
                           className="btn btn--neutral btn--icon-only"
-                          onClick={() => { setQuery(""); setCandidatos([]); }}
+                          onClick={() => { setQuery(""); setCandidatos(candidatosAll); }}
                           aria-label="Limpar"
                         >
                           <XMarkIcon className="icon" aria-hidden="true" />
                         </button>
                       )}
                     </div>
-                    <small className="hint">Mostra somente colaboradores ativos e ainda não incluídos nesta folha.</small>
+                    <small className="hint">
+                      Lista mostra <strong>todos</strong> os colaboradores ativos da empresa que ainda não estão nesta folha.
+                    </small>
                   </div>
 
                   <div className="form-field span-2">
-                    <div className="stat-card" style={{ maxHeight: 320, overflow: "auto" }}>
+                    <div className="stat-card" style={{ maxHeight: 360, overflow: "auto" }}>
                       {busy ? (
-                        <div className="loading-message">Buscando…</div>
+                        <div className="loading-message">Carregando candidatos…</div>
                       ) : candidatos.length === 0 ? (
-                        <div className="empty-message">Nenhum resultado.</div>
+                        <div className="empty-message">Nenhum candidato disponível.</div>
                       ) : (
                         <ul className="simple-list">
                           {candidatos.map((c) => (
