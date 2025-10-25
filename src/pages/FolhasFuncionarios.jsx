@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   PlusIcon,
   ArrowPathIcon,
@@ -13,29 +13,47 @@ import {
 // Usa o mesmo padrão visual de src/pages/Usuarios.jsx
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-// Campos conforme tabela folhas_funcionarios
-// id, empresa_id, folha_id, funcionario_id, horas_normais, he50_horas, he100_horas,
-// valor_base, valor_he50, valor_he100, descontos, proventos, total_liquido, inconsistencias
+// Helpers HTTP
+async function fetchJSON(url, init = {}) {
+  const r = await fetch(url, { credentials: "include", ...init });
+  const data = await r.json().catch(() => null);
+  if (!r.ok || data?.ok === false) {
+    throw new Error(data?.error || `HTTP ${r.status}`);
+  }
+  return data;
+}
 
 export default function FolhasFuncionarios() {
-  const { folhaId } = useParams();
+  const { folhaId: folhaIdParam } = useParams();
+  const navigate = useNavigate();
 
-  // Estados base de tela (mesma semântica do Usuarios.jsx)
+  // Seletor de folha
+  const [folhas, setFolhas] = useState([]); // [{id, competencia, status, empresa_id}]
+  const [folhaId, setFolhaId] = useState(folhaIdParam ? Number(folhaIdParam) : null);
+  const [folhaInfo, setFolhaInfo] = useState(null);
+
+  // Estados base de tela
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("");
   const [lista, setLista] = useState([]); // linhas já incluídas na folha
 
-  // Modal para "incluir funcionário"
+  // Modal "incluir funcionário"
   const [showForm, setShowForm] = useState(false);
   const [query, setQuery] = useState("");
-  const [candidatos, setCandidatos] = useState([]); // resultados de busca (mock até integrar)
+  const [candidatos, setCandidatos] = useState([]); // resultados reais
   const [busy, setBusy] = useState(false);
 
   const liveRef = useRef(null);
   const buscaRef = useRef(null);
 
-  // --- Helpers ---
+  // A folha pode incluir lançamentos?
+  const canEdit = useMemo(() => {
+    const st = String(folhaInfo?.status || "").toLowerCase();
+    return ["rascunho", "aberta", "aberto"].includes(st);
+  }, [folhaInfo]);
+
+  // ---- Utils ----
   function fmtBRL(x) {
     const n = Number(x);
     if (!Number.isFinite(n)) return "—";
@@ -46,7 +64,7 @@ export default function FolhasFuncionarios() {
     }
   }
 
-  // Filtro em memória (igual padrão do Usuarios.jsx)
+  // Filtro da tabela
   const filtrados = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return lista;
@@ -66,113 +84,153 @@ export default function FolhasFuncionarios() {
     setSelecionados((prev) => (on ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
   }
 
-  // Carregamento inicial (mock para front-only)
+  // ---------- Carregamentos ----------
+  // 1) Carrega folhas para o seletor
+  async function carregarFolhas() {
+    // Ajuste este endpoint conforme seu backend (lista de folhas visíveis)
+    // Ex.: GET /api/folhas -> [{id, competencia, status, empresa_id}]
+    const data = await fetchJSON(`${API_BASE}/api/folhas`);
+    // Aceita tanto array puro quanto {folhas:[...]}
+    const arr = Array.isArray(data) ? data : (data.folhas || []);
+    setFolhas(arr);
+    // Se não veio um :folhaId na URL, tenta selecionar a primeira "aberta/rascunho"
+    if (!folhaId && arr.length) {
+      const prefer = arr.find((f) => ["rascunho", "aberta", "aberto"].includes(String(f.status).toLowerCase()));
+      setFolhaId((prefer || arr[0]).id);
+    }
+  }
+
+  // 2) Folha escolhida (detalhe)
+  async function carregarFolhaInfo(id) {
+    if (!id) { setFolhaInfo(null); return; }
+    const info = await fetchJSON(`${API_BASE}/api/folhas/${id}`);
+    setFolhaInfo(info);
+  }
+
+  // 3) Funcionários da folha
+  async function carregarLista(id) {
+    if (!id) { setLista([]); return; }
+    const rows = await fetchJSON(`${API_BASE}/api/folhas/${id}/funcionarios`);
+    // Aceita tanto array puro quanto { ... , folhas_funcionarios: [...] }
+    const arr = Array.isArray(rows) ? rows : (rows.folhas_funcionarios || []);
+    setLista(arr);
+    setSelecionados([]);
+    if (liveRef.current) liveRef.current.textContent = "Lista atualizada.";
+  }
+
+  // Carregamento inicial
   useEffect(() => {
-    setLoading(true);
-    setErr("");
-    // MOCK: dados estáticos apenas para o front; troque por fetch real depois
-    const demo = [
-      {
-        id: 101,
-        funcionario_id: 1,
-        nome: "Ana Paula Mendes",
-        cpf: "123.456.789-09",
-        horas_normais: 160.0,
-        he50_horas: 12.5,
-        he100_horas: 2.0,
-        valor_base: 3200.0,
-        valor_he50: 281.25,
-        valor_he100: 120.0,
-        proventos: 0.0,
-        descontos: 350.0,
-        total_liquido: 3251.25,
-        inconsistencias: 1,
-      },
-      {
-        id: 102,
-        funcionario_id: 2,
-        nome: "Bruno Almeida",
-        cpf: "987.654.321-00",
-        horas_normais: 168.0,
-        he50_horas: 5.0,
-        he100_horas: 0.0,
-        valor_base: 3800.0,
-        valor_he50: 95.0,
-        valor_he100: 0.0,
-        proventos: 150.0,
-        descontos: 275.0,
-        total_liquido: 3770.0,
-        inconsistencias: 0,
-      },
-    ];
-    const t = setTimeout(() => { setLista(demo); setLoading(false); }, 400);
-    return () => clearTimeout(t);
+    (async () => {
+      try {
+        setErr("");
+        await carregarFolhas();
+      } catch (e) {
+        setErr(e.message || "Falha ao carregar folhas.");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Quando a folhaId muda, carrega detalhe e lista
+  useEffect(() => {
+    (async () => {
+      if (!folhaId) return;
+      setLoading(true);
+      setErr("");
+      try {
+        await carregarFolhaInfo(folhaId);
+        await carregarLista(folhaId);
+        // mantém URL em sincronia, se você usa rota com :folhaId
+        if (String(folhaIdParam || "") !== String(folhaId)) {
+          navigate(`/folhas/${folhaId}/funcionarios`, { replace: true });
+        }
+      } catch (e) {
+        setErr(e.message || "Falha ao carregar dados da folha.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folhaId]);
 
-  // Abrir modal
+  // ---------- Ações ----------
   function abrirInclusao() {
+    if (!canEdit) return; // proteção extra
     setShowForm(true);
     setQuery("");
     setCandidatos([]);
     setTimeout(() => buscaRef.current?.focus(), 0);
   }
 
-  // Buscar candidatos (front-only: simula resposta)
   async function buscarCandidatos(q) {
     setQuery(q);
-    if (q.trim().length < 2) { setCandidatos([]); return; }
+    if (!folhaId || q.trim().length < 2) { setCandidatos([]); return; }
     setBusy(true);
-    // MOCK: simula 2 resultados
-    setTimeout(() => {
-      setCandidatos([
-        { funcionario_id: 3, nome: "Camila Souza", cpf: "111.222.333-44" },
-        { funcionario_id: 4, nome: "Diego Ramos", cpf: "555.666.777-88" },
-      ]);
+    try {
+      const data = await fetchJSON(
+        `${API_BASE}/api/folhas/${folhaId}/candidatos?search=${encodeURIComponent(q)}`
+      );
+      const arr = Array.isArray(data) ? data : (data.candidatos || []);
+      setCandidatos(arr);
+    } catch (e) {
+      setErr(e.message || "Falha ao buscar candidatos.");
+      setCandidatos([]);
+    } finally {
       setBusy(false);
-    }, 300);
+    }
   }
 
-  // Incluir (apenas front: insere item fake)
-  function incluirFuncionario(c) {
-    const novo = {
-      id: Math.max(0, ...lista.map((x) => x.id)) + 1,
-      funcionario_id: c.funcionario_id,
-      nome: c.nome,
-      cpf: c.cpf,
-      horas_normais: 0,
-      he50_horas: 0,
-      he100_horas: 0,
-      valor_base: 0,
-      valor_he50: 0,
-      valor_he100: 0,
-      proventos: 0,
-      descontos: 0,
-      total_liquido: 0,
-      inconsistencias: 0,
-    };
-    setLista((prev) => [...prev, novo]);
-    setShowForm(false);
-    if (liveRef.current) liveRef.current.textContent = `${c.nome} incluído na folha.`;
+  async function incluirFuncionario(c) {
+    if (!folhaId) return;
+    setBusy(true);
+    try {
+      await fetchJSON(`${API_BASE}/api/folhas/${folhaId}/funcionarios`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ funcionario_id: Number(c.funcionario_id) }),
+      });
+      setShowForm(false);
+      await carregarLista(folhaId);
+      if (liveRef.current) liveRef.current.textContent = `${c.nome} incluído na folha.`;
+    } catch (e) {
+      setErr(e.message || "Falha ao incluir funcionário.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  // Remover (front-only)
-  function remover(item) {
+  async function remover(item) {
+    if (!folhaId || !item?.id) return;
     if (!window.confirm(`Remover ${item.nome} desta folha?`)) return;
-    setLista((prev) => prev.filter((x) => x.id !== item.id));
-    if (liveRef.current) liveRef.current.textContent = `${item.nome} removido.`;
+    setBusy(true);
+    try {
+      await fetchJSON(`${API_BASE}/api/folhas/${folhaId}/funcionarios/${item.id}`, { method: "DELETE" });
+      await carregarLista(folhaId);
+      if (liveRef.current) liveRef.current.textContent = `${item.nome} removido.`;
+    } catch (e) {
+      setErr(e.message || "Falha ao remover.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  // Recalcular selecionados (front-only: feedback visual)
-  function recalcularSelecionados(idsOptional) {
+  async function recalcularSelecionados(idsOptional) {
     const alvo = Array.isArray(idsOptional) && idsOptional.length > 0 ? idsOptional : selecionados;
-    if (!alvo.length) return;
+    if (!folhaId || !alvo.length) return;
     setBusy(true);
-    setTimeout(() => {
+    try {
+      await fetchJSON(`${API_BASE}/api/folhas/${folhaId}/funcionarios/recalcular`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: alvo }),
+      });
+      await carregarLista(folhaId);
+      if (liveRef.current) liveRef.current.textContent = `Recalculo concluído para ${alvo.length} registro(s).`;
+    } catch (e) {
+      setErr(e.message || "Falha ao recalcular.");
+    } finally {
       setBusy(false);
-      if (liveRef.current) {
-        liveRef.current.textContent = `Recalculo concluído para ${alvo.length} registro(s).`;
-      }
-    }, 600);
+    }
   }
 
   // Somas de totais (rodapé)
@@ -207,33 +265,43 @@ export default function FolhasFuncionarios() {
       {/* região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER seguindo padrão de Usuarios.jsx */}
+      {/* HEADER (padrão Usuarios.jsx) */}
       <header className="page-header" role="region" aria-labelledby="titulo-pagina">
         <div>
           <h1 id="titulo-pagina" className="page-title">Folhas &rsaquo; Funcionários</h1>
+
           <p className="page-subtitle">
-            Inclua/gerencie os colaboradores que compõem a folha #{folhaId}. Os valores são calculados
-            pelo backend a partir dos apontamentos.
+            {folhaInfo
+              ? <>Competência: <strong>{folhaInfo.competencia}</strong> — Status: <strong className="capitalize">{folhaInfo.status}</strong></>
+              : "Selecione uma folha para gerenciar os lançamentos."}
           </p>
         </div>
 
         <div className="page-header__toolbar" aria-label="Ações da página">
-          <button className="btn btn--success" onClick={abrirInclusao} aria-label="Incluir funcionário">
+          <button
+            className="btn btn--success"
+            onClick={abrirInclusao}
+            aria-label="Incluir funcionário"
+            disabled={!canEdit || !folhaId}
+            title={canEdit ? "Incluir funcionário" : "Folha não permite novos lançamentos"}
+          >
             <PlusIcon className="icon" aria-hidden="true" />
             <span>Incluir</span>
           </button>
           <button
             className="btn btn--neutral"
-            onClick={() => window.location.reload()}
+            onClick={() => folhaId && carregarLista(folhaId)}
+            disabled={loading || !folhaId}
+            aria-busy={loading ? "true" : "false"}
             aria-label="Atualizar"
           >
-            <ArrowPathIcon className="icon" aria-hidden="true" />
-            <span>Atualizar</span>
+            {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
+            <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
           <button
             className="btn btn--neutral"
             onClick={() => recalcularSelecionados()}
-            disabled={!selecionados.length || busy}
+            disabled={!selecionados.length || busy || !folhaId}
             aria-label="Recalcular selecionados"
             title="Recalcular selecionados"
           >
@@ -243,13 +311,36 @@ export default function FolhasFuncionarios() {
         </div>
       </header>
 
+      {/* Seletor de Folha */}
+      <div className="search-container" style={{ marginTop: -8 }}>
+        <div className="form-field" style={{ maxWidth: 420 }}>
+          <label htmlFor="sel_folha">Selecionar Folha</label>
+          <select
+            id="sel_folha"
+            className="input input--lg"
+            value={folhaId || ""}
+            onChange={(e) => setFolhaId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Selecione…</option>
+            {folhas.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.competencia} — {String(f.status || "").toUpperCase()}
+              </option>
+            ))}
+          </select>
+          {!canEdit && folhaId && (
+            <small className="hint">Esta folha está <strong>fechada</strong> (ou não editável). Não é possível incluir novos funcionários.</small>
+          )}
+        </div>
+      </div>
+
       {err && (
         <div className="error-alert" role="alert">
           <ExclamationTriangleIcon className="icon" aria-hidden="true" /> {err}
         </div>
       )}
 
-      {/* Busca */}
+      {/* Busca dentro da folha selecionada */}
       <div className="search-container">
         <div className="search-bar" role="search" aria-label="Buscar funcionários nesta folha">
           <MagnifyingGlassIcon className="icon" aria-hidden="true" />
@@ -262,6 +353,7 @@ export default function FolhasFuncionarios() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             autoComplete="off"
+            disabled={!folhaId}
           />
           {Boolean(filter) && (
             <button
@@ -280,10 +372,12 @@ export default function FolhasFuncionarios() {
       <div className="listagem-container">
         {/* Desktop/tablet */}
         <div className="table-wrapper table-only" role="region" aria-label="Tabela de funcionários na folha">
-          {loading ? (
+          {!folhaId ? (
+            <div className="empty-message">Selecione uma folha para visualizar os lançamentos.</div>
+          ) : loading ? (
             <div className="loading-message" role="status">Carregando…</div>
           ) : filtrados.length === 0 ? (
-            <div className="empty-message">Nenhum funcionário incluído ainda.</div>
+            <div className="empty-message">Nenhum funcionário incluído nesta folha.</div>
           ) : (
             <div className="stat-card" style={{ overflow: "hidden" }}>
               <table className="usuarios-table">
@@ -387,10 +481,12 @@ export default function FolhasFuncionarios() {
 
         {/* Mobile: cards */}
         <div className="cards-wrapper cards-only" role="region" aria-label="Lista de funcionários (cartões)">
-          {loading ? (
+          {!folhaId ? (
+            <div className="empty-message">Selecione uma folha para visualizar os lançamentos.</div>
+          ) : loading ? (
             <div className="loading-message" role="status">Carregando…</div>
           ) : filtrados.length === 0 ? (
-            <div className="empty-message">Nenhum funcionário incluído ainda.</div>
+            <div className="empty-message">Nenhum funcionário incluído nesta folha.</div>
           ) : (
             <ul className="cards-grid">
               {filtrados.map((r) => (
@@ -447,60 +543,66 @@ export default function FolhasFuncionarios() {
               </button>
             </div>
             <div className="form">
-              <div className="form-field span-2">
-                <label htmlFor="ff_busca">Buscar</label>
-                <div className="search-bar">
-                  <MagnifyingGlassIcon className="icon" aria-hidden="true" />
-                  <input
-                    id="ff_busca"
-                    ref={buscaRef}
-                    type="search"
-                    className="input input--lg"
-                    placeholder="Nome ou CPF (mín. 2 caracteres)"
-                    value={query}
-                    onChange={(e) => buscarCandidatos(e.target.value)}
-                    autoComplete="off"
-                  />
-                  {Boolean(query) && (
-                    <button
-                      type="button"
-                      className="btn btn--neutral btn--icon-only"
-                      onClick={() => { setQuery(""); setCandidatos([]); }}
-                      aria-label="Limpar"
-                    >
-                      <XMarkIcon className="icon" aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-                <small className="hint">Mostra somente colaboradores ativos e ainda não incluídos nesta folha.</small>
-              </div>
+              {!canEdit ? (
+                <div className="error-alert">Esta folha não permite novos lançamentos.</div>
+              ) : (
+                <>
+                  <div className="form-field span-2">
+                    <label htmlFor="ff_busca">Buscar</label>
+                    <div className="search-bar">
+                      <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+                      <input
+                        id="ff_busca"
+                        ref={buscaRef}
+                        type="search"
+                        className="input input--lg"
+                        placeholder="Nome ou CPF (mín. 2 caracteres)"
+                        value={query}
+                        onChange={(e) => buscarCandidatos(e.target.value)}
+                        autoComplete="off"
+                      />
+                      {Boolean(query) && (
+                        <button
+                          type="button"
+                          className="btn btn--neutral btn--icon-only"
+                          onClick={() => { setQuery(""); setCandidatos([]); }}
+                          aria-label="Limpar"
+                        >
+                          <XMarkIcon className="icon" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                    <small className="hint">Mostra somente colaboradores ativos e ainda não incluídos nesta folha.</small>
+                  </div>
 
-              <div className="form-field span-2">
-                <div className="stat-card" style={{ maxHeight: 320, overflow: "auto" }}>
-                  {busy ? (
-                    <div className="loading-message">Buscando…</div>
-                  ) : candidatos.length === 0 ? (
-                    <div className="empty-message">Nenhum resultado.</div>
-                  ) : (
-                    <ul className="simple-list">
-                      {candidatos.map((c) => (
-                        <li key={c.funcionario_id} className="simple-list__item">
-                          <div className="simple-list__content">
-                            <div className="simple-list__title">{c.nome}</div>
-                            <div className="simple-list__subtitle">CPF: {c.cpf || "—"}</div>
-                          </div>
-                          <div className="simple-list__actions">
-                            <button className="btn btn--success btn--sm" onClick={() => incluirFuncionario(c)}>
-                              <CheckIcon className="icon" aria-hidden="true" />
-                              <span>Incluir</span>
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
+                  <div className="form-field span-2">
+                    <div className="stat-card" style={{ maxHeight: 320, overflow: "auto" }}>
+                      {busy ? (
+                        <div className="loading-message">Buscando…</div>
+                      ) : candidatos.length === 0 ? (
+                        <div className="empty-message">Nenhum resultado.</div>
+                      ) : (
+                        <ul className="simple-list">
+                          {candidatos.map((c) => (
+                            <li key={c.funcionario_id} className="simple-list__item">
+                              <div className="simple-list__content">
+                                <div className="simple-list__title">{c.nome}</div>
+                                <div className="simple-list__subtitle">CPF: {c.cpf || "—"}</div>
+                              </div>
+                              <div className="simple-list__actions">
+                                <button className="btn btn--success btn--sm" onClick={() => incluirFuncionario(c)}>
+                                  <CheckIcon className="icon" aria-hidden="true" />
+                                  <span>Incluir</span>
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -515,6 +617,7 @@ export default function FolhasFuncionarios() {
         .strong { font-weight: 700; }
         .flex-col { display: flex; flex-direction: column; gap: 4px; }
         .tag-warning { background: rgba(245,158,11,.15); color: #b45309; border: 1px solid rgba(245,158,11,.35); padding: 2px 6px; border-radius: 999px; display: inline-block; }
+        .capitalize { text-transform: capitalize; }
 
         .table-only { display: block; }
         .cards-only { display: none; }
@@ -538,8 +641,6 @@ export default function FolhasFuncionarios() {
         .usuario-dl__row dt { color: var(--muted); font-weight: 600; font-size: var(--fs-12); }
         .usuario-dl__row dd { margin: 0; color: var(--fg); font-weight: 500; }
         .usuario-card__actions { display: flex; gap: 6px; }
-
-        /* Simple list */
         .simple-list { list-style: none; padding: 0; margin: 0; }
         .simple-list__item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
         .simple-list__title { font-weight: 600; }
