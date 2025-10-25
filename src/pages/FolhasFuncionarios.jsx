@@ -1,3 +1,4 @@
+// src/pages/FolhasFuncionarios.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -13,7 +14,7 @@ import {
 // Usa o mesmo padrão visual de src/pages/Usuarios.jsx
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 
-// Helpers HTTP
+// ----- Helpers HTTP -----
 async function fetchJSON(url, init = {}) {
   const r = await fetch(url, { credentials: "include", ...init });
   const data = await r.json().catch(() => null);
@@ -29,31 +30,32 @@ export default function FolhasFuncionarios() {
 
   // Seletor de folha
   const [folhas, setFolhas] = useState([]); // [{id, competencia, status, empresa_id}]
-  const [folhaId, setFolhaId] = useState(folhaIdParam ? Number(folhaIdParam) : null);
+  const [folhaId, setFolhaId] = useState(folhaIdParam ? Number(folhaIdParam) : "");
   const [folhaInfo, setFolhaInfo] = useState(null);
 
   // Estados base de tela
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [filter, setFilter] = useState("");
-  const [lista, setLista] = useState([]); // linhas já incluídas na folha
+  const [lista, setLista] = useState([]); // linhas já incluídas
 
   // Modal "incluir funcionário"
   const [showForm, setShowForm] = useState(false);
   const [query, setQuery] = useState("");
-  const [candidatos, setCandidatos] = useState([]); // resultados reais
+  const [candidatos, setCandidatos] = useState([]);
   const [busy, setBusy] = useState(false);
 
   const liveRef = useRef(null);
   const buscaRef = useRef(null);
+  const buscaTimer = useRef(null);
 
-  // A folha pode incluir lançamentos?
+  // Pode editar?
   const canEdit = useMemo(() => {
     const st = String(folhaInfo?.status || "").toLowerCase();
     return ["rascunho", "aberta", "aberto"].includes(st);
   }, [folhaInfo]);
 
-  // ---- Utils ----
+  // ----- Utils -----
   function fmtBRL(x) {
     const n = Number(x);
     if (!Number.isFinite(n)) return "—";
@@ -64,7 +66,7 @@ export default function FolhasFuncionarios() {
     }
   }
 
-  // Filtro da tabela
+  // Filtro
   const filtrados = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return lista;
@@ -85,44 +87,39 @@ export default function FolhasFuncionarios() {
   }
 
   // ---------- Carregamentos ----------
-  // 1) Carrega folhas para o seletor
   async function carregarFolhas() {
-    // Ajuste este endpoint conforme seu backend (lista de folhas visíveis)
-    // Ex.: GET /api/folhas -> [{id, competencia, status, empresa_id}]
     const data = await fetchJSON(`${API_BASE}/api/folhas`);
-    // Aceita tanto array puro quanto {folhas:[...]}
     const arr = Array.isArray(data) ? data : (data.folhas || []);
     setFolhas(arr);
-    // Se não veio um :folhaId na URL, tenta selecionar a primeira "aberta/rascunho"
-    if (!folhaId && arr.length) {
+
+    // Seleciona uma automaticamente se não houver na URL
+    if (!folhaId && arr.length > 0) {
       const prefer = arr.find((f) => ["rascunho", "aberta", "aberto"].includes(String(f.status).toLowerCase()));
-      setFolhaId((prefer || arr[0]).id);
+      const chosen = (prefer || arr[0]).id;
+      setFolhaId(chosen);
     }
   }
 
-  // 2) Folha escolhida (detalhe)
   async function carregarFolhaInfo(id) {
     if (!id) { setFolhaInfo(null); return; }
     const info = await fetchJSON(`${API_BASE}/api/folhas/${id}`);
     setFolhaInfo(info);
   }
 
-  // 3) Funcionários da folha
   async function carregarLista(id) {
     if (!id) { setLista([]); return; }
     const rows = await fetchJSON(`${API_BASE}/api/folhas/${id}/funcionarios`);
-    // Aceita tanto array puro quanto { ... , folhas_funcionarios: [...] }
     const arr = Array.isArray(rows) ? rows : (rows.folhas_funcionarios || []);
     setLista(arr);
     setSelecionados([]);
     if (liveRef.current) liveRef.current.textContent = "Lista atualizada.";
   }
 
-  // Carregamento inicial
+  // Inicial
   useEffect(() => {
     (async () => {
+      setErr("");
       try {
-        setErr("");
         await carregarFolhas();
       } catch (e) {
         setErr(e.message || "Falha ao carregar folhas.");
@@ -131,7 +128,7 @@ export default function FolhasFuncionarios() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Quando a folhaId muda, carrega detalhe e lista
+  // Reage à mudança da folha
   useEffect(() => {
     (async () => {
       if (!folhaId) return;
@@ -140,7 +137,6 @@ export default function FolhasFuncionarios() {
       try {
         await carregarFolhaInfo(folhaId);
         await carregarLista(folhaId);
-        // mantém URL em sincronia, se você usa rota com :folhaId
         if (String(folhaIdParam || "") !== String(folhaId)) {
           navigate(`/folhas/${folhaId}/funcionarios`, { replace: true });
         }
@@ -155,15 +151,14 @@ export default function FolhasFuncionarios() {
 
   // ---------- Ações ----------
   function abrirInclusao() {
-    if (!canEdit) return; // proteção extra
+    if (!canEdit) return;
     setShowForm(true);
     setQuery("");
     setCandidatos([]);
     setTimeout(() => buscaRef.current?.focus(), 0);
   }
 
-  async function buscarCandidatos(q) {
-    setQuery(q);
+  async function buscarCandidatosNow(q) {
     if (!folhaId || q.trim().length < 2) { setCandidatos([]); return; }
     setBusy(true);
     try {
@@ -178,6 +173,13 @@ export default function FolhasFuncionarios() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // debounce para busca
+  function buscarCandidatos(q) {
+    setQuery(q);
+    clearTimeout(buscaTimer.current);
+    buscaTimer.current = setTimeout(() => buscarCandidatosNow(q), 250);
   }
 
   async function incluirFuncionario(c) {
@@ -233,7 +235,7 @@ export default function FolhasFuncionarios() {
     }
   }
 
-  // Somas de totais (rodapé)
+  // Totais
   const totais = useMemo(() => {
     const base = {
       horas_normais: 0,
@@ -265,11 +267,10 @@ export default function FolhasFuncionarios() {
       {/* região viva para leitores de tela */}
       <div ref={liveRef} aria-live="polite" className="visually-hidden" />
 
-      {/* HEADER (padrão Usuarios.jsx) */}
+      {/* HEADER */}
       <header className="page-header" role="region" aria-labelledby="titulo-pagina">
         <div>
           <h1 id="titulo-pagina" className="page-title">Folhas &rsaquo; Funcionários</h1>
-
           <p className="page-subtitle">
             {folhaInfo
               ? <>Competência: <strong>{folhaInfo.competencia}</strong> — Status: <strong className="capitalize">{folhaInfo.status}</strong></>
@@ -319,7 +320,7 @@ export default function FolhasFuncionarios() {
             id="sel_folha"
             className="input input--lg"
             value={folhaId || ""}
-            onChange={(e) => setFolhaId(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) => setFolhaId(e.target.value ? Number(e.target.value) : "")}
           >
             <option value="">Selecione…</option>
             {folhas.map((f) => (
@@ -340,7 +341,7 @@ export default function FolhasFuncionarios() {
         </div>
       )}
 
-      {/* Busca dentro da folha selecionada */}
+      {/* Busca */}
       <div className="search-container">
         <div className="search-bar" role="search" aria-label="Buscar funcionários nesta folha">
           <MagnifyingGlassIcon className="icon" aria-hidden="true" />
@@ -368,7 +369,7 @@ export default function FolhasFuncionarios() {
         </div>
       </div>
 
-      {/* LISTAGEM: Tabela (desktop) + Cards (mobile) */}
+      {/* LISTAGEM */}
       <div className="listagem-container">
         {/* Desktop/tablet */}
         <div className="table-wrapper table-only" role="region" aria-label="Tabela de funcionários na folha">
@@ -641,6 +642,8 @@ export default function FolhasFuncionarios() {
         .usuario-dl__row dt { color: var(--muted); font-weight: 600; font-size: var(--fs-12); }
         .usuario-dl__row dd { margin: 0; color: var(--fg); font-weight: 500; }
         .usuario-card__actions { display: flex; gap: 6px; }
+
+        /* Simple list */
         .simple-list { list-style: none; padding: 0; margin: 0; }
         .simple-list__item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
         .simple-list__title { font-weight: 600; }
