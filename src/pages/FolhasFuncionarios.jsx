@@ -61,10 +61,10 @@ export default function FolhasFuncionarios() {
   const buscaTimer = useRef(null);
 
   // Pode editar?
-  const canEdit = useMemo(() => {
-    const st = String(folhaInfo?.status || "").toLowerCase();
-    return ["rascunho", "ABERTA", "aberto"].includes(st);
-  }, [folhaInfo]);
+const canEdit = useMemo(() => {
+  const st = String(folhaInfo?.status || "").trim().toUpperCase();
+  return st === "ABERTA";
+}, [folhaInfo]);
 
   // ----- Utils -----
   function fmtBRL(x) {
