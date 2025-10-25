@@ -9,6 +9,8 @@ import {
   MagnifyingGlassIcon,
   XMarkIcon,
   ExclamationTriangleIcon,
+  ArrowDownTrayIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/solid";
 
 const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
@@ -75,6 +77,7 @@ export default function FolhasFuncionarios() {
       return n.toFixed(2);
     }
   }
+  const fmt2 = (v) => Number(v || 0).toFixed(2);
 
   /* Filtro da tabela principal */
   const filtrados = useMemo(() => {
@@ -297,6 +300,152 @@ export default function FolhasFuncionarios() {
     }
   }
 
+  /* ===== Exportação ===== */
+  function exportCSV() {
+    const cols = [
+      "id","funcionario","cpf",
+      "horas_normais","he50_horas","he100_horas",
+      "valor_base","valor_he50","valor_he100",
+      "proventos","descontos","total_liquido"
+    ];
+    const header = cols.join(";");
+    const lines = filtrados.map(r => ([
+      r.id,
+      `"${getDisplayName(r).replaceAll('"','""')}"`,
+      `"${getCPF(r)}"`,
+      fmt2(r.horas_normais),
+      fmt2(r.he50_horas),
+      fmt2(r.he100_horas),
+      fmt2(r.valor_base),
+      fmt2(r.valor_he50),
+      fmt2(r.valor_he100),
+      fmt2(r.proventos),
+      fmt2(r.descontos),
+      fmt2(r.total_liquido),
+    ].join(";")));
+    const total = [
+      "",
+      `"TOTAL"`,
+      "",
+      fmt2(totais.horas_normais),
+      fmt2(totais.he50_horas),
+      fmt2(totais.he100_horas),
+      fmt2(totais.valor_base),
+      fmt2(totais.valor_he50),
+      fmt2(totais.valor_he100),
+      fmt2(totais.proventos),
+      fmt2(totais.descontos),
+      fmt2(totais.total_liquido),
+    ].join(";");
+
+    const csv = [header, ...lines, total].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    const comp = (folhaInfo?.competencia || "folha");
+    a.href = URL.createObjectURL(blob);
+    a.download = `folha_${comp}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportPDF() {
+    // Gera uma janela/impressão com 1 funcionário por página
+    const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+    if (!win) return;
+
+    const comp = folhaInfo?.competencia || "";
+    const status = folhaInfo?.status || "";
+    const title = `Folha ${comp} — Funcionários`;
+
+    const rowsHTML = filtrados.map((r, idx) => {
+      const nome = getDisplayName(r);
+      const cpf  = getCPF(r);
+      return `
+        <section class="page">
+          <header class="page-head">
+            <div class="ph-left">
+              <h1>Folha ${comp}</h1>
+              <div class="muted">Status: ${status}</div>
+            </div>
+            <div class="ph-right">
+              <div class="pill">${idx+1} / ${filtrados.length}</div>
+            </div>
+          </header>
+
+          <h2 class="emp-name">${nome}</h2>
+          <div class="emp-meta">CPF: <strong>${cpf}</strong></div>
+
+          <table class="grid">
+            <thead>
+              <tr>
+                <th>Horas</th>
+                <th>HE 50%</th>
+                <th>HE 100%</th>
+                <th>Base (R$)</th>
+                <th>HE 50 (R$)</th>
+                <th>HE 100 (R$)</th>
+                <th>Proventos</th>
+                <th>Descontos</th>
+                <th>Líquido</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="num">${fmt2(r.horas_normais)}</td>
+                <td class="num">${fmt2(r.he50_horas)}</td>
+                <td class="num">${fmt2(r.he100_horas)}</td>
+                <td class="num">${fmtBRL(r.valor_base)}</td>
+                <td class="num">${fmtBRL(r.valor_he50)}</td>
+                <td class="num">${fmtBRL(r.valor_he100)}</td>
+                <td class="num">${fmtBRL(r.proventos)}</td>
+                <td class="num">${fmtBRL(r.descontos)}</td>
+                <td class="num strong">${fmtBRL(r.total_liquido)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <footer class="page-foot">
+            <div>Gerado em ${new Date().toLocaleString()}</div>
+          </footer>
+        </section>
+      `;
+    }).join("");
+
+    win.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8"/>
+          <title>${title}</title>
+          <style>
+            *{box-sizing:border-box}
+            html,body{margin:0;padding:0;font:12px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
+            @page{size:A4;margin:16mm}
+            .page{page-break-after: always; padding: 4mm 0}
+            .page:last-child{page-break-after: auto}
+            .page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+            .ph-left h1{margin:0;font-size:16px}
+            .muted{color:#666}
+            .pill{border:1px solid #ddd;border-radius:999px;padding:2px 8px;font-weight:600}
+            .emp-name{margin:0 0 2px 0;font-size:18px}
+            .emp-meta{margin:0 0 10px 0;color:#444}
+            .grid{width:100%;border-collapse:collapse}
+            .grid th,.grid td{border:1px solid #ddd;padding:6px 8px}
+            .grid thead th{background:#f8f8f8;text-align:left}
+            .num{text-align:right;font-variant-numeric:tabular-nums}
+            .strong{font-weight:700}
+            .page-foot{margin-top:10px;color:#666;font-size:11px;display:flex;justify-content:flex-end}
+          </style>
+        </head>
+        <body>${rowsHTML}</body>
+      </html>
+    `);
+    win.document.close();
+    // abre o diálogo de impressão (usuário salva em PDF)
+    win.focus();
+    win.print();
+  }
+
   /* Totais */
   const totais = useMemo(() => {
     const base = {
@@ -351,6 +500,7 @@ export default function FolhasFuncionarios() {
             <PlusIcon className="icon" aria-hidden="true" />
             <span>Incluir</span>
           </button>
+
           <button
             className="btn btn--neutral"
             onClick={() => folhaId && carregarLista(folhaId)}
@@ -361,6 +511,7 @@ export default function FolhasFuncionarios() {
             {loading ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
             <span>{loading ? "Atualizando…" : "Atualizar"}</span>
           </button>
+
           <button
             className="btn btn--neutral"
             onClick={() => recalcularSelecionados()}
@@ -370,6 +521,26 @@ export default function FolhasFuncionarios() {
           >
             {busy ? <span className="spinner" aria-hidden="true" /> : <ArrowPathIcon className="icon" aria-hidden="true" />}
             <span>{busy ? "Recalculando…" : "Recalcular"}</span>
+          </button>
+
+          {/* Exportações */}
+          <button
+            className="btn btn--info"
+            onClick={exportCSV}
+            disabled={!filtrados.length}
+            title="Exportar CSV"
+          >
+            <ArrowDownTrayIcon className="icon" aria-hidden="true" />
+            <span>CSV</span>
+          </button>
+          <button
+            className="btn btn--info"
+            onClick={exportPDF}
+            disabled={!filtrados.length}
+            title="Exportar PDF (1 por página)"
+          >
+            <PrinterIcon className="icon" aria-hidden="true" />
+            <span>PDF</span>
           </button>
         </div>
       </header>
