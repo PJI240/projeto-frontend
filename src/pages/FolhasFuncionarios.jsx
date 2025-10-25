@@ -18,10 +18,21 @@ const API_BASE = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "";
 async function fetchJSON(url, init = {}) {
   const r = await fetch(url, { credentials: "include", ...init });
   const data = await r.json().catch(() => null);
-  if (!r.ok || data?.ok === false) {
-    throw new Error(data?.error || `HTTP ${r.status}`);
-  }
+  if (!r.ok || data?.ok === false) throw new Error(data?.error || `HTTP ${r.status}`);
   return data;
+}
+
+// Fallback de nome/CPF vindos de respostas diferentes
+function getDisplayName(row) {
+  return (
+    row?.nome ??
+    row?.funcionario_nome ??
+    row?.pessoa_nome ??
+    (row?.funcionario_id ? `#${row.funcionario_id}` : "—")
+  );
+}
+function getCPF(row) {
+  return row?.cpf ?? row?.pessoa_cpf ?? "—";
 }
 
 export default function FolhasFuncionarios() {
@@ -30,7 +41,7 @@ export default function FolhasFuncionarios() {
 
   // Seletor de folha
   const [folhas, setFolhas] = useState([]); // [{id, competencia, status, empresa_id}]
-  const [folhaId, setFolhaId] = useState(folhaIdParam ? Number(folhaIdParam) : "");
+  const [folhaId, setFolhaId] = useState(folhaIdParam ? Number(folhaIdParam) : null);
   const [folhaInfo, setFolhaInfo] = useState(null);
 
   // Estados base de tela
@@ -71,8 +82,8 @@ export default function FolhasFuncionarios() {
     const q = filter.trim().toLowerCase();
     if (!q) return lista;
     return (lista || []).filter((r) => {
-      const nome = String(r.nome || "").toLowerCase();
-      const cpf = String(r.cpf || "").toLowerCase();
+      const nome = String(getDisplayName(r) || "").toLowerCase();
+      const cpf = String(getCPF(r) || "").toLowerCase();
       return nome.includes(q) || cpf.includes(q);
     });
   }, [filter, lista]);
@@ -92,7 +103,7 @@ export default function FolhasFuncionarios() {
     const arr = Array.isArray(data) ? data : (data.folhas || []);
     setFolhas(arr);
 
-    // Seleciona uma automaticamente se não houver na URL
+    // Seleciona automaticamente se não houver na URL
     if (!folhaId && arr.length > 0) {
       const prefer = arr.find((f) => ["rascunho", "aberta", "aberto"].includes(String(f.status).toLowerCase()));
       const chosen = (prefer || arr[0]).id;
@@ -103,7 +114,7 @@ export default function FolhasFuncionarios() {
   async function carregarFolhaInfo(id) {
     if (!id) { setFolhaInfo(null); return; }
     const info = await fetchJSON(`${API_BASE}/api/folhas/${id}`);
-    setFolhaInfo(info);
+    setFolhaInfo(Array.isArray(info) ? info?.[0] : info); // tolera {..} ou [..]
   }
 
   async function carregarLista(id) {
@@ -117,19 +128,30 @@ export default function FolhasFuncionarios() {
 
   // Inicial
   useEffect(() => {
+    let alive = true;
     (async () => {
       setErr("");
       try {
         await carregarFolhas();
       } catch (e) {
-        setErr(e.message || "Falha ao carregar folhas.");
+        if (alive) setErr(e.message || "Falha ao carregar folhas.");
       }
     })();
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Se URL (:folhaId) mudar externamente, sincroniza o estado
+  useEffect(() => {
+    if (folhaIdParam && Number(folhaIdParam) !== Number(folhaId)) {
+      setFolhaId(Number(folhaIdParam));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folhaIdParam]);
+
   // Reage à mudança da folha
   useEffect(() => {
+    let alive = true;
     (async () => {
       if (!folhaId) return;
       setLoading(true);
@@ -137,15 +159,17 @@ export default function FolhasFuncionarios() {
       try {
         await carregarFolhaInfo(folhaId);
         await carregarLista(folhaId);
+        // ✅ mantém URL no padrão /folhas/:folhaId/funcionarios
         if (String(folhaIdParam || "") !== String(folhaId)) {
-navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
+          navigate(`/folhas/${folhaId}/funcionarios`, { replace: true });
         }
       } catch (e) {
-        setErr(e.message || "Falha ao carregar dados da folha.");
+        if (alive) setErr(e.message || "Falha ao carregar dados da folha.");
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folhaId]);
 
@@ -181,6 +205,7 @@ navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
     clearTimeout(buscaTimer.current);
     buscaTimer.current = setTimeout(() => buscarCandidatosNow(q), 250);
   }
+  useEffect(() => () => clearTimeout(buscaTimer.current), []);
 
   async function incluirFuncionario(c) {
     if (!folhaId) return;
@@ -193,7 +218,7 @@ navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
       });
       setShowForm(false);
       await carregarLista(folhaId);
-      if (liveRef.current) liveRef.current.textContent = `${c.nome} incluído na folha.`;
+      if (liveRef.current) liveRef.current.textContent = `${getDisplayName(c)} incluído na folha.`;
     } catch (e) {
       setErr(e.message || "Falha ao incluir funcionário.");
     } finally {
@@ -203,12 +228,12 @@ navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
 
   async function remover(item) {
     if (!folhaId || !item?.id) return;
-    if (!window.confirm(`Remover ${item.nome} desta folha?`)) return;
+    if (!window.confirm(`Remover ${getDisplayName(item)} desta folha?`)) return;
     setBusy(true);
     try {
       await fetchJSON(`${API_BASE}/api/folhas/${folhaId}/funcionarios/${item.id}`, { method: "DELETE" });
       await carregarLista(folhaId);
-      if (liveRef.current) liveRef.current.textContent = `${item.nome} removido.`;
+      if (liveRef.current) liveRef.current.textContent = `${getDisplayName(item)} removido.`;
     } catch (e) {
       setErr(e.message || "Falha ao remover.");
     } finally {
@@ -319,8 +344,8 @@ navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
           <select
             id="sel_folha"
             className="input input--lg"
-            value={folhaId || ""}
-            onChange={(e) => setFolhaId(e.target.value ? Number(e.target.value) : "")}
+            value={folhaId ?? ""}
+            onChange={(e) => setFolhaId(e.target.value ? Number(e.target.value) : null)}
           >
             <option value="">Selecione…</option>
             {folhas.map((f) => (
@@ -407,58 +432,61 @@ navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
                   </tr>
                 </thead>
                 <tbody>
-                  {filtrados.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          aria-label={`Selecionar ${r.nome}`}
-                          checked={selecionados.includes(r.id)}
-                          onChange={(e) => toggleOne(r.id, e.target.checked)}
-                        />
-                      </td>
-                      <td>
-                        <div className="flex-col">
-                          <strong>{r.nome}</strong>
-                          {r.inconsistencias > 0 && (
-                            <small className="tag-warning">{r.inconsistencias} inconsistência(s)</small>
-                          )}
-                        </div>
-                      </td>
-                      <td>{r.cpf || "—"}</td>
-                      <td className="ta-right tabular">{Number(r.horas_normais || 0).toFixed(2)}</td>
-                      <td className="ta-right tabular">{Number(r.he50_horas || 0).toFixed(2)}</td>
-                      <td className="ta-right tabular">{Number(r.he100_horas || 0).toFixed(2)}</td>
-                      <td className="ta-right tabular">{fmtBRL(r.valor_base)}</td>
-                      <td className="ta-right tabular">{fmtBRL(r.valor_he50)}</td>
-                      <td className="ta-right tabular">{fmtBRL(r.valor_he100)}</td>
-                      <td className="ta-right tabular">{fmtBRL(r.proventos)}</td>
-                      <td className="ta-right tabular">{fmtBRL(r.descontos)}</td>
-                      <td className="ta-right tabular strong">{fmtBRL(r.total_liquido)}</td>
-                      <td>
-                        <div className="actions-buttons">
-                          <button
-                            className="btn btn--neutral btn--sm"
-                            onClick={() => recalcularSelecionados([r.id])}
-                            aria-label={`Recalcular ${r.nome}`}
-                            title="Recalcular"
-                          >
-                            <ArrowPathIcon className="icon" aria-hidden="true" />
-                            <span>Recalcular</span>
-                          </button>
-                          <button
-                            className="btn btn--danger btn--sm"
-                            onClick={() => remover(r)}
-                            aria-label={`Remover ${r.nome}`}
-                            title="Remover"
-                          >
-                            <TrashIcon className="icon" aria-hidden="true" />
-                            <span>Remover</span>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtrados.map((r) => {
+                    const nome = getDisplayName(r);
+                    return (
+                      <tr key={r.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Selecionar ${nome}`}
+                            checked={selecionados.includes(r.id)}
+                            onChange={(e) => toggleOne(r.id, e.target.checked)}
+                          />
+                        </td>
+                        <td>
+                          <div className="flex-col">
+                            <strong>{nome}</strong>
+                            {Number(r.inconsistencias || 0) > 0 && (
+                              <small className="tag-warning">{r.inconsistencias} inconsistência(s)</small>
+                            )}
+                          </div>
+                        </td>
+                        <td>{getCPF(r)}</td>
+                        <td className="ta-right tabular">{Number(r.horas_normais || 0).toFixed(2)}</td>
+                        <td className="ta-right tabular">{Number(r.he50_horas || 0).toFixed(2)}</td>
+                        <td className="ta-right tabular">{Number(r.he100_horas || 0).toFixed(2)}</td>
+                        <td className="ta-right tabular">{fmtBRL(r.valor_base)}</td>
+                        <td className="ta-right tabular">{fmtBRL(r.valor_he50)}</td>
+                        <td className="ta-right tabular">{fmtBRL(r.valor_he100)}</td>
+                        <td className="ta-right tabular">{fmtBRL(r.proventos)}</td>
+                        <td className="ta-right tabular">{fmtBRL(r.descontos)}</td>
+                        <td className="ta-right tabular strong">{fmtBRL(r.total_liquido)}</td>
+                        <td>
+                          <div className="actions-buttons">
+                            <button
+                              className="btn btn--neutral btn--sm"
+                              onClick={() => recalcularSelecionados([r.id])}
+                              aria-label={`Recalcular ${nome}`}
+                              title="Recalcular"
+                            >
+                              <ArrowPathIcon className="icon" aria-hidden="true" />
+                              <span>Recalcular</span>
+                            </button>
+                            <button
+                              className="btn btn--danger btn--sm"
+                              onClick={() => remover(r)}
+                              aria-label={`Remover ${nome}`}
+                              title="Remover"
+                            >
+                              <TrashIcon className="icon" aria-hidden="true" />
+                              <span>Remover</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr>
@@ -491,16 +519,16 @@ navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
           ) : (
             <ul className="cards-grid">
               {filtrados.map((r) => (
-                <li key={r.id} className="usuario-card" aria-label={`Funcionário: ${r.nome}`}>
+                <li key={r.id} className="usuario-card" aria-label={`Funcionário: ${getDisplayName(r)}`}>
                   <div className="usuario-card__head">
-                    <h3 className="usuario-card__title">{r.nome}</h3>
+                    <h3 className="usuario-card__title">{getDisplayName(r)}</h3>
                     <span className="badge ok">{fmtBRL(r.total_liquido)}</span>
                   </div>
                   <div className="usuario-card__body">
                     <dl className="usuario-dl">
                       <div className="usuario-dl__row">
                         <dt>CPF</dt>
-                        <dd>{r.cpf || "—"}</dd>
+                        <dd>{getCPF(r)}</dd>
                       </div>
                       <div className="usuario-dl__row">
                         <dt>Horas</dt>
@@ -587,8 +615,8 @@ navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
                           {candidatos.map((c) => (
                             <li key={c.funcionario_id} className="simple-list__item">
                               <div className="simple-list__content">
-                                <div className="simple-list__title">{c.nome}</div>
-                                <div className="simple-list__subtitle">CPF: {c.cpf || "—"}</div>
+                                <div className="simple-list__title">{getDisplayName(c)}</div>
+                                <div className="simple-list__subtitle">CPF: {getCPF(c)}</div>
                               </div>
                               <div className="simple-list__actions">
                                 <button className="btn btn--success btn--sm" onClick={() => incluirFuncionario(c)}>
