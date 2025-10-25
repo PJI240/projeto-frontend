@@ -63,7 +63,7 @@ export default function FolhasFuncionarios() {
   // Pode editar?
   const canEdit = useMemo(() => {
     const st = String(folhaInfo?.status || "").toLowerCase();
-    return ["rascunho", "aberta", "aberto"].includes(st);
+    return ["rascunho", "ABERTA", "aberto"].includes(st);
   }, [folhaInfo]);
 
   // ----- Utils -----
