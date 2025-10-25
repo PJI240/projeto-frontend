@@ -138,7 +138,7 @@ export default function FolhasFuncionarios() {
         await carregarFolhaInfo(folhaId);
         await carregarLista(folhaId);
         if (String(folhaIdParam || "") !== String(folhaId)) {
-          navigate(`/folhas/${folhaId}/funcionarios`, { replace: true });
+navigate(`/folhas-funcionarios?folhaId=${folhaId}`, { replace: true });
         }
       } catch (e) {
         setErr(e.message || "Falha ao carregar dados da folha.");
