@@ -1,3 +1,4 @@
+// src/pages/Ocorrencias.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeftIcon,
@@ -20,14 +21,17 @@ const API_BASE = (import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "");
 
 /* =================== Utils de Data/Hora =================== */
 function toISO(d) {
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt)) return "";
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
 }
 function fromISO(s) {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
+  const iso = String(s || "").slice(0, 10); // aceita YYYY-MM-DD ou ISO com hora
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y || NaN, (m || 1) - 1, d || 1);
 }
 function startOfWeek(d) {
   const dt = new Date(d);
@@ -43,6 +47,7 @@ function addDays(d, n) {
   return r;
 }
 function formatDateBR(d) {
+  if (!(d instanceof Date) || isNaN(d)) return "—";
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function parseNumber(n) {
@@ -219,7 +224,9 @@ export default function Ocorrencias() {
         + (filtroTipo !== "todos" ? `&tipo=${q(filtroTipo)}` : "")
         + (busca ? `&q=${q(busca)}` : "");
       const r = await api(qs);
-      const items = Array.isArray(r) ? r : (r.ocorrencias || []);
+      const itemsRaw = Array.isArray(r) ? r : (r.ocorrencias || []);
+      // Normaliza a data recebida para 'YYYY-MM-DD'
+      const items = itemsRaw.map(o => ({ ...o, data: toISO(String(o.data || "").slice(0, 10)) }));
       setOcorrencias(items);
       if (liveRef.current) liveRef.current.textContent = "Ocorrências atualizadas.";
     } catch (e) {
@@ -263,19 +270,12 @@ export default function Ocorrencias() {
       horasTotal += parseNumber(o.horas);
       if (parseNumber(o.horas) > 0) presentesSet.add(o.funcionario_id ?? o.funcionarioId ?? o.funcionario);
     }
-    return {
-      total,
-      horasTotal,
-      presentes: presentesSet.size,
-      porTipo,
-    };
+    return { total, horasTotal, presentes: presentesSet.size, porTipo };
   }, [ocorrencias]);
 
   const porTipoArray = useMemo(() => {
     const arr = [];
-    for (const [tipo, qtd] of kpis.porTipo.entries()) {
-      arr.push({ tipo, qtd });
-    }
+    for (const [tipo, qtd] of kpis.porTipo.entries()) arr.push({ tipo, qtd });
     arr.sort((a, b) => b.qtd - a.qtd);
     return arr;
   }, [kpis]);
@@ -292,7 +292,8 @@ export default function Ocorrencias() {
         return nome.toLowerCase().includes(q) || (o.obs || "").toLowerCase().includes(q) || (o.tipo || "").toLowerCase().includes(q);
       });
     }
-    arr.sort((a, b) => (a.data > b.data ? -1 : 1));
+    // datas já normalizadas em YYYY-MM-DD -> string compare funciona
+    arr.sort((a, b) => (b.data || "").localeCompare(a.data || ""));
     return arr;
   }, [ocorrencias, busca, mapFunc]);
   const totalPages = Math.max(1, Math.ceil(filtradas.length / pageSize));
@@ -316,7 +317,7 @@ export default function Ocorrencias() {
     const tipoOk = sanitizeTipo(o.tipo) || (tiposPermitidos[0] || TIPOS_WHITELIST[0]);
     setForm({
       funcionario_id: o.funcionario_id,
-      data: o.data,
+      data: toISO(String(o.data || "").slice(0, 10)), // normaliza para input date
       tipo: tipoOk,
       horas: o.horas ?? "",
       obs: o.obs ?? "",
@@ -333,7 +334,7 @@ export default function Ocorrencias() {
 
       const payload = {
         funcionario_id: Number(form.funcionario_id),
-        data: form.data,
+        data: toISO(String(form.data || "").slice(0, 10)), // garante YYYY-MM-DD
         tipo: tipoVal,
         horas: form.horas === "" ? null : Number(form.horas),
         obs: form.obs || null,
@@ -667,7 +668,7 @@ export default function Ocorrencias() {
                   {o.obs ? <span className="obs">{o.obs}</span> : <span className="muted">—</span>}
                 </div>
 
-                {/* Ações: inline (desktop) + kebab (médio/pequeno) */}
+                {/* Ações */}
                 <div className="td td--actions">
                   <div className="actions-inline">
                     <button className="btn btn--neutral btn--icon" onClick={() => abrirEdicao(o)}>
